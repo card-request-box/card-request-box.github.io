@@ -1,0 +1,1722 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>配布ルーレット</title>
+<meta name="description" content="好きな枠を選んで配布ルーレットに参加できます。早い者勝ちです。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://card-request-box.github.io/roulette.html">
+<meta property="og:title" content="★配布ルーレット">
+<meta property="og:description" content="好きな枠をえらんで参加しよう。抽選時刻になったら自分でルーレットを回せます。">
+<meta property="og:image" content="https://card-request-box.github.io/ogp-roulette.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="★配布ルーレット">
+<meta name="twitter:description" content="好きな枠をえらんで参加しよう。抽選時刻に自分で回せます。">
+<meta name="twitter:image" content="https://card-request-box.github.io/ogp-roulette.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky-top: #0E1633; --sky-bottom: #25346A;
+    --gold: #F2C14E; --gold-deep: #C9962A;
+    --panel: #FBFAF5; --ink: #18213D; --muted: #5C6781; --line: #DADDE5; --soft: #EEF0F6;
+    --ok: #2E8B57; --error: #B3261E; --taken: #C9CFDD; --mine: #F2C14E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: #151F42; --ink: #EEF1FA; --muted: #A3ADC6; --line: #2F3B66; --soft: #1D2850;
+      --ok: #6FD39A; --error: #FF8A80; --taken: #33406A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: #151F42; --ink: #EEF1FA; --muted: #A3ADC6; --line: #2F3B66; --soft: #1D2850;
+    --ok: #6FD39A; --error: #FF8A80; --taken: #33406A;
+  }
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--sky-bottom); }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Meiryo", sans-serif;
+    line-height: 1.7; overflow-x: hidden;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  }
+  .sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .8;
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 78% 12%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 40% 30%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 44%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 6% 62%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 64% 70%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 30% 86%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 92% 90%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 52% 52%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 20% 40%, #FFF4C8 50%, transparent 51%); }
+  .gstar { position: fixed; color: var(--gold); opacity: .85; line-height: 1; pointer-events: none; z-index: 0; }
+
+  main { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; padding: 32px 16px 120px; }
+  header { color: #fff; margin-bottom: 16px; }
+  h1 { font-size: 1.7rem; font-weight: 800; line-height: 1.3; margin: 0 0 6px; }
+  h1 .mark { color: var(--gold); margin-right: 6px; }
+  .lead { color: #C9D1EA; font-size: 0.92rem; margin: 0; }
+  .note { color: #C9D1EA; text-align: center; font-size: .8rem; }
+
+  .panel { background: var(--panel); border-radius: 18px; padding: 16px; box-shadow: 0 0 0 4px rgba(242,193,78,.35); margin-bottom: 16px; }
+  .panel h2 { font-size: 1rem; font-weight: 800; margin: 0 0 8px; }
+
+  /* 一覧 */
+  .cards { display: grid; gap: 14px; }
+  .rcard { display: block; width: 100%; text-align: left; font: inherit; color: var(--ink); padding: 0; border: 0; cursor: pointer;
+    background: var(--panel); border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 4px rgba(242,193,78,.35); }
+  .rcard:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .rcard img { display: block; width: 100%; max-height: 320px; object-fit: contain; background: #0E1633; }
+  .rcard .body { padding: 12px 16px 14px; }
+  .rcard .t { font-size: 1.1rem; font-weight: 800; line-height: 1.4; margin: 0 0 6px; }
+  .rcard .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: .82rem; color: var(--muted); }
+  .badge { display: inline-block; font-size: .78rem; font-weight: 800; padding: 1px 10px; border-radius: 999px; }
+  .b-open { background: var(--gold); color: #2B1F03; }
+  .b-full { background: var(--taken); color: var(--ink); }
+  .b-done { background: var(--ink); color: var(--panel); }
+  .b-wait { background: var(--soft); color: var(--ink); }
+  .rcard.disabled { cursor: not-allowed; }
+  .rcard.disabled .body, .rcard.disabled img { opacity: .55; }
+  .empty { color: #C9D1EA; text-align: center; padding: 30px 0; }
+
+  /* 詳細 */
+  .back { display: inline-block; color: #C9D1EA; font-weight: 700; text-decoration: none; margin-bottom: 10px; background: none; border: 0; font: inherit; cursor: pointer; padding: 4px 0; }
+  .back:focus-visible { outline: 2px solid var(--gold); }
+  .prize { margin-bottom: 14px; }
+  .prize img { display: block; width: 100%; border-radius: 14px; background: #0E1633; }
+  .prize h2 { color: #fff; font-size: 1.35rem; margin: 10px 0 0; line-height: 1.4; }
+
+  .timer { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin: 0 0 16px; padding: 12px 16px; border-radius: 14px;
+    background: rgba(16,25,58,.92); border: 1px solid rgba(242,193,78,.4); color: #fff; }
+  .timer .label { font-size: .8rem; color: #C9D1EA; }
+  .timer .count { font-size: 1.4rem; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .timer.closed .count { color: #fff; font-size: 1.1rem; }
+  .timer .dl { font-size: .8rem; color: #C9D1EA; text-align: right; white-space: pre-line; }
+
+  .rules { margin: 0; padding-left: 1.2em; font-size: .86rem; color: var(--muted); }
+  .rules li { margin: 2px 0; }
+  .rules b { color: var(--ink); }
+
+  .mine { font-size: .88rem; margin: 0 0 10px; }
+  .mine b { color: var(--gold-deep); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .75rem; color: var(--muted); margin: 0 0 10px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; border: 2px solid var(--line); }
+  .legend .l-taken { background: var(--taken); border-color: var(--taken); }
+  .legend .l-mine { background: var(--mine); border-color: var(--mine); }
+  .grid { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+  .slot { aspect-ratio: 1; min-width: 0; border-radius: 8px; border: 2px solid var(--line); background: var(--panel); color: var(--ink);
+    font: inherit; font-size: .8rem; font-weight: 800; display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .slot:hover:not(:disabled) { border-color: var(--gold); }
+  .slot:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+  .slot.taken { background: var(--taken); border-color: var(--taken); color: var(--muted); cursor: not-allowed; }
+  .slot.mine { background: var(--mine); border-color: var(--gold-deep); color: #2B1F03; }
+  .slot.win { box-shadow: 0 0 0 3px #fff, 0 0 12px 4px var(--gold); }
+  .slot.flash { animation: flash .7s ease 2; }
+  @keyframes flash { 50% { background: var(--error); color: #fff; } }
+  .grid.closed .slot:not(.taken):not(.mine) { opacity: .45; cursor: default; }
+  .hint { font-size: .78rem; color: var(--muted); margin: 8px 0 0; }
+  .linkbtn { background: none; border: 0; padding: 0; font: inherit; font-size: .85rem; font-weight: 700; color: var(--gold-deep); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+  /* パネル（下から出る） */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(8,12,30,.55); z-index: 10; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; max-height: 92vh; overflow-y: auto;
+    background: var(--panel); border-radius: 20px 20px 0 0; padding: 18px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 30px rgba(0,0,0,.35); max-width: 560px; margin: 0 auto; animation: up .22s ease; }
+  @keyframes up { from { transform: translateY(40px); opacity: 0; } }
+  .sheet h2 { margin: 0 0 4px; font-size: 1.15rem; }
+  .no { display: inline-block; min-width: 2.4em; text-align: center; background: var(--gold); color: #2B1F03; border-radius: 8px; padding: 0 8px; margin-right: 6px; }
+  .sub { margin: 0 0 12px; font-size: .82rem; color: var(--muted); }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-weight: 700; font-size: .85rem; margin-bottom: 3px; }
+  .ex { font-weight: 400; color: var(--muted); font-size: .75rem; }
+  .field input, .field select { width: 100%; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--gold); }
+  .field input[aria-invalid="true"] { border-color: var(--error); }
+  .at { position: relative; }
+  .at span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 700; }
+  .at input { padding-left: 28px; }
+  .code-box { margin: 12px 0; padding: 10px 12px; border-radius: 12px; background: var(--soft); }
+  .code-box p { margin: 0 0 6px; font-size: .8rem; color: var(--muted); }
+  .warn { font-size: .82rem; color: var(--error); font-weight: 700; margin: 6px 0 10px; }
+  .confirm { list-style: none; margin: 0 0 12px; padding: 0; border: 2px solid var(--line); border-radius: 12px; }
+  .confirm li { display: grid; grid-template-columns: 8.5em 1fr; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .9rem; }
+  .confirm li:first-child { border-top: 0; }
+  .confirm li span { color: var(--muted); font-size: .8rem; }
+  .confirm li b { word-break: break-all; }
+  .btn { display: block; width: 100%; font: inherit; font-weight: 800; font-size: 1rem; border: 0; border-radius: 14px; padding: 13px; cursor: pointer; text-align: center; }
+  .btn.primary { background: var(--gold); color: #2B1F03; box-shadow: 0 5px 0 var(--gold-deep); }
+  .btn.primary:disabled { background: var(--soft); color: var(--muted); box-shadow: none; cursor: default; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 2px solid var(--line); margin-top: 10px; }
+  .btn.small { width: auto; display: inline-block; font-size: .85rem; padding: 7px 14px; border-radius: 10px; margin: 4px 6px 0 0; }
+  .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .status { min-height: 1.4em; margin: 8px 0 0; font-size: .86rem; text-align: center; }
+  .status.error { color: var(--error); font-weight: 700; }
+  .choices { display: grid; gap: 8px; margin: 10px 0; }
+  .choices button { font: inherit; font-weight: 800; padding: 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  .choices button:hover, .choices button:focus-visible { border-color: var(--gold); outline: none; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20;
+    background: var(--ink); color: var(--panel); padding: 10px 16px; border-radius: 12px; font-size: .9rem; font-weight: 700;
+    max-width: calc(100% - 32px); box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+  .toast.err { background: var(--error); color: #fff; }
+
+  /* ルーレット */
+  .wheel-wrap { position: relative; width: min(100%, 420px); margin: 6px auto 12px; aspect-ratio: 1; }
+  .wheel-wrap svg.wheel { width: 100%; height: 100%; display: block; transition: transform 6.5s cubic-bezier(.12,.72,.08,1); }
+  .pointer { position: absolute; left: 50%; top: -8px; transform: translateX(-50%); width: 0; height: 0;
+    border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 30px solid var(--gold);
+    filter: drop-shadow(0 3px 2px rgba(0,0,0,.4)); z-index: 2; }
+  .hub { position: absolute; inset: 0; margin: auto; width: 22%; height: 22%; border-radius: 50%;
+    background: var(--panel); border: 5px solid var(--gold); display: grid; place-items: center; color: var(--gold-deep); font-size: 1.8rem; z-index: 1; }
+  .result { text-align: center; margin: 6px 0 4px; }
+  .result .big { font-size: 1.5rem; font-weight: 800; }
+  .result .big b { color: var(--gold-deep); }
+  .winners { list-style: none; margin: 10px 0 0; padding: 0; }
+  .winners li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--soft); margin-bottom: 6px; font-weight: 700; }
+  .winners li .n { background: var(--gold); color: #2B1F03; border-radius: 8px; padding: 0 8px; min-width: 2.6em; text-align: center; }
+  .winners li .who { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+  .winners li .who small { font-weight: 700; color: var(--muted); font-size: .78rem; word-break: break-all; }
+  .spin-btn { font-size: 1.2rem; padding: 16px; }
+  .myres { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+  .myres li { text-align: center; padding: 12px; border-radius: 14px; font-weight: 800; font-size: 1.15rem; }
+  .myres .hit { background: var(--gold); color: #2B1F03; box-shadow: 0 0 0 3px #fff inset; }
+  .myres .miss { background: var(--soft); color: var(--muted); }
+  .myres small { display: block; font-size: .8rem; font-weight: 700; }
+  .claim-note { margin: -6px 0 16px; padding: 12px 14px; border-radius: 14px; background: rgba(242,193,78,.14); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .88rem; }
+  .claim-note p { margin: 0 0 8px; }
+  .claim-note b { color: var(--gold); }
+  .dm-btn { display: block; text-align: center; text-decoration: none; background: var(--gold); color: #2B1F03; font-weight: 800; border-radius: 12px; padding: 11px; box-shadow: 0 4px 0 var(--gold-deep); }
+  .dm-copy { display: block; width: 100%; margin-top: 8px; font: inherit; font-size: .82rem; font-weight: 800; color: #fff; background: transparent; border: 1px solid rgba(242,193,78,.6); border-radius: 12px; padding: 9px; cursor: pointer; }
+  .dm-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .win-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 10px; border-radius: 10px; background: var(--soft); margin-bottom: 8px; font-size: .9rem; }
+  .win-row .n { background: var(--gold); color: #2B1F03; border-radius: 8px; padding: 0 8px; font-weight: 800; }
+  .win-row .full { flex-basis: 100%; }
+  .win-row a { color: var(--gold-deep); font-weight: 700; }
+
+  /* 管理者 */
+  .adm-item { border-top: 1px dashed var(--line); padding: 12px 0; }
+  .adm-item:first-child { border-top: 0; }
+  .adm-item .t { font-weight: 800; }
+  .adm-item .m { font-size: .8rem; color: var(--muted); }
+  .codes { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .codes li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--soft); }
+  .codes code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.05rem; font-weight: 700; letter-spacing: 1px; }
+  .codes .used code { text-decoration: line-through; opacity: .6; }
+  .codes .handed code { opacity: .75; }
+  .codes .tag { font-size: .75rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+  .next-code { margin: 10px 0 4px; padding: 12px; border-radius: 12px; background: var(--soft); text-align: center; border: 2px solid var(--gold); }
+  .next-code p { margin: 0 0 6px; font-size: .8rem; color: var(--muted); font-weight: 700; }
+  .next-code code { display: block; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; margin-bottom: 6px; user-select: all; }
+  .rcard .mybadge { margin-left: auto; }
+  .period { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; margin: 0 0 12px; }
+  .period .plabel { color: #C9D1EA; font-size: .78rem; font-weight: 700; }
+  .pchips { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(16,25,58,.95); border: 1px solid rgba(242,193,78,.35); }
+  .pchips button { font: inherit; font-size: .78rem; font-weight: 800; color: #C9D1EA; background: transparent; border: 0; border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+  .pchips button[aria-pressed="true"] { background: var(--gold); color: #2B1F03; }
+  .pchips button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  .dm-preview { white-space: pre-wrap; word-break: break-all; text-align: left; font: inherit; font-size: .78rem; color: var(--muted); background: var(--panel); border-radius: 8px; padding: 8px; margin: 0 0 8px; }
+  .codes .to { font-size: .75rem; color: var(--muted); margin-left: 6px; }
+  .cal { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -8px 0 16px; font-size: .8rem; color: #C9D1EA; }
+  .cal a, .cal button { font: inherit; font-size: .8rem; font-weight: 800; color: #fff; background: transparent; border: 1px solid rgba(242,193,78,.6); border-radius: 999px; padding: 5px 12px; text-decoration: none; cursor: pointer; }
+  .contact { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: .85rem; flex-basis: 100%; margin-top: 4px; cursor: pointer; }
+  .contact input { width: 20px; height: 20px; accent-color: var(--ok); }
+  .win-row.done { background: color-mix(in srgb, var(--ok) 14%, var(--soft)); }
+  .b-hit { background: #E5484D; color: #fff; }
+  .b-mine { background: var(--mine); color: #2B1F03; }
+  .preview-img { display: block; max-width: 100%; max-height: 200px; border-radius: 10px; margin-top: 6px; }
+
+  .tabs { display: flex; gap: 6px; padding: 4px; margin: 0 0 20px; background: rgba(16,25,58,.95); border: 1px solid rgba(242,193,78,.35); border-radius: 999px; position: relative; z-index: 2; }
+  .tabs a { flex: 1; text-align: center; padding: 9px 8px; border-radius: 999px; color: #C9D1EA; font-weight: 800; font-size: .9rem; text-decoration: none; line-height: 1.4; }
+  .tabs a:hover { color: #fff; }
+  .tabs a[aria-current="page"] { background: var(--gold); color: #2B1F03; box-shadow: 0 3px 0 var(--gold-deep); }
+  .tabs a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .loginbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -8px 0 16px; padding: 10px 14px; border-radius: 14px; background: rgba(16,25,58,.92); border: 1px solid rgba(242,193,78,.35); color: #fff; font-size: .85rem; }
+  .loginbar .who { min-width: 0; line-height: 1.4; }
+  .loginbar .who b { color: var(--gold); word-break: break-all; }
+  .loginbar .who small { display: block; color: #C9D1EA; font-size: .75rem; }
+  .loginbar .acts { display: flex; gap: 6px; flex-shrink: 0; }
+  .loginbar button { font: inherit; font-weight: 800; font-size: .8rem; border-radius: 999px; padding: 6px 12px; cursor: pointer; border: 1px solid rgba(242,193,78,.6); background: transparent; color: #fff; }
+  .loginbar button.main { background: var(--gold); color: #2B1F03; border-color: var(--gold); }
+  .loginbar button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .prefill { font-size: .8rem; color: var(--ok); font-weight: 700; margin: -4px 0 10px; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .wheel-wrap svg.wheel { transition-duration: .01s; }
+    .sheet, .slot.flash { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+<span class="gstar" style="right:18%;top:3%;font-size:20px" aria-hidden="true">★</span>
+<span class="gstar" style="right:7%;top:14%;font-size:16px" aria-hidden="true">★</span>
+<span class="gstar" style="left:4%;top:58%;font-size:14px" aria-hidden="true">★</span>
+<span class="gstar" style="right:5%;top:72%;font-size:24px" aria-hidden="true">★</span>
+
+<main>
+  <nav class="tabs" aria-label="ページの切り替え">
+    <a href="./">カードリクエスト</a>
+    <a aria-current="page" href="roulette.html">配布ルーレット</a>
+  </nav>
+  <div class="loginbar" id="loginbar">
+    <div class="who" id="login-who"></div>
+    <div class="acts"><button type="button" id="login-out" hidden>ログアウト</button><button type="button" class="main" id="login-open">ログイン</button></div>
+  </div>
+  <header>
+    <h1><span class="mark" aria-hidden="true">★</span><span id="h1-text">配布ルーレット</span></h1>
+    <p class="lead" id="lead">参加したいルーレットを選んでください。</p>
+  </header>
+
+  <!-- ルーレット一覧 -->
+  <section id="list-view">
+    <div class="period" role="group" aria-label="終わったルーレットの表示期間">
+      <span class="plabel">終わったルーレット：過去</span>
+      <div class="pchips" id="period"><button type="button" data-d="1">1日</button><button type="button" data-d="3">3日</button><button type="button" data-d="7">7日</button><button type="button" data-d="30">1か月</button><button type="button" data-d="0">すべて</button></div>
+    </div>
+    <div class="cards" id="cards"></div>
+    <p class="empty" id="list-empty" hidden>いま参加できるルーレットはありません。</p>
+    <p class="note" id="list-hidden" hidden></p>
+  </section>
+
+  <!-- ルーレットの中身 -->
+  <section id="detail-view" hidden>
+    <button type="button" class="back" id="back">← ルーレット一覧にもどる</button>
+    <div class="prize" id="prize"></div>
+
+    <div class="timer" id="timer">
+      <div><div class="label" id="timer-label">抽選まで</div><div class="count" id="count">--</div></div>
+      <div class="dl" id="deadline-text"></div>
+    </div>
+    <div class="cal" id="cal" hidden><span>抽選時刻を忘れないように：</span><a id="cal-google" href="#" target="_blank" rel="noopener">Googleカレンダーに登録</a><button type="button" id="cal-ics">iPhoneのカレンダーに登録</button></div>
+    <div class="claim-note" id="claim-note" hidden>
+      <p>当選した方は、上記の時間が <b>00:00:00</b> になるまでに「<span id="dm-name">そす</span>」までDMを送ってください。</p>
+      <a class="dm-btn" id="dm-link" href="#" target="_blank" rel="noopener">「<span id="dm-name2">そす</span>」にDMを送る</a>
+      <button type="button" class="dm-copy" id="dm-copy" hidden>DMに書く文章をコピー（文章が入っていなかったとき用）</button>
+    </div>
+
+    <section class="panel" id="result-panel" hidden aria-labelledby="result-title">
+      <h2 id="result-title">ルーレット</h2>
+      <div class="wheel-wrap">
+        <div class="pointer" aria-hidden="true"></div>
+        <svg class="wheel" id="wheel" viewBox="-110 -110 220 220" role="img" aria-label="ルーレット"></svg>
+        <div class="hub" aria-hidden="true">★</div>
+      </div>
+      <button type="button" class="btn primary spin-btn" id="spin" hidden>ルーレットを回す</button>
+      <div class="result" id="result" aria-live="polite"></div>
+      <ul class="myres" id="myres"></ul>
+      <ul class="winners" id="winners"></ul>
+      <button type="button" class="btn ghost" id="replay" hidden>もう一度回す</button>
+    </section>
+
+    <section class="panel" aria-labelledby="rules-title">
+      <h2 id="rules-title">参加のしかた</h2>
+      <ol class="rules">
+        <li>下の表から<b>空いている枠</b>をタップ</li>
+        <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
+        <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます</li>
+        <li>合言葉がほしい方は、ポストを<b>引用RP</b>してください（引用RPには <b>#ポケポケトレード</b> と <b>#ポケポケ配布</b> を入れてください）。引用RPのあと、<b>DMで合言葉をお送りします</b></li>
+        <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
+        <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
+        <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
+        <li>入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの人には見えません</li>
+      </ol>
+    </section>
+
+    <section class="panel" aria-labelledby="grid-title">
+      <h2 id="grid-title">枠をえらぶ <span id="left" style="font-weight:700;color:var(--muted);font-size:.85rem"></span></h2>
+      <p class="mine" id="mine" hidden></p>
+      <div class="legend" aria-hidden="true"><span><i></i>空き</span><span><i class="l-taken"></i>うまっている</span><span><i class="l-mine"></i>あなたの枠</span></div>
+      <div class="grid" id="grid" role="group" aria-label="枠の一覧"></div>
+      <p class="hint" id="grid-hint"></p>
+      <p class="hint" id="edit-row"><button type="button" class="linkbtn" id="open-edit">入力した内容を変更する</button></p>
+    </section>
+  </section>
+
+  <!-- 管理者画面 -->
+  <section id="admin-view" hidden>
+    <div class="panel" id="adm-login">
+      <h2>管理者画面</h2>
+      <div class="field"><label for="adm-key">管理キー</label><input type="password" id="adm-key" autocomplete="off"></div>
+      <button type="button" class="btn primary" id="adm-login-btn">ログイン</button>
+      <p class="status" id="adm-login-status" role="status"></p>
+    </div>
+    <div id="adm-main" hidden>
+      <div class="panel">
+        <h2>新しいルーレットを作る</h2>
+        <div class="field"><label for="c-title">タイトル</label><input id="c-title" maxlength="60" placeholder="例：メガルカリオex 配布"></div>
+        <div class="field"><label for="c-img">画像 <span class="ex">（なくてもOK。ないときはタイトルだけ表示）</span></label><input id="c-img" type="file" accept="image/*"><img id="c-img-prev" class="preview-img" alt="" hidden><p class="hint" id="c-copy-note" hidden></p></div>
+        <div class="field"><label for="c-deadline">抽選時刻 <span class="ex">（この時刻で受付終了）</span></label><input id="c-deadline" type="datetime-local"></div>
+        <div class="field"><label for="c-claim">配布期限 <span class="ex">（当選者がDMを送る期限）</span></label><input id="c-claim" type="datetime-local"></div>
+        <div class="field"><label for="c-win">当選数</label><input id="c-win" type="number" min="1" max="100" value="1"></div>
+        <div class="field"><label for="c-slots">枠の数</label><input id="c-slots" type="number" min="1" max="100" value="100"></div>
+        <button type="button" class="btn primary" id="c-create">ルーレットを作る</button>
+        <p class="status" id="c-status" role="status"></p>
+      </div>
+      <div class="panel">
+        <h2>ルーレット一覧</h2>
+        <p class="hint" id="adm-updated" style="margin:-4px 0 6px"></p>
+        <div id="adm-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="note" id="note"></p>
+</main>
+
+<!-- 参加パネル -->
+<div class="sheet-bg" id="sheet-bg" hidden></div>
+<div class="sheet" id="entry-sheet" role="dialog" aria-modal="true" aria-labelledby="entry-title" hidden>
+  <form id="entry-form" novalidate>
+    <div id="entry-step1">
+      <h2 id="entry-title"><span class="no" id="entry-no">1</span>番の枠に参加</h2>
+      <p class="sub">入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの人には見えません（枠にはトレーナーネーム、当選したときは当選者の一覧にXの名前も出ます）。</p>
+      <p class="prefill" id="prefill-note" hidden>ログイン中の内容が入っています。そのままでも、変更してもOKです。</p>
+      <div class="field"><label for="f-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><input id="f-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
+      <div class="field"><label for="f-trainer">トレーナーネーム</label><input id="f-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
+      <div class="field"><label for="f-xname">Xの名前</label><input id="f-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
+      <div class="field"><label for="f-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="f-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
+      <div class="code-box">
+        <p id="code-note">2枠目に参加する人だけ入力してください。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。</p>
+        <div class="field" style="margin:0"><label for="f-code">合言葉 <span class="ex">（2枠目のみ・大文字小文字も正確に）</span></label><input id="f-code" autocomplete="off" maxlength="30" autocapitalize="off" spellcheck="false"></div>
+      </div>
+      <button type="submit" class="btn primary" id="to-confirm">確認する</button>
+      <p class="status" id="entry-status1" role="status"></p>
+      <button type="button" class="btn ghost" data-close>ほかの枠をえらぶ</button>
+    </div>
+    <div id="entry-step2" hidden>
+      <h2><span class="no" id="entry-no2">1</span>番の枠に参加</h2>
+      <p class="sub">入力内容に間違いがないか、よく確認してください。</p>
+      <ul class="confirm" id="entry-confirm"></ul>
+      <p class="warn">※枠はあとから変更できません</p>
+      <button type="button" class="btn primary" id="entry-submit">この内容で参加する</button>
+      <p class="status" id="entry-status2" role="status"></p>
+      <button type="button" class="btn ghost" id="entry-back">入力をなおす</button>
+    </div>
+  </form>
+</div>
+
+<!-- 変更パネル -->
+<div class="sheet" id="edit-sheet" role="dialog" aria-modal="true" aria-labelledby="edit-title" hidden>
+  <div id="edit-step1">
+    <h2 id="edit-title">入力した内容を変更する</h2>
+    <p class="sub">参加したときに入力した4つを、そのまま入れてください。</p>
+    <div class="field"><label for="e-poke">ポケポケのID</label><input id="e-poke" inputmode="numeric" autocomplete="off" maxlength="30"></div>
+    <div class="field"><label for="e-trainer">トレーナーネーム</label><input id="e-trainer" autocomplete="off" maxlength="20"></div>
+    <div class="field"><label for="e-xname">Xの名前</label><input id="e-xname" autocomplete="off" maxlength="50"></div>
+    <div class="field"><label for="e-xid">XのID</label><div class="at"><span aria-hidden="true">@</span><input id="e-xid" autocomplete="off" maxlength="16" autocapitalize="off" spellcheck="false"></div></div>
+    <button type="button" class="btn primary" id="e-lookup">参加している枠をさがす</button>
+    <p class="status" id="edit-status1" role="status"></p>
+    <button type="button" class="btn ghost" data-close>閉じる</button>
+  </div>
+  <div id="edit-step2" hidden>
+    <h2>参加している枠</h2>
+    <p class="sub" id="edit-found"></p>
+    <div class="choices" id="edit-choices"></div>
+    <button type="button" class="btn ghost" data-close>閉じる</button>
+  </div>
+  <div id="edit-step3" hidden>
+    <h2><span class="no" id="edit-no">1</span>番の入力を変更</h2>
+    <p class="sub">枠は変えられません。入力内容だけ直せます。同じ人の枠（2枠参加している場合）は、まとめて変更されます。</p>
+    <div class="field"><label for="n-poke">ポケポケのID</label><input id="n-poke" inputmode="numeric" autocomplete="off" maxlength="30"></div>
+    <div class="field"><label for="n-trainer">トレーナーネーム</label><input id="n-trainer" autocomplete="off" maxlength="20"></div>
+    <div class="field"><label for="n-xname">Xの名前</label><input id="n-xname" autocomplete="off" maxlength="50"></div>
+    <div class="field"><label for="n-xid">XのID</label><div class="at"><span aria-hidden="true">@</span><input id="n-xid" autocomplete="off" maxlength="16" autocapitalize="off" spellcheck="false"></div></div>
+    <button type="button" class="btn primary" id="n-confirm">確認する</button>
+    <p class="status" id="edit-status3" role="status"></p>
+    <button type="button" class="btn ghost" data-close>やめる</button>
+  </div>
+  <div id="edit-step4" hidden>
+    <h2><span class="no" id="edit-no2">1</span>番の入力を変更</h2>
+    <p class="sub">この内容に変更します。よろしいですか？</p>
+    <ul class="confirm" id="edit-confirm"></ul>
+    <button type="button" class="btn primary" id="n-save">変更する</button>
+    <p class="status" id="edit-status4" role="status"></p>
+    <button type="button" class="btn ghost" id="n-back">入力をなおす</button>
+  </div>
+</div>
+
+<!-- 合言葉（管理者） -->
+<div class="sheet" id="codes-sheet" role="dialog" aria-modal="true" aria-labelledby="codes-title" hidden>
+  <h2 id="codes-title">合言葉</h2>
+  <p class="sub" id="codes-sub"></p>
+  <div class="field"><label for="codes-to">渡す相手のXのID <span class="ex">（引用RTしてくれた人。入れておくと同じ人に2つ渡しません）</span></label><div class="at"><span aria-hidden="true">@</span><input id="codes-to" autocomplete="off" maxlength="16" autocapitalize="off" spellcheck="false" placeholder="example_id"></div></div>
+  <button type="button" class="btn primary" id="codes-next">合言葉を出してDM用の文章をコピー</button>
+  <div class="next-code" id="next-code" hidden><p id="next-code-head">DMに貼り付けて送ってください（「渡し済み」にしました）</p><code id="next-code-text"></code><pre class="dm-preview" id="next-dm"></pre><button type="button" class="btn ghost small" id="next-copy">DM用の文章をもう一度コピー</button> <a class="btn ghost small" id="next-profile" href="#" target="_blank" rel="noopener" hidden>相手のXを開く</a></div>
+  <div class="field"><label for="codes-count">足りないときに追加で発行する数</label><input id="codes-count" type="number" min="1" max="100" value="1"></div>
+  <button type="button" class="btn ghost" id="codes-issue">追加で発行する</button>
+  <p class="status" id="codes-status" role="status"></p>
+  <ul class="codes" id="codes-list"></ul>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<!-- ログイン -->
+<div class="sheet" id="login-sheet" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
+  <h2 id="login-title">ログイン</h2>
+  <p class="sub">4つを入力しておくと、このスマホ（ブラウザ）ではどのルーレットでも参加するときに最初から入力された状態になります。入力内容はこのスマホの中にだけ保存されます。</p>
+  <div class="field"><label for="l-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><input id="l-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
+  <div class="field"><label for="l-trainer">トレーナーネーム</label><input id="l-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
+  <div class="field"><label for="l-xname">Xの名前</label><input id="l-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
+  <div class="field"><label for="l-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="l-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
+  <button type="button" class="btn primary" id="l-save">ログインする</button>
+  <p class="status" id="login-status" role="status"></p>
+  <button type="button" class="btn ghost" id="l-logout" hidden>ログアウトする</button>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<!-- 参加者（管理者） -->
+<div class="sheet" id="ent-sheet" role="dialog" aria-modal="true" aria-labelledby="ent-title" hidden>
+  <h2 id="ent-title">参加者</h2>
+  <p class="sub" id="ent-sub"></p>
+  <div id="ent-list"></div>
+  <p class="status" id="ent-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<!-- 当選者（管理者） -->
+<div class="sheet" id="win-sheet" role="dialog" aria-modal="true" aria-labelledby="win-title" hidden>
+  <h2 id="win-title">当選者</h2>
+  <p class="sub" id="win-sub"></p>
+  <div id="win-list"></div>
+  <p class="status" id="win-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<!-- 編集（管理者） -->
+<div class="sheet" id="upd-sheet" role="dialog" aria-modal="true" aria-labelledby="upd-title" hidden>
+  <h2 id="upd-title">ルーレットを編集</h2>
+  <p class="sub" id="upd-sub"></p>
+  <div class="field"><label for="u-title">タイトル</label><input id="u-title" maxlength="60"></div>
+  <div class="field"><label for="u-img">画像を差し替える <span class="ex">（選ばなければそのまま）</span></label><input id="u-img" type="file" accept="image/*"><img id="u-img-prev" class="preview-img" alt="" hidden></div>
+  <div class="field" id="u-rmimg-row"><label><input type="checkbox" id="u-rmimg" style="width:auto"> 画像を消す（タイトルだけにする）</label></div>
+  <div class="field"><label for="u-deadline">抽選時刻</label><input id="u-deadline" type="datetime-local"></div>
+  <div class="field"><label for="u-claim">配布期限</label><input id="u-claim" type="datetime-local"></div>
+  <div class="field"><label for="u-win">当選数</label><input id="u-win" type="number" min="1" max="100"></div>
+  <div class="field"><label for="u-slots">枠の数</label><input id="u-slots" type="number" min="1" max="100"></div>
+  <button type="button" class="btn primary" id="u-save">保存する</button>
+  <p class="status" id="u-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+  // ===== 設定 =====
+  const CONFIG = {
+    // リクエスト箱と同じ Apps Script の「ウェブアプリのURL」
+    GAS_URL: "https://script.google.com/macros/s/AKfycbxfcJFpA0QjPY07_Cw_bJiaeXmeElMYDphnG_cjHZF4X6tf_IAF3ItcBJySQWFuIu6H/exec",
+    POLL_MS: 12000,
+    // 当選者がDMを送る相手（XのユーザーIDの数字と、表示する名前）
+    DM_ID: "1249919714022678528",
+    DM_NAME: "そす",
+    // 合言葉のDMに入れるルーレットのURL
+    PAGE_URL: "https://card-request-box.github.io/roulette.html",
+    // true: 見た目確認用（送信しない・サンプルのデータを使う）
+    PREVIEW: false
+  };
+  // ================
+
+  const $ = (id) => document.getElementById(id);
+  let ADMIN = /[?&]admin\b/.test(location.search);
+  const MY_KEY = "cardRoulette:mine2";
+
+  let list = null;        // ルーレット一覧
+  let cur = null;         // 表示中のルーレット
+  let curId = null;
+  let skew = 0;
+  let selected = null;
+  let spinning = false;
+  let wheelAngle = 0;
+  let adminKey = "";
+  let editCtx = null;
+
+  const now = () => Date.now() + skew;
+  const BUSY_LOAD = "混み合っています。少し待ってから再読み込みしてください。";
+  const txt = (el, s) => { el.textContent = s; return el; };
+  const mk = (tag, cls, s) => { const e = document.createElement(tag); if (cls) e.className = cls; if (s != null) e.textContent = s; return e; };
+
+  // ---- 自分の枠（このブラウザで参加した枠） ----
+  function mineAll() { try { const v = JSON.parse(localStorage.getItem(MY_KEY) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } }
+  function saveMine(rid, slot) {
+    try { const v = mineAll(); v[rid] = (v[rid] || []).concat(slot).filter((x, i, a) => a.indexOf(x) === i); localStorage.setItem(MY_KEY, JSON.stringify(v)); } catch (e) {}
+  }
+  // 当選したときのDM用に、このスマホで入力した内容を覚えておく（このスマホの中だけに保存）
+  const INFO_KEY = "cardRoulette:info";
+  function saveInfo(rid, slot, p) {
+    try { const v = JSON.parse(localStorage.getItem(INFO_KEY) || "{}"); v[rid] = v[rid] || {}; v[rid][slot] = { pokeId: p.pokeId, trainer: p.trainer, xName: p.xName }; localStorage.setItem(INFO_KEY, JSON.stringify(v)); } catch (e) {}
+  }
+  function getInfo(rid, slot) { try { return ((JSON.parse(localStorage.getItem(INFO_KEY) || "{}"))[rid] || {})[slot] || null; } catch (e) { return null; } }
+  // この端末の番号（同じスマホからの参加は2枠まで）
+  const DEVICE = (() => {
+    try {
+      let d = localStorage.getItem("cardRoulette:dev");
+      if (!d) { d = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^\w-]/g, ""); localStorage.setItem("cardRoulette:dev", d); }
+      return d;
+    } catch (e) { return ""; }
+  })();
+  // ルーレットを回したかどうか（回すまでは結果を出さない）
+  // 回した回数（管理者が決めた回数まで回せる）
+  const SPUN_KEY = "cardRoulette:spins";
+  const spunMem = {};
+  function spunCount(rid) { try { const v = JSON.parse(localStorage.getItem(SPUN_KEY) || "{}"); return Math.max(v[rid] || 0, spunMem[rid] || 0); } catch (e) { return spunMem[rid] || 0; } }
+  const hasSpun = (rid) => spunCount(rid) > 0;
+  // 回したあとの結果（一覧に「あたり／はずれ」を出すため）
+  const RESULT_KEY = "cardRoulette:result";
+  function saveResult(rid, mine, won) { try { const v = JSON.parse(localStorage.getItem(RESULT_KEY) || "{}"); v[rid] = { mine, won }; localStorage.setItem(RESULT_KEY, JSON.stringify(v)); } catch (e) {} }
+  function getResult(rid) { try { return (JSON.parse(localStorage.getItem(RESULT_KEY) || "{}"))[rid] || null; } catch (e) { return null; } }
+  let myStatus = {}, lastMyStatus = 0, justJoined = [];
+  function markSpun(rid) { const n = spunCount(rid) + 1; spunMem[rid] = n; try { const v = JSON.parse(localStorage.getItem(SPUN_KEY) || "{}"); v[rid] = n; localStorage.setItem(SPUN_KEY, JSON.stringify(v)); } catch (e) {} }
+  function mySlots() {
+    if (!cur) return [];
+    const set = new Set(cur.taken.map((t) => t[0]));
+    return (mineAll()[cur.id] || []).filter((n) => set.has(n));
+  }
+
+  // ---- 見た目確認用の仮サーバー ----
+  const fake = (() => {
+    const t = Date.now();
+    const names = ["ピカ好き", "リーフ", "ミュウ推し", "ゆうき", "そら", "Kai", "ねこ", "たまご", "ヒカリ", "トウヤ", "ルナ", "ハル", "こはる", "みずき", "ジュン", "Red"];
+    const svg = (a, b, label) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${a}'/><stop offset='1' stop-color='${b}'/></linearGradient></defs><rect width='1200' height='630' fill='url(#g)'/><text x='600' y='300' font-size='88' font-weight='900' fill='#fff' text-anchor='middle' font-family='sans-serif'>${label}</text><text x='600' y='400' font-size='40' fill='#fff' text-anchor='middle' font-family='sans-serif'>（送ってもらった画像がここに出ます）</text></svg>`);
+    const H = 3600e3;
+    const R = [
+      { id: "demo1", title: "メガルカリオex 配布ルーレット", img: svg("#3E6FB0", "#8A63C9", "サンプル画像"), deadline: t + 2 * H + 15 * 60e3, claim: t + 26 * H, slots: 100, winCount: 2, winners: [], drawn: false, visible: true, entries: [] },
+      { id: "demo2", title: "アイリス（トレーナー）配布", img: "", deadline: t + 5 * H, claim: t + 29 * H, slots: 10, winCount: 1, winners: [], drawn: false, visible: true, entries: [] },
+      { id: "demo3", title: "デデンネex ★2色違い 配布", img: svg("#D2557A", "#F2C14E", "サンプル画像"), deadline: t - 60e3, claim: t + 23 * H, slots: 100, winCount: 2, winners: [], drawn: false, visible: true, entries: [] }
+    ];
+    R.push({ id: "demo4", title: "ミライドンex 配布（10日前）", img: "", deadline: t - 10 * 24 * H, claim: t - 9 * 24 * H, slots: 50, winCount: 1, winners: [], drawn: false, visible: true, entries: [] });
+    const addE = (r, slot, name, pid, dev) => r.entries.push({ slot, trainer: name, pokeId: pid, xId: "x" + pid.slice(-4), xName: name, dev: dev || "d" + pid });
+    [3, 7, 12, 18, 21, 25, 33, 40, 41, 47, 52, 58, 66, 71, 77, 89].forEach((n, i) => addE(R[0], n, names[i], String(1000000000000000 + i)));
+    for (let i = 1; i <= 10; i++) addE(R[1], i, names[i], String(2000000000000000 + i));
+    [4, 9, 15, 22, 30, 38, 45, 61].forEach((n, i) => addE(R[2], n, names[i + 3], String(3000000000000000 + i)));
+    // プレビューでは「あなたの枠」を1つ入れておく（あたり・はずれの表示確認用）
+    addE(R[2], 27, "あなた", "3999000011112222", DEVICE);
+    if (CONFIG.PREVIEW) try { const v = mineAll(); v.demo3 = [27]; localStorage.setItem(MY_KEY, JSON.stringify(v)); } catch (e) {}
+    const codes = { "Ab3#kP9x": { rid: "demo1", used: false }, "Zq7!mR2s": { rid: "demo1", used: false } };
+    const same = (a, b) => a.pokeId === b.pokeId || a.xId.toLowerCase() === b.xId.toLowerCase();
+    const sameIn = (e, p) => e.pokeId === p.pokeId && e.trainer === p.trainer && e.xName === p.xName && e.xId.toLowerCase() === p.xId.toLowerCase();
+    const shuffle = (a) => a.sort(() => Math.random() - 0.5);
+    function draw(r) {
+      if (r.drawn || Date.now() <= r.deadline) return;
+      const won = [];
+      // プレビューでは、あたりの表示を見られるように「あなたの枠」を必ず当選にする
+      const pool = shuffle(r.entries.slice()).sort((a, b) => (b.dev === DEVICE) - (a.dev === DEVICE));
+      for (const e of pool) { if (won.length >= r.winCount) break; if (won.some((w) => same(w, e))) continue; won.push(e); }
+      r.winners = won.map((e) => e.slot); r.drawn = true;
+    }
+    const pub = (r) => ({ ok: true, id: r.id, title: r.title, img: r.img, deadline: r.deadline, claim: r.claim, slots: r.slots, winCount: r.winCount, winners: r.winners, drawn: r.drawn, taken: r.entries.map((e) => [e.slot, e.trainer]), winnersInfo: r.drawn ? r.winners.map((s) => { const e = r.entries.find((x) => x.slot === s); return [s, e ? e.trainer : "", e ? e.xName : ""]; }) : [], now: Date.now() });
+    const find = (id) => R.find((r) => r.id === id);
+    const info = (r, s) => { const e = r.entries.find((x) => x.slot === s); return e ? { slot: s, pokeId: e.pokeId, trainer: e.trainer, xName: e.xName, xId: e.xId } : { slot: s }; };
+    return {
+      R,
+      get(p) {
+        R.forEach(draw);
+        if (p.action === "roulettes") return { ok: true, now: Date.now(), items: R.filter((r) => r.visible).map((r) => ({ id: r.id, title: r.title, img: r.img, deadline: r.deadline, claim: r.claim, slots: r.slots, taken: r.entries.length, drawn: r.drawn })) };
+        const r = find(p.id); return r && r.visible ? pub(r) : { ok: false, error: "not_found" };
+      },
+      post(d) {
+        R.forEach(draw);
+        const r = find(d.rid);
+        if (d.action === "rl_entry") {
+          if (!r) return { ok: false, error: "not_found" };
+          if (Date.now() > r.deadline) return { ok: false, error: "closed" };
+          const al = r.entries.find((e) => e.slot === d.slot);
+          if (al && sameIn(al, d)) return { ok: true, slot: d.slot, already: true };
+          if (al) return { ok: false, error: "taken", taken: pub(r).taken };
+          if (r.entries.length >= r.slots) return { ok: false, error: "full" };
+          if (d.dev && r.entries.filter((e) => e.dev === d.dev).length >= 2) return { ok: false, error: "device_limit" };
+          if (r.entries.some((e) => (e.pokeId === d.pokeId) !== (e.xId.toLowerCase() === d.xId.toLowerCase()))) return { ok: false, error: "mismatch" };
+          const mine = r.entries.filter((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() === d.xId.toLowerCase());
+          if (mine.length >= 2) return { ok: false, error: "limit" };
+          if (mine.length) {
+            if (!d.code) return { ok: false, error: "need_code" };
+            const c = codes[d.code]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (c.used) return { ok: false, error: "used_code" }; c.used = true;
+          }
+          r.entries.push({ slot: d.slot, trainer: d.trainer, pokeId: d.pokeId, xId: d.xId, xName: d.xName, dev: d.dev, code: d.code || "" }); return { ok: true, slot: d.slot };
+        }
+        if (d.action === "rl_mystatus") { const out = {}; R.forEach((x) => x.entries.forEach((e) => { if (!sameIn(e, d)) return; const o = out[x.id] = out[x.id] || { slots: [], won: [] }; o.slots.push(e.slot); if (x.drawn && x.winners.indexOf(e.slot) >= 0) o.won.push(e.slot); })); return { ok: true, mine: out }; }
+        if (d.action === "rl_entries") return { ok: true, entries: r.entries.slice().sort((a, b) => a.slot - b.slot).map((e) => ({ slot: e.slot, pokeId: e.pokeId, trainer: e.trainer, xName: e.xName, xId: e.xId, code: !!e.code })) };
+        if (d.action === "rl_codes_next") {
+          const to = (d.to || "").toLowerCase();
+          if (to) { const g = Object.keys(codes).find((c) => codes[c].rid === d.rid && (codes[c].to || "").toLowerCase() === to); if (g) return { ok: false, error: "already_given", code: g, status: codes[g].used ? "使用済み" : "未使用" }; }
+          const k = Object.keys(codes).find((c) => codes[c].rid === d.rid && !codes[c].used && !codes[c].handed); if (!k) return { ok: false, error: "no_code" };
+          codes[k].handed = true; codes[k].to = d.to || ""; return { ok: true, code: k };
+        }
+        if (d.action === "rl_contacted") { r.contacted = (r.contacted || []).filter((n) => n !== d.slot); if (d.on) r.contacted.push(d.slot); return { ok: true }; }
+        if (d.action === "rl_lookup") { const s = r.entries.filter((e) => sameIn(e, d)).map((e) => e.slot); return s.length ? { ok: true, slots: s } : { ok: false, error: "not_found" }; }
+        if (d.action === "rl_edit") {
+          if (Date.now() > r.deadline) return { ok: false, error: "closed" };
+          const tg = r.entries.find((e) => e.slot === d.slot && sameIn(e, d.old)); if (!tg) return { ok: false, error: "not_found" };
+          if (r.entries.some((e) => e !== tg && !same(e, tg) && same(e, d.next))) return { ok: false, error: "conflict" };
+          const mineE = r.entries.filter((e) => e.pokeId === tg.pokeId && e.xId.toLowerCase() === tg.xId.toLowerCase());
+          if (r.entries.some((e) => mineE.indexOf(e) < 0 && (e.pokeId === d.next.pokeId || e.xId.toLowerCase() === d.next.xId.toLowerCase()))) return { ok: false, error: "conflict" };
+          mineE.forEach((e) => Object.assign(e, d.next)); return { ok: true, slots: mineE.map((e) => e.slot) };
+        }
+        if (d.action === "rl_admin_list") return { ok: true, now: Date.now(), items: R.map((x) => ({ id: x.id, title: x.title, img: x.img, deadline: x.deadline, claim: x.claim, slots: x.slots, winCount: x.winCount, visible: x.visible, taken: x.entries.length, winners: x.winners, drawn: x.drawn, contacted: (x.contacted || []).filter((n) => x.winners.indexOf(n) >= 0).length, codesUnused: Object.values(codes).filter((c) => c.rid === x.id && !c.used && !c.handed).length, codesHanded: Object.values(codes).filter((c) => c.rid === x.id && !c.used && c.handed).length, codesUsed: Object.values(codes).filter((c) => c.rid === x.id && c.used).length })) };
+        if (d.action === "rl_codes_issue") { const out = []; for (let i = 0; i < d.count; i++) { const c = Math.random().toString(36).slice(2, 6) + "#" + Math.floor(Math.random() * 90 + 10) + "Q"; codes[c] = { rid: d.rid, used: false }; out.push(c); } return { ok: true, codes: out }; }
+        if (d.action === "rl_codes_list") return { ok: true, codes: Object.entries(codes).filter(([, c]) => c.rid === d.rid).map(([code, c]) => ({ code, status: c.used ? "使用済み" : "未使用", slot: "", handed: !!c.handed, to: c.to || "" })) };
+        if (d.action === "rl_create") { const id = "demo" + (R.length + 1); for (let i = 0; i < d.slots; i++) codes["demo" + (R.length + 1) + "-" + Math.random().toString(36).slice(2, 6) + "#" + (i % 8 + 2)] = { rid: "demo" + (R.length + 1), used: false }; R.push({ id, title: d.title, img: d.image ? "data:" + d.image.type + ";base64," + d.image.data : d.copyFrom ? (find(d.copyFrom) || {}).img || "" : "", deadline: d.deadline, claim: d.claim, slots: d.slots, winCount: d.winCount, winners: [], drawn: false, visible: true, entries: [] }); return { ok: true, id }; }
+        if (d.action === "rl_update") {
+          if (!r) return { ok: false, error: "not_found" };
+          const base = r.drawn ? r.deadline : d.deadline;
+          if (!r.drawn && !(d.deadline > Date.now())) return { ok: false, error: "bad_deadline" };
+          if (!(d.claim > base)) return { ok: false, error: "bad_claim" };
+          r.title = d.title; r.claim = d.claim;
+          if (d.image) r.img = "data:" + d.image.type + ";base64," + d.image.data;
+          if (d.removeImage) r.img = "";
+          if (!r.drawn) { r.deadline = d.deadline; r.winCount = d.winCount; r.slots = d.slots; }
+          return { ok: true, id: r.id };
+        }
+        if (d.action === "rl_visible") { r.visible = !!d.visible; return { ok: true }; }
+        if (d.action === "rl_winners") return { ok: true, drawn: r.drawn, winners: r.winners.map((s) => Object.assign(info(r, s), { contacted: (r.contacted || []).indexOf(s) >= 0 })) };
+        return { ok: false, error: "unknown" };
+      }
+    };
+  })();
+
+  async function apiGet(params) {
+    if (CONFIG.PREVIEW) { await new Promise((r) => setTimeout(r, 250)); return JSON.parse(JSON.stringify(fake.get(params))); }
+    const q = Object.entries(params).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
+    // Apps Scriptはときどき返事が遅い・失敗するので、時間を区切って1回だけやり直す
+    for (let i = 0; ; i++) {
+      // ふだんは1〜3秒で返ってくるので、8秒待っても来なければ止まっているとみなしてやり直す
+      try { return await fetchJson(CONFIG.GAS_URL + "?" + q + "&t=" + Date.now(), {}, 8000); }
+      catch (e) { if (i >= 2) throw e; await new Promise((r) => setTimeout(r, 500)); }
+    }
+  }
+  // 前に読み込んだ内容をこのスマホに残しておき、次に開いたときはすぐ表示する（そのあと最新に更新）
+  const CACHE_PREFIX = "cardRoulette:cache:";
+  function cacheSave(key, data) { try { localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ at: Date.now(), data })); } catch (e) {} }
+  function cacheLoad(key, maxMs) { try { const v = JSON.parse(localStorage.getItem(CACHE_PREFIX + key) || "null"); return v && Date.now() - v.at < maxMs ? v.data : null; } catch (e) { return null; } }
+  async function fetchJson(url, opt, ms) {
+    const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+    try {
+      const res = await fetch(url, Object.assign({}, opt, ctl ? { signal: ctl.signal } : {}));
+      if (!res.ok) throw new Error("http " + res.status);
+      return await res.json();
+    } finally { if (timer) clearTimeout(timer); }
+  }
+  async function apiPost(body) {
+    if (CONFIG.PREVIEW) { await new Promise((r) => setTimeout(r, 350)); return JSON.parse(JSON.stringify(fake.post(body))); }
+    return fetchJson(CONFIG.GAS_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) }, 30000);
+  }
+
+  function fmtTime(ms) {
+    return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(ms));
+  }
+  function fmtLeft(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+    const p = (x) => String(x).padStart(2, "0");
+    return p(h) + ":" + p(m) + ":" + p(sec);
+  }
+
+  // ---- 画面の切り替え ----
+  // 合言葉入りのリンク（#r=ID&c=合言葉）から開いたとき
+  const linkCodes = {};
+  function route() {
+    const m = location.hash.match(/r=([\w-]+)/);
+    const c = location.hash.match(/[#&]c=([^&]+)/);
+    if (m && c) { try { linkCodes[m[1]] = decodeURIComponent(c[1]); } catch (e) {} }
+    closeSheets();
+    if (ADMIN && !m) { showAdmin(); return; }
+    if (m) openDetail(m[1]); else showList();
+  }
+  window.addEventListener("hashchange", route);
+  $("back").addEventListener("click", () => { location.hash = ADMIN ? "" : ""; });
+
+  // ---- 一覧 ----
+  function statusOf(r) {
+    if (now() > r.deadline) return r.drawn ? "done" : "wait";
+    if (r.taken >= r.slots) return "full";
+    return "open";
+  }
+  let listBusy = false;
+  async function showList() {
+    $("list-view").hidden = false; $("detail-view").hidden = true; $("admin-view").hidden = true;
+    txt($("h1-text"), "配布ルーレット"); txt($("lead"), "参加したいルーレットを選んでください。");
+    curId = null; cur = null;
+    renderLoginBar();
+    if (!list) {
+      const c = cacheLoad("list", 30 * 60e3);
+      if (c) { list = c.items; skew = c.skew || 0; renderList(); }
+      else { $("list-empty").hidden = false; txt($("list-empty"), "読み込み中…"); }
+    }
+    if (listBusy) return;
+    listBusy = true;
+    try {
+      const r = await apiGet({ action: "roulettes" });
+      if (!r.ok) throw 0;
+      skew = r.now - Date.now();
+      list = r.items;
+      cacheSave("list", { items: r.items, skew });
+      renderList();
+      txt($("note"), "");
+    } catch (e) {
+      if (!list) { txt($("list-empty"), "つながりにくいため、読み込みをやり直しています…"); setTimeout(() => { if (!curId && !$("list-view").hidden) showList(); }, 3000); }
+      return;
+    } finally { listBusy = false; }
+    // ログイン中なら、どのルーレットに参加しているかをまとめて調べる
+    const prof = getProfile();
+    if (prof && Date.now() - lastMyStatus > 60000) {
+      lastMyStatus = Date.now();
+      try {
+        const m = await apiPost(Object.assign({ action: "rl_mystatus" }, prof));
+        if (m.ok) { myStatus = m.mine; Object.entries(m.mine).forEach(([rid, o]) => o.slots.forEach((sl) => { saveMine(rid, sl); saveInfo(rid, sl, prof); })); renderList(); }
+      } catch (e) { lastMyStatus = 0; }
+    }
+  }
+  // 終わったルーレット（抽選時刻を過ぎたもの）の表示期間。受付中・抽選前のものはいつも表示
+  const PERIOD_KEY = "cardRoulette:period";
+  let periodDays = (() => { try { const v = localStorage.getItem(PERIOD_KEY); return v === null ? 3 : Number(v); } catch (e) { return 3; } })();
+  function renderPeriod() { document.querySelectorAll("#period button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.d) === periodDays))); }
+  document.querySelectorAll("#period button").forEach((b) => b.addEventListener("click", () => {
+    periodDays = Number(b.dataset.d);
+    try { localStorage.setItem(PERIOD_KEY, String(periodDays)); } catch (e) {}
+    renderPeriod(); renderList();
+  }));
+  renderPeriod();
+  const inPeriod = (r) => now() <= r.deadline || periodDays === 0 || now() - r.deadline <= periodDays * 86400e3;
+  function renderList() {
+    if (!list || curId) return;
+    const box = $("cards");
+    box.innerHTML = "";
+    const shown = list.filter(inPeriod);
+    const hiddenN = list.length - shown.length;
+    $("list-empty").hidden = shown.length > 0;
+    txt($("list-empty"), list.length ? "この期間に終わったルーレットはありません。" : "いま参加できるルーレットはありません。");
+    $("list-hidden").hidden = !hiddenN;
+    txt($("list-hidden"), "それより前に終わったルーレットが " + hiddenN + " 件あります（右上の期間を変えると表示されます）。");
+    // 受付中 → 満員 → 抽選前 → 抽選済み（新しい順）
+    const order = { open: 0, full: 1, wait: 2, done: 3 };
+    shown.sort((a, b) => order[statusOf(a)] - order[statusOf(b)] || (statusOf(a) === "done" ? b.deadline - a.deadline : a.deadline - b.deadline)).forEach((r) => {
+      const st = statusOf(r);
+      const joined = ((myStatus[r.id] && myStatus[r.id].slots) || mineAll()[r.id] || []).length > 0;
+      const b = mk("button", "rcard" + (st === "full" && !joined ? " disabled" : ""));
+      b.type = "button";
+      if (r.img) { const im = mk("img"); im.src = r.img; im.alt = r.title; im.loading = "lazy"; b.appendChild(im); }
+      const body = mk("div", "body");
+      body.appendChild(mk("p", "t", r.title));
+      const meta = mk("div", "meta");
+      const badge = { open: ["b-open", "受付中"], full: ["b-full", "満員"], wait: ["b-wait", "まもなく抽選"], done: ["b-done", "抽選済み"] }[st];
+      meta.appendChild(mk("span", "badge " + badge[0], badge[1]));
+      meta.appendChild(mk("span", "", "抽選 " + fmtTime(r.deadline)));
+      meta.appendChild(mk("span", "", "参加 " + r.taken + " / " + r.slots));
+      // 自分の状況
+      let myRow = null;
+      const slotsMine = ((myStatus[r.id] && myStatus[r.id].slots) || mineAll()[r.id] || []).slice().sort((a, b) => a - b);
+      if (slotsMine.length) {
+        let mb;
+        if (!r.drawn) mb = ["b-mine", "参加中（" + slotsMine.map((n) => n + "番").join("・") + "）"];
+        else if (!hasSpun(r.id)) mb = ["b-open", "結果が出ました！回してみよう"];
+        else {
+          const res = myStatus[r.id] ? myStatus[r.id].won : (getResult(r.id) || {}).won;
+          mb = res && res.length ? ["b-hit", "あたり！（" + res.map((n) => n + "番").join("・") + "）"] : ["b-full", "はずれ"];
+        }
+        myRow = mk("div", "meta"); myRow.style.marginTop = "6px"; myRow.appendChild(mk("span", "badge " + mb[0], mb[1]));
+      }
+      body.appendChild(meta);
+      if (myRow) body.appendChild(myRow);
+      b.appendChild(body);
+      if (st === "full" && !joined) { b.disabled = true; b.setAttribute("aria-label", r.title + "（満員のため選べません）"); }
+      else b.addEventListener("click", () => { location.hash = "r=" + r.id; });
+      box.appendChild(b);
+    });
+  }
+
+  // ---- 詳細 ----
+  async function openDetail(id) {
+    $("list-view").hidden = true; $("admin-view").hidden = true; $("detail-view").hidden = false;
+    if (curId !== id) { txt($("count"), "読み込み中…"); txt($("deadline-text"), ""); $("prize").innerHTML = ""; $("prize").dataset.id = ""; cur = null; spinning = false; shownFor = null; $("grid").innerHTML = ""; $("result-panel").hidden = true; $("winners").innerHTML = ""; $("myres").innerHTML = ""; $("result").textContent = ""; $("claim-note").hidden = true; }
+    curId = id;
+    txt($("h1-text"), "配布ルーレット"); txt($("lead"), "好きな枠を選んで参加しよう。早い者勝ちです。");
+    $("back").textContent = ADMIN ? "← 管理者画面にもどる" : "← ルーレット一覧にもどる";
+    renderLoginBar();
+    // 前に開いたことがあれば、まずその内容を表示しておく
+    if (!cur) {
+      const c = cacheLoad("r:" + id, 30 * 60e3);
+      if (c && c.r && c.r.id === id) { cur = c.r; skew = c.skew || 0; renderDetail(); txt($("note"), "最新の状態を確認しています…"); }
+    }
+    await refreshDetail();
+    window.scrollTo(0, 0);
+  }
+  let detailBusy = false, retryTimer = null;
+  async function refreshDetail() {
+    if (!curId || detailBusy) return;
+    detailBusy = true;
+    const want = curId;
+    try {
+      const r = await apiGet({ action: "roulette", id: want });
+      if (!r.ok) { txt($("note"), "このルーレットは見つかりませんでした。"); return; }
+      if (curId !== r.id) return;
+      // 参加した直後に古い空き状況が返ってきても、自分の枠が空きに戻らないようにする
+      justJoined = justJoined.filter((j) => Date.now() - j.at < 20000);
+      justJoined.filter((j) => j.rid === r.id && !r.taken.some((t) => t[0] === j.slot)).forEach((j) => r.taken.push([j.slot, j.trainer]));
+      cur = r; skew = r.now - Date.now();
+      cacheSave("r:" + r.id, { r, skew });
+      txt($("note"), "");
+      renderDetail();
+      findMine();
+    } catch (e) {
+      // まだ何も表示できていないときは、3秒後にもう一度読み込む
+      if (!cur && curId === want) {
+        txt($("count"), "読み込み中…"); txt($("note"), "つながりにくいため、読み込みをやり直しています…");
+        clearTimeout(retryTimer); retryTimer = setTimeout(refreshDetail, 3000);
+      }
+    } finally { detailBusy = false; }
+  }
+  const closed = () => !cur || now() > cur.deadline;
+  const takenMap = () => new Map(cur.taken.map((t) => [t[0], t[1]]));
+
+  function renderDetail() {
+    if (!cur) return;
+    const pz = $("prize");
+    if (pz.dataset.id !== cur.id) {
+      pz.dataset.id = cur.id; pz.innerHTML = "";
+      if (cur.img) { const im = mk("img"); im.src = cur.img; im.alt = cur.title; pz.appendChild(im); }
+      pz.appendChild(mk("h2", "", cur.title));
+    }
+    const isClosed = closed();
+    const map = takenMap();
+    const mine = mySlots();
+    const spun = hasSpun(cur.id);
+    const winners = spun ? (cur.winners || []) : [];
+    const full = map.size >= cur.slots;
+    const grid = $("grid");
+    grid.classList.toggle("closed", isClosed || full);
+    if (grid.children.length !== cur.slots) {
+      grid.innerHTML = "";
+      for (let n = 1; n <= cur.slots; n++) {
+        const b = mk("button", "slot", String(n)); b.type = "button"; b.dataset.n = n;
+        b.addEventListener("click", () => openEntry(n));
+        grid.appendChild(b);
+      }
+    }
+    for (const b of grid.children) {
+      const n = Number(b.dataset.n), who = map.get(n), isMine = mine.indexOf(n) >= 0;
+      b.classList.toggle("taken", !!who && !isMine);
+      b.classList.toggle("mine", isMine);
+      b.classList.toggle("win", winners.indexOf(n) >= 0);
+      b.disabled = isClosed || !!who;
+      b.title = who ? n + "番：" + who : n + "番：空き";
+      b.setAttribute("aria-label", who ? n + "番 " + who + (isMine ? "（あなたの枠）" : "（うまっています）") : n + "番 空き");
+    }
+    txt($("left"), "（空き " + (cur.slots - map.size) + " / " + cur.slots + "）");
+    const mineEl = $("mine");
+    mineEl.hidden = !mine.length;
+    if (mine.length) {
+      mineEl.innerHTML = ""; mineEl.append("あなたの枠：", txt(mk("b"), mine.map((n) => n + "番").join("・")));
+      if (mine.length < 2 && !isClosed) mineEl.append("（合言葉があればもう1枠参加できます）");
+    }
+    txt($("grid-hint"), isClosed ? "受付は終了しました。ご参加ありがとうございました。" : full ? "満員になりました。抽選時刻になるとルーレットを回せます。" : "空き状況は数秒ごとに自動で更新されます。");
+    $("edit-row").hidden = isClosed;
+    renderResultPanel();
+    renderClaim();
+    renderCal();
+    // 送信中は、自分の送った分で枠が埋まって見えることがあるので、ここでは判断しない
+    if (selected && !submitting && (isClosed || map.has(selected))) { if (map.has(selected)) slotTaken(selected); else closeSheets(); }
+  }
+
+  function tick() {
+    if (!cur || $("detail-view").hidden) { if (list && !$("list-view").hidden) renderListTimers(); return; }
+    const t = now();
+    const timer = $("timer");
+    if (t <= cur.deadline) {
+      timer.classList.remove("closed");
+      txt($("timer-label"), "抽選まで");
+      txt($("count"), fmtLeft(cur.deadline - t));
+      txt($("deadline-text"), "抽選時刻\n" + fmtTime(cur.deadline));
+    } else if (cur.claim && t <= cur.claim) {
+      timer.classList.remove("closed");
+      txt($("timer-label"), "配布期限まで");
+      txt($("count"), fmtLeft(cur.claim - t));
+      txt($("deadline-text"), "配布期限\n" + fmtTime(cur.claim));
+    } else {
+      timer.classList.add("closed");
+      txt($("timer-label"), "配布");
+      txt($("count"), "配布期限を過ぎました");
+      txt($("deadline-text"), cur.claim ? "配布期限\n" + fmtTime(cur.claim) : "");
+    }
+    // 抽選時刻・配布期限をまたいだら表示を切り替える
+    const phase = t <= cur.deadline ? 0 : (!cur.claim || t <= cur.claim) ? 1 : 2;
+    if (phase !== lastPhase) { lastPhase = phase; renderDetail(); }
+  }
+  let lastPhase = -1;
+  let lastListRender = 0;
+  function renderListTimers() {
+    // 締め切りをまたいだら並びと表示を更新
+    if (Date.now() - lastListRender > 5000) { lastListRender = Date.now(); renderList(); }
+  }
+
+  // ---- 参加 ----
+  const val = (id) => $(id).value;
+  function readPerson(prefix) {
+    return {
+      pokeId: val(prefix + "poke").normalize("NFKC").replace(/\D/g, ""),
+      trainer: val(prefix + "trainer").normalize("NFKC").trim(),
+      xName: val(prefix + "xname").trim(),
+      xId: val(prefix + "xid").normalize("NFKC").trim().replace(/^@/, "")
+    };
+  }
+  function checkPerson(p, prefix) {
+    const bad = {
+      poke: p.pokeId.length < 8 || p.pokeId.length > 20,
+      trainer: !p.trainer, xname: !p.xName,
+      xid: !/^[A-Za-z0-9_]{1,15}$/.test(p.xId)
+    };
+    Object.keys(bad).forEach((k) => $(prefix + k).setAttribute("aria-invalid", bad[k] ? "true" : "false"));
+    if (bad.poke) return "ポケポケのIDを数字で入力してください。";
+    if (bad.trainer) return "トレーナーネームを入力してください。";
+    if (bad.xname) return "Xの名前を入力してください。";
+    if (bad.xid) return "XのIDは英数字と _ で入力してください（@のあとの部分）。";
+    return "";
+  }
+  function fillConfirm(ul, p, code) {
+    ul.innerHTML = "";
+    const rows = [["ポケポケのID", p.pokeId.replace(/(\d{4})(?=\d)/g, "$1-")], ["トレーナーネーム", p.trainer], ["Xの名前", p.xName], ["XのID", "@" + p.xId]];
+    if (code) rows.push(["合言葉", code]);
+    rows.forEach(([k, v]) => { const li = mk("li"); li.append(mk("span", "", k), mk("b", "", v)); ul.appendChild(li); });
+  }
+  function setStatus(id, t, err) { const s = $(id); s.className = "status" + (err ? " error" : ""); s.textContent = t || ""; }
+
+  function openSheet(id) {
+    closeSheets(true);
+    $(id).hidden = false; $("sheet-bg").hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+  function closeSheets(keepSel) {
+    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet"].forEach((i) => { $(i).hidden = true; });
+    $("sheet-bg").hidden = true;
+    document.body.style.overflow = "";
+    if (!keepSel) selected = null;
+  }
+  // 参加の送信中は画面を閉じない（閉じてほかの枠を選ぶと、前の送信があとから登録されてしまうため）
+  const tryClose = () => { if (submitting) { toast("参加の処理中です。終わるまでお待ちください。", true); return; } closeSheets(); };
+  document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", tryClose));
+  $("sheet-bg").addEventListener("click", tryClose);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") tryClose(); });
+  ["f-xid", "e-xid", "n-xid", "l-xid", "codes-to"].forEach((id) => $(id).addEventListener("input", (e) => { const v = e.target.value.replace(/^[@＠]+/, ""); if (v !== e.target.value) e.target.value = v; }));
+
+  function openEntry(n) {
+    if (submitting) { toast("前の参加の処理中です。少しお待ちください。", true); return; }
+    if (closed() || takenMap().has(n)) return;
+    if (mySlots().length >= 2) { toast("このスマホ（ブラウザ）から参加できるのは2枠までです。", true); return; }
+    selected = n;
+    txt($("entry-no"), n); txt($("entry-no2"), n);
+    $("entry-step1").hidden = false; $("entry-step2").hidden = true;
+    setStatus("entry-status1", ""); setStatus("entry-status2", "");
+    txt($("code-note"), mySlots().length ? "2枠目の参加には合言葉が必要です。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。" : "2枠目に参加する人だけ入力してください。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。");
+    // ログイン中は最初から入力しておく。ログインしていなければ毎回空にする
+    const prof = getProfile();
+    $("f-poke").value = prof ? prof.pokeId : ""; $("f-trainer").value = prof ? prof.trainer : ""; $("f-xname").value = prof ? prof.xName : ""; $("f-xid").value = prof ? prof.xId : "";
+    $("f-code").value = "";
+    ["f-poke", "f-trainer", "f-xname", "f-xid", "f-code"].forEach((id) => $(id).setAttribute("aria-invalid", "false"));
+    $("prefill-note").hidden = !prof;
+    if (linkCodes[cur.id]) { $("f-code").value = linkCodes[cur.id]; txt($("code-note"), "合言葉入りのリンクから開いたので、合言葉が入っています（2枠目のときに使われます）。"); }
+    openSheet("entry-sheet");
+    const first = ["f-poke", "f-trainer", "f-xname", "f-xid"].map($).find((i) => !i.value) || (mySlots().length ? $("f-code") : $("to-confirm"));
+    setTimeout(() => first.focus(), 50);
+  }
+  function slotTaken(n) {
+    closeSheets();
+    toast("ここは既に入力されています。ほかの枠を選んでください。", true);
+    const b = $("grid").querySelector('[data-n="' + n + '"]');
+    if (b) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); }
+  }
+  $("entry-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!selected) return;
+    const p = readPerson("f-");
+    const err = checkPerson(p, "f-");
+    if (err) return setStatus("entry-status1", err, true);
+    fillConfirm($("entry-confirm"), p, $("f-code").value.trim());
+    $("entry-step1").hidden = true; $("entry-step2").hidden = false;
+    $("entry-submit").focus();
+  });
+  $("entry-back").addEventListener("click", () => { $("entry-step2").hidden = true; $("entry-step1").hidden = false; $("f-poke").focus(); });
+  let submitting = false;
+  // 返事が来なかったときに、本当は参加できていたかを確かめる
+  async function joinedAnyway(rid, slot, p) {
+    try { const r = await apiPost(Object.assign({ action: "rl_lookup", rid }, p)); return !!(r.ok && r.slots.indexOf(slot) >= 0); } catch (e) { return false; }
+  }
+  $("entry-submit").addEventListener("click", async () => {
+    if (!selected || !cur || submitting) return;
+    const p = readPerson("f-"), slot = selected, code = $("f-code").value.trim(), rid = cur.id;
+    submitting = true;
+    $("entry-submit").disabled = true; $("entry-back").disabled = true;
+    setStatus("entry-status2", "参加しています…（混み合っているときは30秒ほどかかります。画面を閉じずにお待ちください）");
+    try {
+      let r;
+      try { r = await apiPost(Object.assign({ action: "rl_entry", rid, slot, code, dev: DEVICE }, p)); }
+      catch (e) { r = (await joinedAnyway(rid, slot, p)) ? { ok: true } : { ok: false, error: "net" }; }
+      if (!r.ok && r.error === "busy" && await joinedAnyway(rid, slot, p)) r = { ok: true };
+      if (!cur || cur.id !== rid) return;
+      if (r.ok) {
+        saveMine(cur.id, slot); saveInfo(cur.id, slot, p); cur.taken.push([slot, p.trainer]);
+        justJoined.push({ rid: cur.id, slot, trainer: p.trainer, at: Date.now() });
+        closeSheets(); renderDetail(); $("f-code").value = "";
+        toast(slot + "番で参加しました！"); refreshDetail(); return;
+      }
+      if (r.error === "taken") { if (r.taken) cur.taken = r.taken; renderDetail(); slotTaken(slot); return; }
+      if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは2枠までです。" }[r.error], true); refreshDetail(); return; }
+      const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", used_code: "この合言葉はすでに使われています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
+      if (back) {
+        $("entry-step2").hidden = true; $("entry-step1").hidden = false;
+        setStatus("entry-status1", back, true);
+        if (/code/.test(r.error)) { $("f-code").setAttribute("aria-invalid", "true"); $("f-code").focus(); }
+        return;
+      }
+      setStatus("entry-status2", r.error === "busy" || r.error === "net" ? "混み合っています。少し待ってからもう一度押してください（同じ枠に2回送っても大丈夫です）。" : "参加できませんでした。もう一度お試しください。", true);
+    } catch (e) { setStatus("entry-status2", "混み合っています。少し待ってからもう一度押してください（同じ枠に2回送っても大丈夫です）。", true); }
+    finally { submitting = false; $("entry-submit").disabled = false; $("entry-back").disabled = false; }
+  });
+
+  // ---- 入力内容の変更 ----
+  function editStep(n) { [1, 2, 3, 4].forEach((i) => { $("edit-step" + i).hidden = i !== n; }); }
+  $("open-edit").addEventListener("click", () => {
+    if (closed()) return;
+    editCtx = null; editStep(1); setStatus("edit-status1", "");
+    const prof = getProfile();
+    $("e-poke").value = prof ? prof.pokeId : ""; $("e-trainer").value = prof ? prof.trainer : ""; $("e-xname").value = prof ? prof.xName : ""; $("e-xid").value = prof ? prof.xId : "";
+    openSheet("edit-sheet");
+    // ログイン中なら、そのまま枠をさがす
+    if (prof) $("e-lookup").click(); else setTimeout(() => $("e-poke").focus(), 50);
+  });
+  $("e-lookup").addEventListener("click", async () => {
+    const p = readPerson("e-");
+    const err = checkPerson(p, "e-");
+    if (err) return setStatus("edit-status1", err, true);
+    setStatus("edit-status1", "さがしています…");
+    try {
+      const r = await apiPost(Object.assign({ action: "rl_lookup", rid: cur.id }, p));
+      if (!r.ok) return setStatus("edit-status1", r.error === "busy" ? "混み合っています。少し待ってからもう一度押してください。" : "入力された内容で参加している枠が見つかりません。参加したときと同じ内容か確認してください。", true);
+      editCtx = { old: p, slots: r.slots };
+      r.slots.forEach((s) => { saveMine(cur.id, s); saveInfo(cur.id, s, p); }); renderDetail();
+      txt($("edit-found"), r.slots.map((s) => s + "番").join("・") + " に参加しています。入力を変更しますか？");
+      const box = $("edit-choices"); box.innerHTML = "";
+      const b = mk("button", "", (r.slots.length > 1 ? r.slots.map((s) => s + "番").join("・") + "の入力をまとめて変更する" : r.slots[0] + "番の入力を変更する"));
+      b.type = "button"; b.addEventListener("click", () => startEdit(r.slots[0])); box.appendChild(b);
+      editStep(2);
+    } catch (e) { setStatus("edit-status1", "混み合っています。少し待ってからもう一度押してください。", true); }
+  });
+  function startEdit(slot) {
+    editCtx.slot = slot;
+    const label = editCtx.slots.join("・");
+    txt($("edit-no"), label); txt($("edit-no2"), label);
+    $("n-poke").value = editCtx.old.pokeId; $("n-trainer").value = editCtx.old.trainer; $("n-xname").value = editCtx.old.xName; $("n-xid").value = editCtx.old.xId;
+    setStatus("edit-status3", ""); editStep(3); $("n-poke").focus();
+  }
+  $("n-confirm").addEventListener("click", () => {
+    const p = readPerson("n-");
+    const err = checkPerson(p, "n-");
+    if (err) return setStatus("edit-status3", err, true);
+    editCtx.next = p;
+    fillConfirm($("edit-confirm"), p);
+    setStatus("edit-status4", ""); editStep(4); $("n-save").focus();
+  });
+  $("n-back").addEventListener("click", () => editStep(3));
+  $("n-save").addEventListener("click", async () => {
+    $("n-save").disabled = true; setStatus("edit-status4", "変更しています…");
+    try {
+      const r = await apiPost({ action: "rl_edit", rid: cur.id, slot: editCtx.slot, old: editCtx.old, next: editCtx.next });
+      if (r.ok) {
+        const done = r.slots || editCtx.slots;
+        done.forEach((sl) => { saveMine(cur.id, sl); saveInfo(cur.id, sl, editCtx.next); });
+        // ログイン中の内容で変更した場合は、ログインの内容も新しくする
+        const prof = getProfile();
+        if (prof && prof.pokeId === editCtx.old.pokeId && prof.xId.toLowerCase() === editCtx.old.xId.toLowerCase() && prof.trainer === editCtx.old.trainer && prof.xName === editCtx.old.xName) { setProfile(editCtx.next); renderLoginBar(); }
+        closeSheets(); toast(done.map((sl) => sl + "番").join("・") + "の入力を変更しました。"); ["poke", "trainer", "xname", "xid"].forEach((k) => { $("f-" + k).value = $("n-" + k).value; }); refreshDetail(); return; }
+      setStatus("edit-status4", { conflict: "そのポケポケのIDかXのIDは、ほかの人の枠で使われています。", closed: "抽選時刻を過ぎたため変更できません。", not_found: "枠が見つかりませんでした。最初からやり直してください。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "変更できませんでした。", true);
+    } catch (e) { setStatus("edit-status4", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("n-save").disabled = false; }
+  });
+
+  // ---- ルーレット ----
+  const COLORS = ["#F2C14E", "#3E6FB0", "#D2557A", "#2E8B57", "#8A63C9", "#E07A3F"];
+  const wheelSlots = () => cur.taken.map((t) => t[0]).sort((a, b) => a - b);
+  let wheelFor = null;   // 描いてあるルーレットのID
+  let shownFor = null;   // 結果を表示ずみの状態
+  function drawWheel() {
+    const svg = $("wheel"), ns = "http://www.w3.org/2000/svg";
+    const L = wheelSlots(), n = L.length, r = 100;
+    svg.innerHTML = "";
+    wheelFor = cur.id + ":" + n;
+    if (!n) return;
+    L.forEach((slot, i) => {
+      const a0 = (i / n) * 2 * Math.PI - Math.PI / 2, a1 = ((i + 1) / n) * 2 * Math.PI - Math.PI / 2;
+      const p = document.createElementNS(ns, n === 1 ? "circle" : "path");
+      if (n === 1) p.setAttribute("r", r);
+      else p.setAttribute("d", `M0,0 L${r * Math.cos(a0)},${r * Math.sin(a0)} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${r * Math.cos(a1)},${r * Math.sin(a1)} Z`);
+      p.setAttribute("fill", COLORS[i % COLORS.length]); p.setAttribute("stroke", "#FBFAF5"); p.setAttribute("stroke-width", n > 60 ? 0.3 : 0.8);
+      svg.appendChild(p);
+      if (n <= 60) {
+        const mid = (a0 + a1) / 2, tr = r * 0.8, x = tr * Math.cos(mid), y = tr * Math.sin(mid);
+        const t = document.createElementNS(ns, "text");
+        t.setAttribute("x", x); t.setAttribute("y", y); t.setAttribute("font-size", n > 30 ? 6 : n > 15 ? 8 : 11);
+        t.setAttribute("font-weight", 800); t.setAttribute("fill", "#fff"); t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "central");
+        t.setAttribute("transform", `rotate(${mid * 180 / Math.PI + 90} ${x} ${y})`); t.textContent = slot;
+        svg.appendChild(t);
+      }
+    });
+    const ring = document.createElementNS(ns, "circle");
+    ring.setAttribute("r", 104); ring.setAttribute("fill", "none"); ring.setAttribute("stroke", "#F2C14E"); ring.setAttribute("stroke-width", 6);
+    svg.appendChild(ring);
+  }
+  function resetWheel() { wheelAngle = 0; const w = $("wheel"); w.style.transition = "none"; w.style.transform = "rotate(0deg)"; }
+  function spinTo(slot, animate) {
+    const L = wheelSlots(), i = L.indexOf(slot), n = L.length;
+    const target = 360 - ((i + 0.5) / n) * 360 + (Math.random() - 0.5) * (360 / n) * 0.6;
+    wheelAngle = Math.ceil(wheelAngle / 360) * 360 + (animate ? 360 * 7 : 0) + ((target % 360) + 360) % 360;
+    const svg = $("wheel");
+    svg.style.transition = animate ? "" : "none";
+    svg.style.transform = `rotate(${wheelAngle}deg)`;
+    return new Promise((res) => setTimeout(res, animate ? 6700 : 30));
+  }
+  function renderWinners(upto) {
+    const map = takenMap(), ul = $("winners");
+    ul.innerHTML = "";
+    const info = new Map((cur.winnersInfo || []).map((w) => [w[0], w]));
+    (cur.winners || []).slice(0, upto).forEach((n) => {
+      const w = info.get(n) || [n, map.get(n) || "", ""];
+      const li = mk("li"); const who = mk("span", "who");
+      who.append(mk("b", "", w[1] || map.get(n) || ""));
+      if (w[2]) who.append(mk("small", "", "X：" + w[2]));
+      li.append(mk("span", "n", n + "番"), who); ul.appendChild(li);
+    });
+  }
+  // このブラウザで参加した枠の「あたり・はずれ」
+  function renderMyRes() {
+    const ul = $("myres"); ul.innerHTML = "";
+    const w = cur.winners || [];
+    if (mySlots().length) saveResult(cur.id, mySlots(), mySlots().filter((n) => w.indexOf(n) >= 0));
+    mySlots().forEach((n) => {
+      const hit = w.indexOf(n) >= 0;
+      const li = mk("li", hit ? "hit" : "miss", n + "番　" + (hit ? "あたり！" : "はずれ"));
+      li.appendChild(mk("small", "", hit ? "おめでとうございます！配布期限までにDMを送ってください" : "ご参加ありがとうございました"));
+      ul.appendChild(li);
+    });
+  }
+  function setResultText(k) {
+    const w = cur.winners, map = takenMap(), res = $("result");
+    res.innerHTML = "";
+    const d = mk("div", "big"); d.append(w.length > 1 ? (k + 1) + "人目の当選は " : "当選は ", mk("b", "", w[k] + "番"), "！");
+    res.append(d, mk("div", "", (map.get(w[k]) || "") + " さん"));
+  }
+  function renderResultPanel() {
+    const panel = $("result-panel");
+    if (!closed()) { panel.hidden = true; return; }
+    panel.hidden = false;
+    if (spinning) return;
+    const w = cur.winners || [];
+    const key = cur.id + ":" + w.join(",");
+    if (wheelFor !== cur.id + ":" + cur.taken.length) { drawWheel(); resetWheel(); shownFor = null; }
+    if (!cur.drawn) {
+      $("spin").hidden = true; $("replay").hidden = true; $("winners").innerHTML = ""; $("myres").innerHTML = "";
+      txt($("result"), "抽選しています…少しお待ちください。");
+      return;
+    }
+    if (!w.length) {
+      $("spin").hidden = true; $("replay").hidden = true;
+      txt($("result"), "参加者がいなかったため、抽選はありませんでした。");
+      return;
+    }
+    if (!hasSpun(cur.id)) {
+      $("spin").hidden = false; $("replay").hidden = true;
+      $("winners").innerHTML = ""; $("myres").innerHTML = "";
+      txt($("result"), "抽選時刻になりました！ボタンを押してルーレットを回してください。");
+      return;
+    }
+    if (shownFor === key) return;
+    // 回したあとは結果を表示
+    shownFor = key;
+    $("spin").hidden = true; $("replay").hidden = false;
+    spinTo(w[w.length - 1], false);
+    setResultText(w.length - 1);
+    renderWinners(w.length);
+    renderMyRes();
+  }
+  async function playSpin() {
+    const w = (cur.winners || []).slice();
+    if (!w.length || spinning) return;
+    spinning = true;
+    $("spin").hidden = true; $("replay").hidden = true;
+    $("winners").innerHTML = ""; $("myres").innerHTML = "";
+    drawWheel(); resetWheel();
+    await new Promise((r) => setTimeout(r, 40));
+    for (let k = 0; k < w.length; k++) {
+      txt($("result"), "ルーレットを回しています…");
+      await spinTo(w[k], true);
+      setResultText(k);
+      renderWinners(k + 1);
+      if (k < w.length - 1) await new Promise((r) => setTimeout(r, 1800));
+    }
+    markSpun(cur.id);
+    spinning = false;
+    shownFor = null;
+    renderDetail();
+    if ($("myres").children.length) $("myres").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  $("spin").addEventListener("click", playSpin);
+  $("replay").addEventListener("click", playSpin);
+
+  // 抽選時刻をカレンダーに登録（10分前に通知）
+  function calTimes() {
+    const f = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    return [f(cur.deadline), f(cur.deadline + 15 * 60e3)];
+  }
+  function calDetails() { return "「ルーレットを回す」ボタンが出ます。\n" + CONFIG.PAGE_URL + "#r=" + cur.id; }
+  function renderCal() {
+    const show = !!cur && !closed();
+    $("cal").hidden = !show;
+    if (!show) return;
+    const [a, b] = calTimes();
+    $("cal-google").href = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent("配布ルーレット抽選：" + cur.title) + "&dates=" + a + "/" + b + "&details=" + encodeURIComponent(calDetails());
+  }
+  $("cal-ics").addEventListener("click", () => {
+    if (!cur) return;
+    const [a, b] = calTimes();
+    const esc = (t) => t.replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+    const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//card-roulette//JP", "BEGIN:VEVENT", "UID:" + cur.id + "@card-roulette", "DTSTAMP:" + a, "DTSTART:" + a, "DTEND:" + b,
+      "SUMMARY:" + esc("配布ルーレット抽選：" + cur.title), "DESCRIPTION:" + esc(calDetails()), "URL:" + CONFIG.PAGE_URL + "#r=" + cur.id,
+      "BEGIN:VALARM", "TRIGGER:-PT10M", "ACTION:DISPLAY", "DESCRIPTION:" + esc("まもなく抽選です"), "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const link = document.createElement("a"); link.href = url; link.download = "roulette.ics"; document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  });
+
+  let dmClaimText = "";
+  $("dm-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(dmClaimText); toast("コピーしました。DMの入力欄に貼り付けて送ってください。"); }
+    catch (e) { toast("コピーできませんでした。", true); }
+  });
+  // 当選者への案内（配布期限まで）
+  function renderClaim() {
+    const t = now();
+    const show = closed() && cur.drawn && (cur.winners || []).length && cur.claim && t <= cur.claim;
+    $("claim-note").hidden = !show;
+    if (!show) return;
+    const won = hasSpun(cur.id) ? mySlots().filter((n) => cur.winners.indexOf(n) >= 0) : [];
+    const info = won.map((n) => getInfo(cur.id, n)).find(Boolean) || { pokeId: "", trainer: "", xName: "" };
+    const lines = [
+      "配布ルーレットに当選しました",
+      "「" + cur.title + "」" + (won.length ? won.map((n) => n + "番").join("・") : "　番"),
+      "ポケポケのID：" + info.pokeId.replace(/(\d{4})(?=\d)/g, "$1-"),
+      "トレーナーネーム：" + info.trainer,
+      "Xの名前：" + info.xName
+    ];
+    $("dm-link").hidden = !won.length; $("dm-copy").hidden = !won.length;
+    dmClaimText = lines.join("\n");
+    $("dm-link").href = "https://x.com/messages/compose?recipient_id=" + CONFIG.DM_ID + "&text=" + encodeURIComponent(lines.join("\n"));
+  }
+
+  // ---- ログイン（このブラウザに4つを覚えておく） ----
+  const PROFILE_KEY = "cardRoulette:profile";
+  function getProfile() { try { const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); return p && p.pokeId ? p : null; } catch (e) { return loginMem; } }
+  let loginMem = null;
+  function setProfile(p) { loginMem = p; try { if (p) localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); else localStorage.removeItem(PROFILE_KEY); } catch (e) {} }
+  const lookedUp = new Set();
+  function renderLoginBar() {
+    const bar = $("loginbar"), p = getProfile();
+    bar.hidden = !$("admin-view").hidden;
+    const who = $("login-who"); who.innerHTML = "";
+    if (p) {
+      who.append("ログイン中：", mk("b", "", p.trainer), mk("small", "", "@" + p.xId + "（参加するときに自動で入力されます）"));
+      txt($("login-open"), "変更"); $("login-open").classList.remove("main"); $("login-out").hidden = false;
+    } else {
+      who.append("ログインしていません", mk("small", "", "ログインすると参加するときの入力がいりません"));
+      txt($("login-open"), "ログイン"); $("login-open").classList.add("main"); $("login-out").hidden = true;
+    }
+  }
+  function openLogin() {
+    const p = getProfile() || { pokeId: "", trainer: "", xName: "", xId: "" };
+    $("l-poke").value = p.pokeId; $("l-trainer").value = p.trainer; $("l-xname").value = p.xName; $("l-xid").value = p.xId;
+    txt($("l-save"), getProfile() ? "この内容に変更する" : "ログインする");
+    $("l-logout").hidden = !getProfile();
+    setStatus("login-status", "");
+    openSheet("login-sheet");
+    setTimeout(() => $("l-poke").focus(), 50);
+  }
+  function logout() {
+    setProfile(null); lookedUp.clear(); myStatus = {}; lastMyStatus = 0;
+    // 次に同じスマホを使う人に、前の人の枠や入力内容が出ないように消す
+    try { [MY_KEY, INFO_KEY, RESULT_KEY].forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+    if (cur) { shownFor = null; renderDetail(); } closeSheets(); renderLoginBar(); toast("ログアウトしました。"); }
+  $("login-open").addEventListener("click", openLogin);
+  $("login-out").addEventListener("click", logout);
+  $("l-logout").addEventListener("click", logout);
+  $("l-save").addEventListener("click", () => {
+    const p = readPerson("l-");
+    const err = checkPerson(p, "l-");
+    if (err) return setStatus("login-status", err, true);
+    setProfile(p); lookedUp.clear(); lastMyStatus = 0; closeSheets(); renderLoginBar();
+    toast("ログインしました。");
+    if (cur) findMine(true);
+  });
+  // ログイン中なら、別のスマホで参加した枠も「自分の枠」として見つける（4つとも一致した枠だけ）
+  async function findMine(force) {
+    const p = getProfile();
+    if (!p || !cur || (!force && lookedUp.has(cur.id))) return;
+    lookedUp.add(cur.id);
+    try {
+      const rid = cur.id;
+      const r = await apiPost(Object.assign({ action: "rl_lookup", rid }, p));
+      if (r.ok && cur && cur.id === rid) { r.slots.forEach((s) => { saveMine(rid, s); saveInfo(rid, s, p); }); shownFor = null; renderDetail(); }
+    } catch (e) { lookedUp.delete(cur && cur.id); }
+  }
+
+  // ---- 管理者画面 ----
+  function showAdmin() {
+    $("list-view").hidden = true; $("detail-view").hidden = true; $("admin-view").hidden = false;
+    txt($("h1-text"), "配布ルーレット 管理"); txt($("lead"), "ルーレットの作成・編集、合言葉の発行、当選者の確認ができます。");
+    curId = null; cur = null;
+    renderLoginBar();
+    try { adminKey = adminKey || sessionStorage.getItem("rlAdminKey") || ""; } catch (e) {}
+    if (adminKey || CONFIG.PREVIEW) loadAdmin();
+  }
+  $("adm-login-btn").addEventListener("click", () => { adminKey = $("adm-key").value.trim(); loadAdmin(); });
+  $("adm-key").addEventListener("keydown", (e) => { if (e.key === "Enter") { adminKey = $("adm-key").value.trim(); loadAdmin(); } });
+  async function loadAdmin(quiet) {
+    if (!quiet) setStatus("adm-login-status", "読み込んでいます…");
+    try {
+      const r = await apiPost({ action: "rl_admin_list", key: adminKey });
+      if (quiet && !r.ok && r.error !== "bad_key") return;
+      if (!r.ok) { setStatus("adm-login-status", r.error === "bad_key" ? "管理キーがちがいます。" : "読み込めませんでした。", true); $("adm-login").hidden = false; $("adm-main").hidden = true; return; }
+      try { sessionStorage.setItem("rlAdminKey", adminKey); } catch (e) {}
+      skew = r.now ? r.now - Date.now() : 0;
+      $("adm-login").hidden = true; $("adm-main").hidden = false;
+      renderAdmin(r.items);
+      txt($("adm-updated"), "自動で更新しています（最終更新 " + new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date()) + "）");
+    } catch (e) { if (!quiet) setStatus("adm-login-status", "通信できませんでした。", true); }
+  }
+  function renderAdmin(items) {
+    const box = $("adm-list"); box.innerHTML = "";
+    if (!items.length) { box.appendChild(mk("p", "hint", "まだルーレットがありません。")); return; }
+    items.forEach((r) => {
+      const it = mk("div", "adm-item");
+      it.appendChild(mk("div", "t", r.title + (r.visible ? "" : "（非表示）")));
+      const st0 = now() <= r.deadline ? "受付中" : r.drawn ? (r.winners.length ? "抽選済み：" + r.winners.map((n) => n + "番").join("・") : "抽選済み（参加者なし）") : "まもなく抽選";
+      it.appendChild(mk("div", "m", "抽選 " + fmtTime(r.deadline) + "／配布期限 " + (r.claim ? fmtTime(r.claim) : "未設定")));
+      const st = st0 + (r.drawn && r.winners.length ? "（連絡済み " + (r.contacted || 0) + " / " + r.winners.length + "）" : "");
+      it.appendChild(mk("div", "m", "参加 " + r.taken + " / " + r.slots + "／当選 " + r.winCount + "／" + st));
+      it.appendChild(mk("div", "m", "合言葉：まだ渡していない " + r.codesUnused + "・渡し済み " + (r.codesHanded || 0) + "・使用済み " + r.codesUsed));
+      const btn = (cls, label, fn) => { const b = mk("button", "btn small " + cls, label); b.type = "button"; b.addEventListener("click", fn); it.appendChild(b); };
+      if (r.drawn) btn("primary", "当選者", () => openWinners(r));
+      else btn("primary", "合言葉", () => openCodes(r));
+      btn("ghost", "参加者", () => openEntries(r));
+      btn("ghost", "編集", () => openUpdate(r));
+      btn("ghost", "ページを見る", () => { location.hash = "r=" + r.id; });
+      btn("ghost", "複製", () => copyRoulette(r));
+      if (r.drawn) btn("ghost", "合言葉", () => openCodes(r));
+      btn("ghost", r.visible ? "一覧から隠す" : "一覧に出す", async () => { await apiPost({ action: "rl_visible", key: adminKey, rid: r.id, visible: !r.visible }); loadAdmin(); });
+      box.appendChild(it);
+    });
+  }
+
+  // 日時入力 ⇔ ミリ秒
+  const pad2 = (x) => String(x).padStart(2, "0");
+  function toLocalInput(ms) { const d = new Date(ms); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+  const fromLocalInput = (v) => v ? new Date(v).getTime() : NaN;
+  const ADMIN_ERR = { bad_key: "管理キーがちがいます。", bad_deadline: "抽選時刻は今より後にしてください。", bad_claim: "配布期限は抽選時刻より後にしてください。", bad_slots: "すでに参加者がいる番号より少ない枠の数にはできません。", busy: "混み合っています。少し待ってからもう一度押してください。", invalid: "入力を確認してください。" };
+
+  // ---- 当選者 ----
+  let winFor = null;
+  async function openWinners(r) {
+    winFor = r;
+    txt($("win-sub"), r.title + "（配布期限 " + (r.claim ? fmtTime(r.claim) : "未設定") + "）");
+    setStatus("win-status", "読み込んでいます…");
+    $("win-list").innerHTML = "";
+    openSheet("win-sheet");
+    await loadWinners();
+  }
+  async function loadWinners() {
+    try {
+      const r = await apiPost({ action: "rl_winners", key: adminKey, rid: winFor.id });
+      if (!r.ok) return setStatus("win-status", ADMIN_ERR[r.error] || "読み込めませんでした。", true);
+      setStatus("win-status", "");
+      const box = $("win-list"); box.innerHTML = "";
+      if (!r.winners.length) box.appendChild(mk("p", "hint", r.drawn ? "当選者はいません。" : "まだ抽選していません。"));
+      const row = (w) => {
+        const d = mk("div", "win-row");
+        d.appendChild(mk("span", "n", w.slot + "番"));
+        d.appendChild(mk("b", "", w.trainer || "（入力なし）"));
+        if (w.pokeId) {
+          const id = w.pokeId.replace(/(\d{4})(?=\d)/g, "$1-");
+          const f = mk("span", "full", "ポケポケID：" + id + " ");
+          const c = mk("button", "linkbtn", "コピー"); c.type = "button";
+          c.addEventListener("click", async () => { try { await navigator.clipboard.writeText(w.pokeId); toast("コピーしました：" + id); } catch (e) { toast("コピーできませんでした。長押しで選択してください。", true); } });
+          f.appendChild(c); d.appendChild(f);
+          const x = mk("span", "full", "X：" + (w.xName || "") + " ");
+          const a = mk("a", "", "@" + w.xId); a.href = "https://x.com/" + encodeURIComponent(w.xId); a.target = "_blank"; a.rel = "noopener";
+          x.appendChild(a); d.appendChild(x);
+        }
+        const lab = mk("label", "contact"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!w.contacted;
+        lab.append(cb, "DMが来た（連絡済み）");
+        d.classList.toggle("done", !!w.contacted);
+        cb.addEventListener("change", async () => {
+          cb.disabled = true;
+          try {
+            const res = await apiPost({ action: "rl_contacted", key: adminKey, rid: winFor.id, slot: w.slot, on: cb.checked });
+            if (!res.ok) throw 0;
+            d.classList.toggle("done", cb.checked); loadAdmin();
+          } catch (e) { cb.checked = !cb.checked; toast("混み合っています。少し待ってからもう一度押してください。", true); }
+          finally { cb.disabled = false; }
+        });
+        d.appendChild(lab);
+        return d;
+      };
+      r.winners.forEach((w) => box.appendChild(row(w)));
+      const n = r.winners.filter((w) => w.contacted).length;
+      if (r.winners.length) box.prepend(mk("p", "hint", "連絡済み " + n + " / " + r.winners.length + " 人"));
+    } catch (e) { setStatus("win-status", "混み合っています。少し待ってから開き直してください。", true); }
+  }
+  // ---- 参加者 ----
+  async function openEntries(r) {
+    txt($("ent-sub"), r.title + "（参加 " + r.taken + " / " + r.slots + "）");
+    $("ent-list").innerHTML = ""; setStatus("ent-status", "読み込んでいます…");
+    openSheet("ent-sheet");
+    try {
+      const res = await apiPost({ action: "rl_entries", key: adminKey, rid: r.id });
+      if (!res.ok) return setStatus("ent-status", ADMIN_ERR[res.error] || "読み込めませんでした。", true);
+      setStatus("ent-status", res.entries.length ? "" : "まだ参加者はいません。");
+      const box = $("ent-list");
+      res.entries.forEach((w) => {
+        const d = mk("div", "win-row" + ((r.winners || []).indexOf(w.slot) >= 0 ? " won" : ""));
+        d.appendChild(mk("span", "n", w.slot + "番"));
+        d.appendChild(mk("b", "", w.trainer));
+        if ((r.winners || []).indexOf(w.slot) >= 0) d.appendChild(mk("span", "badge b-hit", "当選"));
+        if (w.code) d.appendChild(mk("span", "badge b-wait", "合言葉で2枠目"));
+        d.appendChild(mk("span", "full", "ポケポケID：" + w.pokeId.replace(/(\d{4})(?=\d)/g, "$1-")));
+        const x = mk("span", "full", "X：" + w.xName + " ");
+        const a = mk("a", "", "@" + w.xId); a.href = "https://x.com/" + encodeURIComponent(w.xId); a.target = "_blank"; a.rel = "noopener";
+        x.appendChild(a); d.appendChild(x);
+        box.appendChild(d);
+      });
+    } catch (e) { setStatus("ent-status", "混み合っています。少し待ってから開き直してください。", true); }
+  }
+
+  // ---- 編集 ----
+  let updFor = null, updImg = null;
+  function openUpdate(r) {
+    updFor = r; updImg = null;
+    const drawn = r.drawn;
+    txt($("upd-sub"), drawn ? "抽選が終わっているので、抽選時刻・当選数・枠の数は変えられません。" : "参加者がいても編集できます。");
+    $("u-title").value = r.title;
+    $("u-deadline").value = toLocalInput(r.deadline);
+    $("u-claim").value = r.claim ? toLocalInput(r.claim) : toLocalInput(r.deadline + 24 * 3600e3);
+    $("u-win").value = r.winCount; $("u-slots").value = r.slots;
+    ["u-deadline", "u-win", "u-slots"].forEach((id) => { $(id).disabled = drawn; });
+    $("u-img").value = ""; $("u-img-prev").hidden = true; $("u-rmimg").checked = false;
+    $("u-rmimg-row").hidden = !r.img;
+    setStatus("u-status", "");
+    openSheet("upd-sheet");
+  }
+  $("u-img").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    updImg = null; $("u-img-prev").hidden = true;
+    if (!f) return;
+    try { updImg = await shrinkImage(f); $("u-img-prev").src = updImg.url; $("u-img-prev").hidden = false; $("u-rmimg").checked = false; }
+    catch (err) { setStatus("u-status", "画像を読み込めませんでした。", true); }
+  });
+  $("u-save").addEventListener("click", async () => {
+    const r = updFor;
+    const title = $("u-title").value.trim();
+    const deadline = r.drawn ? r.deadline : fromLocalInput($("u-deadline").value);
+    const claim = fromLocalInput($("u-claim").value);
+    if (!title) return setStatus("u-status", "タイトルを入力してください。", true);
+    if (!r.drawn && !(deadline > Date.now())) return setStatus("u-status", ADMIN_ERR.bad_deadline, true);
+    if (!(claim > deadline)) return setStatus("u-status", ADMIN_ERR.bad_claim, true);
+    $("u-save").disabled = true; setStatus("u-status", "保存しています…");
+    try {
+      const res = await apiPost({ action: "rl_update", key: adminKey, rid: r.id, title, deadline, claim, winCount: Number($("u-win").value), slots: Number($("u-slots").value),
+        image: updImg ? { type: updImg.type, data: updImg.data } : null, removeImage: !updImg && $("u-rmimg").checked });
+      if (!res.ok) return setStatus("u-status", ADMIN_ERR[res.error] || "保存できませんでした。", true);
+      closeSheets(); toast("保存しました。"); loadAdmin();
+    } catch (e) { setStatus("u-status", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("u-save").disabled = false; }
+  });
+
+  // 画像は送る前に小さくする（長い辺 1200px）
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+        const url = c.toDataURL(type, 0.88);
+        resolve({ type, data: url.split(",")[1], url });
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  let pendingImg = null, copyFrom = null;
+  function clearCopy() { copyFrom = null; $("c-copy-note").hidden = true; }
+  // 前のルーレットを複製（タイトル・画像・当選数・枠の数を引き継ぐ。抽選時刻と配布期限は次の22:00から）
+  function copyRoulette(r) {
+    $("c-title").value = r.title; $("c-win").value = r.winCount; $("c-slots").value = r.slots;
+    $("c-img").value = ""; pendingImg = null;
+    copyFrom = r.img ? r.id : null;
+    $("c-img-prev").hidden = !r.img; if (r.img) $("c-img-prev").src = r.img;
+    $("c-copy-note").hidden = !r.img; txt($("c-copy-note"), "「" + r.title + "」の画像をそのまま使います。別の画像にするときは選び直してください。");
+    initDeadline();
+    setStatus("c-status", "「" + r.title + "」を複製しました。抽選時刻を確認して「ルーレットを作る」を押してください。");
+    $("c-title").scrollIntoView({ behavior: "smooth", block: "center" }); $("c-title").focus({ preventScroll: true });
+  }
+  $("c-img").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    pendingImg = null; $("c-img-prev").hidden = true; clearCopy();
+    if (!f) return;
+    try { pendingImg = await shrinkImage(f); $("c-img-prev").src = pendingImg.url; $("c-img-prev").hidden = false; }
+    catch (err) { setStatus("c-status", "画像を読み込めませんでした。", true); }
+  });
+  function initDeadline() {
+    const d = new Date(); d.setHours(22, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1);
+    $("c-deadline").value = toLocalInput(d.getTime());
+    $("c-claim").value = toLocalInput(d.getTime() + 24 * 3600e3);
+  }
+  initDeadline();
+  // 抽選時刻を変えたら、配布期限も24時間後に合わせる
+  $("c-deadline").addEventListener("change", () => { const t = fromLocalInput($("c-deadline").value); if (t) $("c-claim").value = toLocalInput(t + 24 * 3600e3); });
+  $("c-create").addEventListener("click", async () => {
+    const title = $("c-title").value.trim();
+    const deadline = fromLocalInput($("c-deadline").value);
+    const claim = fromLocalInput($("c-claim").value);
+    if (!title) return setStatus("c-status", "タイトルを入力してください。", true);
+    if (!(deadline > Date.now())) return setStatus("c-status", ADMIN_ERR.bad_deadline, true);
+    if (!(claim > deadline)) return setStatus("c-status", ADMIN_ERR.bad_claim, true);
+    $("c-create").disabled = true; setStatus("c-status", "作成しています…");
+    try {
+      const r = await apiPost({ action: "rl_create", key: adminKey, title, deadline, claim, winCount: Number($("c-win").value), slots: Number($("c-slots").value), image: pendingImg ? { type: pendingImg.type, data: pendingImg.data } : null, copyFrom: pendingImg ? null : copyFrom });
+      if (!r.ok) return setStatus("c-status", ADMIN_ERR[r.error] || "作成できませんでした。入力を確認してください。", true);
+      setStatus("c-status", "作成しました！");
+      $("c-title").value = ""; $("c-img").value = ""; pendingImg = null; $("c-img-prev").hidden = true; clearCopy();
+      loadAdmin();
+    } catch (e) { setStatus("c-status", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("c-create").disabled = false; }
+  });
+
+  let codesFor = null;
+  async function openCodes(r) {
+    codesFor = r;
+    txt($("codes-sub"), r.title + " の合言葉です。ルーレットを作ったときに枠の数と同じ数だけ用意してあります（枠を増やすと自動で足されます）。1つにつき1回だけ使えます。引用RTしてくれた人のXのIDを入れてボタンを押すと、合言葉入りのDM用の文章がコピーされます。");
+    setStatus("codes-status", ""); $("next-code").hidden = true; $("codes-to").value = "";
+    openSheet("codes-sheet");
+    loadCodes();
+  }
+  async function loadCodes() {
+    const r = await apiPost({ action: "rl_codes_list", key: adminKey, rid: codesFor.id });
+    const ul = $("codes-list"); ul.innerHTML = "";
+    if (!r.ok) return;
+    const rank = (c) => c.status !== "未使用" ? 2 : c.handed ? 1 : 0;
+    const counts = [0, 0, 0]; r.codes.forEach((c) => counts[rank(c)]++);
+    txt($("codes-status"), "まだ渡していない " + counts[0] + "・渡し済み " + counts[1] + "・使用済み " + counts[2]);
+    $("codes-status").className = "status";
+    r.codes.slice().sort((a, b) => rank(a) - rank(b)).forEach((c) => {
+      const k = rank(c);
+      const li = mk("li", k === 2 ? "used" : k === 1 ? "handed" : "");
+      const cw = mk("span"); cw.appendChild(mk("code", "", c.code)); if (c.to) cw.appendChild(mk("span", "to", "→ @" + c.to));
+      li.appendChild(cw);
+      if (k === 2) li.appendChild(mk("span", "tag", "使用済み" + (c.slot ? "（" + c.slot + "番）" : "")));
+      else if (k === 1) {
+        const b = mk("button", "btn ghost small", "渡し済み・コピー"); b.type = "button";
+        b.addEventListener("click", () => { showNext(c.code, c.to, "渡し済みの合言葉です" + (c.to ? "（@" + c.to + "）" : "")); copyText(lastDm); });
+        li.appendChild(b);
+      } else li.appendChild(mk("span", "tag", "まだ渡していない"));
+      ul.appendChild(li);
+    });
+    if (!r.codes.length) ul.appendChild(mk("li", "", "まだ発行していません。"));
+  }
+  async function copyText(t, quiet) {
+    try { await navigator.clipboard.writeText(t); toast(quiet ? "DM用の文章をコピーしました。" : "コピーしました：" + t); return true; }
+    catch (e) { if (!quiet) toast("コピーできませんでした。長押しで選択してください。", true); return false; }
+  }
+  let lastDm = "";
+  function dmText(code) {
+    return "合言葉：" + code + "\n\n「" + codesFor.title + "」の2枠目に参加するときに使えます。下のリンクから開くと合言葉が入った状態になります。\n" + CONFIG.PAGE_URL + "#r=" + codesFor.id + "&c=" + encodeURIComponent(code);
+  }
+  function showNext(code, to, head) {
+    lastDm = dmText(code);
+    txt($("next-code-text"), code); txt($("next-dm"), lastDm); txt($("next-code-head"), head);
+    $("next-profile").hidden = !to; if (to) $("next-profile").href = "https://x.com/" + encodeURIComponent(to);
+    $("next-code").hidden = false;
+  }
+  $("codes-next").addEventListener("click", async () => {
+    const to = $("codes-to").value.normalize("NFKC").trim().replace(/^[@＠]+/, "");
+    if (to && !/^[A-Za-z0-9_]{1,15}$/.test(to)) return setStatus("codes-status", "XのIDは英数字と _ で入力してください。", true);
+    $("codes-next").disabled = true;
+    try {
+      const r = await apiPost({ action: "rl_codes_next", key: adminKey, rid: codesFor.id, to });
+      if (r.error === "already_given") {
+        showNext(r.code, to, "@" + to + " さんにはもう渡しています" + (r.status === "使用済み" ? "（使用済み）" : "") + "。同じ合言葉を送り直せます");
+        if (!(await copyText(lastDm, true))) txt($("next-copy"), "DM用の文章をコピー");
+        return;
+      }
+      if (!r.ok) { setStatus("codes-status", r.error === "no_code" ? "まだ渡していない合言葉がありません。下の「追加で発行する」で増やしてください。" : "混み合っています。少し待ってからもう一度押してください。", true); return; }
+      showNext(r.code, to, "DMに貼り付けて送ってください（「渡し済み」にしました）");
+      $("codes-to").value = "";
+      // iPhoneは通信のあとだと自動でコピーできないことがあるので、そのときはボタンで
+      const ok = await copyText(lastDm, true);
+      txt($("next-copy"), ok ? "DM用の文章をもう一度コピー" : "DM用の文章をコピー");
+      if (!ok) txt($("next-code-head"), "合言葉を「渡し済み」にしました。下のボタンでDM用の文章をコピーしてください");
+      await loadCodes(); loadAdmin();
+    } catch (e) { setStatus("codes-status", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("codes-next").disabled = false; }
+  });
+  $("next-copy").addEventListener("click", () => copyText(lastDm));
+  $("codes-issue").addEventListener("click", async () => {
+    $("codes-issue").disabled = true; setStatus("codes-status", "発行しています…");
+    try {
+      const r = await apiPost({ action: "rl_codes_issue", key: adminKey, rid: codesFor.id, count: Number($("codes-count").value) || 1 });
+      setStatus("codes-status", r.ok ? r.codes.length + "個発行しました。" : "発行できませんでした。", !r.ok);
+      await loadCodes(); loadAdmin();
+    } catch (e) { setStatus("codes-status", "通信できませんでした。", true); }
+    finally { $("codes-issue").disabled = false; }
+  });
+
+  // ---- お知らせ ----
+  let toastTimer = null;
+  function toast(text, err) {
+    const t = $("toast"); t.textContent = text; t.className = "toast" + (err ? " err" : ""); t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
+  }
+
+  // ---- 起動 ----
+  (async function init() {
+    if (CONFIG.PREVIEW) {
+      txt($("note"), "見た目確認用のプレビューです（送信はされません）。2枠目の合言葉の例：Ab3#kP9x");
+      const b = mk("button", "btn ghost", "【プレビュー】管理者画面 ⇄ 参加者画面 を切り替える");
+      b.type = "button"; b.style.color = "#fff"; b.style.borderColor = "rgba(255,255,255,.3)";
+      b.addEventListener("click", () => { ADMIN = !ADMIN; if (location.hash) location.hash = ""; else route(); window.scrollTo(0, 0); });
+      $("note").after(b);
+    }
+    txt($("dm-name"), CONFIG.DM_NAME); txt($("dm-name2"), CONFIG.DM_NAME);
+    route();
+    setInterval(tick, 1000);
+    // 管理者画面は10秒ごとに自動で更新
+    setInterval(() => { if (!$("admin-view").hidden && !$("adm-main").hidden && document.visibilityState === "visible") loadAdmin(true); }, 20000);
+    setInterval(() => {
+      if (document.visibilityState !== "visible" || spinning) return;
+      if (curId && !cur) refreshDetail();
+      else if (curId && cur) {
+        const left = cur.deadline - now();
+        if (left > 0 || !cur.drawn || (cur.claim && now() < cur.claim)) refreshDetail();
+      } else if (!$("list-view").hidden) showList();
+    }, CONFIG.POLL_MS);
+    // 締め切りの直後は、すぐに結果を取りに行く
+    setInterval(() => { if (cur && !spinning && now() > cur.deadline && !cur.drawn && document.visibilityState === "visible") refreshDetail(); }, 2500);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (curId) refreshDetail(); } });
+  })();
+</script>
+</body>
+</html>

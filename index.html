@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>カードリクエスト箱</title>
+<meta name="description" content="配布してほしいカードを匿名でリクエストできます。名前もメールアドレスもいりません。">
+<!-- XやLINEにリンクを貼ったときの表示 -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://card-request-box.github.io/">
+<meta property="og:title" content="★カードリクエスト箱">
+<meta property="og:description" content="配布してほしいカードを匿名でリクエストできます。名前もメールアドレスもいりません。">
+<meta property="og:image" content="https://card-request-box.github.io/ogp.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="★カードリクエスト箱">
+<meta name="twitter:description" content="配布してほしいカードを匿名でリクエストできます。">
+<meta name="twitter:image" content="https://card-request-box.github.io/ogp.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky-top: #0E1633;
+    --sky-bottom: #25346A;
+    --star: #FFF4C8;
+    --gold: #F2C14E;
+    --gold-deep: #C9962A;
+    --panel: #FBFAF5;
+    --ink: #18213D;
+    --muted: #5C6781;
+    --line: #DADDE5;
+    --soft: #EEF0F6;
+    --ok: #2E8B57;
+    --error: #B3261E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: #151F42; --ink: #EEF1FA; --muted: #A3ADC6; --line: #2F3B66; --soft: #1D2850;
+      --ok: #6FD39A; --error: #FF8A80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: #151F42; --ink: #EEF1FA; --muted: #A3ADC6; --line: #2F3B66; --soft: #1D2850;
+    --ok: #6FD39A; --error: #FF8A80;
+  }
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--sky-bottom); }
+  body {
+    margin: 0; min-height: 100vh;
+    background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+    color: var(--ink);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Meiryo", sans-serif;
+    line-height: 1.7;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+    overflow-x: hidden;
+  }
+
+  /* 夜空の星 */
+  .sky { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .sky::before, .sky::after { content: ""; position: absolute; left: 0; top: 0; border-radius: 50%; }
+  .sky::before { width: 1px; height: 1px; box-shadow: 663px 1941px rgba(255,248,220,.75),308px 808px rgba(255,248,220,.75),1333px 98px rgba(255,248,220,.75),148px 1681px rgba(255,248,220,.75),1097px 192px rgba(255,248,220,.75),748px 1193px rgba(255,248,220,.75),118px 1863px rgba(255,248,220,.75),1039px 439px rgba(255,248,220,.75),76px 176px rgba(255,248,220,.75),888px 856px rgba(255,248,220,.75),143px 492px rgba(255,248,220,.75),185px 1128px rgba(255,248,220,.75),869px 121px rgba(255,248,220,.75),1158px 253px rgba(255,248,220,.75),457px 1291px rgba(255,248,220,.75),1284px 1193px rgba(255,248,220,.75),126px 1181px rgba(255,248,220,.75),1199px 812px rgba(255,248,220,.75),101px 1999px rgba(255,248,220,.75),452px 95px rgba(255,248,220,.75),1140px 1758px rgba(255,248,220,.75),272px 593px rgba(255,248,220,.75),858px 295px rgba(255,248,220,.75),1107px 241px rgba(255,248,220,.75),1169px 631px rgba(255,248,220,.75),1147px 1671px rgba(255,248,220,.75),1396px 370px rgba(255,248,220,.75),211px 1191px rgba(255,248,220,.75),1169px 1308px rgba(255,248,220,.75),384px 762px rgba(255,248,220,.75),199px 1121px rgba(255,248,220,.75),1458px 128px rgba(255,248,220,.75),1155px 122px rgba(255,248,220,.75),1267px 421px rgba(255,248,220,.75),1016px 1393px rgba(255,248,220,.75),1088px 875px rgba(255,248,220,.75),1591px 643px rgba(255,248,220,.75),953px 1199px rgba(255,248,220,.75),928px 740px rgba(255,248,220,.75),613px 508px rgba(255,248,220,.75),368px 1431px rgba(255,248,220,.75),1597px 499px rgba(255,248,220,.75),167px 1176px rgba(255,248,220,.75),614px 1075px rgba(255,248,220,.75),1013px 1792px rgba(255,248,220,.75),703px 1493px rgba(255,248,220,.75),919px 589px rgba(255,248,220,.75),1247px 149px rgba(255,248,220,.75),241px 1048px rgba(255,248,220,.75),856px 337px rgba(255,248,220,.75),1550px 700px rgba(255,248,220,.75),311px 1911px rgba(255,248,220,.75),1001px 863px rgba(255,248,220,.75),80px 1970px rgba(255,248,220,.75),1368px 158px rgba(255,248,220,.75),1565px 1142px rgba(255,248,220,.75),1173px 1616px rgba(255,248,220,.75),642px 696px rgba(255,248,220,.75),1423px 717px rgba(255,248,220,.75),1217px 1017px rgba(255,248,220,.75),1187px 1632px rgba(255,248,220,.75),934px 140px rgba(255,248,220,.75),191px 1934px rgba(255,248,220,.75),552px 970px rgba(255,248,220,.75),1427px 1360px rgba(255,248,220,.75),133px 124px rgba(255,248,220,.75),1497px 1436px rgba(255,248,220,.75),634px 1325px rgba(255,248,220,.75),1183px 1395px rgba(255,248,220,.75),912px 582px rgba(255,248,220,.75),1467px 790px rgba(255,248,220,.75),1369px 710px rgba(255,248,220,.75),46px 1926px rgba(255,248,220,.75),945px 727px rgba(255,248,220,.75),344px 1251px rgba(255,248,220,.75),239px 1011px rgba(255,248,220,.75),120px 446px rgba(255,248,220,.75),1573px 588px rgba(255,248,220,.75),264px 1512px rgba(255,248,220,.75),507px 814px rgba(255,248,220,.75),800px 1877px rgba(255,248,220,.75),1016px 165px rgba(255,248,220,.75),340px 919px rgba(255,248,220,.75),822px 1125px rgba(255,248,220,.75),569px 1809px rgba(255,248,220,.75),280px 1677px rgba(255,248,220,.75),881px 1769px rgba(255,248,220,.75),1126px 570px rgba(255,248,220,.75),1446px 850px rgba(255,248,220,.75),734px 1398px rgba(255,248,220,.75),779px 1961px rgba(255,248,220,.75),472px 309px rgba(255,248,220,.75),169px 360px rgba(255,248,220,.75),309px 475px rgba(255,248,220,.75),1348px 477px rgba(255,248,220,.75),24px 993px rgba(255,248,220,.75),1206px 373px rgba(255,248,220,.75),538px 577px rgba(255,248,220,.75),8px 298px rgba(255,248,220,.75),858px 1094px rgba(255,248,220,.75),756px 1248px rgba(255,248,220,.75),1159px 652px rgba(255,248,220,.75),257px 1414px rgba(255,248,220,.75),1055px 1946px rgba(255,248,220,.75),1264px 1341px rgba(255,248,220,.75),1384px 1515px rgba(255,248,220,.75),110px 935px rgba(255,248,220,.75),1597px 1949px rgba(255,248,220,.75),1393px 1634px rgba(255,248,220,.75),1145px 803px rgba(255,248,220,.75),815px 817px rgba(255,248,220,.75),807px 212px rgba(255,248,220,.75),986px 1299px rgba(255,248,220,.75),820px 127px rgba(255,248,220,.75),390px 137px rgba(255,248,220,.75),427px 902px rgba(255,248,220,.75),332px 225px rgba(255,248,220,.75),696px 1230px rgba(255,248,220,.75),107px 209px rgba(255,248,220,.75),0px 1160px rgba(255,248,220,.75),309px 1098px rgba(255,248,220,.75),207px 1943px rgba(255,248,220,.75),744px 1256px rgba(255,248,220,.75),52px 144px rgba(255,248,220,.75),425px 1257px rgba(255,248,220,.75),770px 304px rgba(255,248,220,.75),1299px 516px rgba(255,248,220,.75),711px 1233px rgba(255,248,220,.75),745px 971px rgba(255,248,220,.75),251px 236px rgba(255,248,220,.75),999px 954px rgba(255,248,220,.75),983px 990px rgba(255,248,220,.75),638px 175px rgba(255,248,220,.75),295px 209px rgba(255,248,220,.75),1535px 701px rgba(255,248,220,.75),1516px 542px rgba(255,248,220,.75),980px 1697px rgba(255,248,220,.75),1417px 330px rgba(255,248,220,.75),1057px 47px rgba(255,248,220,.75),420px 1947px rgba(255,248,220,.75); }
+  .sky::after  { width: 2px; height: 2px; box-shadow: 1081px 740px rgba(255,244,200,.95),300px 1413px rgba(255,244,200,.95),1112px 1872px rgba(255,244,200,.95),55px 1552px rgba(255,244,200,.95),1081px 610px rgba(255,244,200,.95),1316px 1768px rgba(255,244,200,.95),186px 1425px rgba(255,244,200,.95),534px 1061px rgba(255,244,200,.95),751px 1860px rgba(255,244,200,.95),342px 728px rgba(255,244,200,.95),1580px 456px rgba(255,244,200,.95),1090px 1109px rgba(255,244,200,.95),1595px 1029px rgba(255,244,200,.95),675px 1303px rgba(255,244,200,.95),456px 1255px rgba(255,244,200,.95),1553px 1746px rgba(255,244,200,.95),399px 1650px rgba(255,244,200,.95),490px 1675px rgba(255,244,200,.95),820px 1515px rgba(255,244,200,.95),464px 409px rgba(255,244,200,.95),1060px 1009px rgba(255,244,200,.95),728px 1497px rgba(255,244,200,.95),59px 57px rgba(255,244,200,.95),572px 967px rgba(255,244,200,.95),530px 396px rgba(255,244,200,.95),1418px 1239px rgba(255,244,200,.95),705px 915px rgba(255,244,200,.95),1480px 715px rgba(255,244,200,.95),746px 164px rgba(255,244,200,.95),451px 209px rgba(255,244,200,.95),464px 962px rgba(255,244,200,.95),402px 691px rgba(255,244,200,.95),418px 988px rgba(255,244,200,.95),1278px 1843px rgba(255,244,200,.95),1249px 1721px rgba(255,244,200,.95),3px 981px rgba(255,244,200,.95),1337px 704px rgba(255,244,200,.95),1317px 173px rgba(255,244,200,.95),1352px 245px rgba(255,244,200,.95),795px 1602px rgba(255,244,200,.95); }
+  .gstar { position: absolute; color: var(--gold); opacity: .85; line-height: 1; }
+
+  main { position: relative; z-index: 1; max-width: 440px; margin: 0 auto; padding: 36px 18px 48px; }
+
+  header { color: #fff; margin-bottom: 22px; }
+  h1 { font-size: 1.7rem; font-weight: 800; line-height: 1.3; margin: 0 0 6px; }
+  h1 .mark { color: var(--gold); margin-right: 6px; }
+  .lead { color: #C9D1EA; font-size: 0.92rem; margin: 0; }
+
+  /* 今週の注目カード */
+  .trend { margin-bottom: 18px; padding: 14px 14px 10px; border-radius: 16px;
+    background: rgba(16,25,58,.92); border: 1px solid rgba(242,193,78,.35); color: #fff; }
+  .trend h2 { font-size: 0.98rem; font-weight: 800; margin: 0 0 2px; }
+  .trend h2 span { color: var(--gold); }
+  .trend .sub { color: #C9D1EA; font-size: 0.78rem; margin: 0 0 8px; }
+  .trend ol { list-style: none; margin: 0; padding: 0; }
+  .trend li { margin: 0; }
+  .trend button {
+    width: 100%; display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px;
+    font: inherit; text-align: left; color: #fff; background: transparent; border: 0;
+    padding: 7px 4px; border-top: 1px solid rgba(255,255,255,.1); cursor: pointer; border-radius: 8px;
+  }
+  .trend li:first-child button { border-top: 0; }
+  .trend button:hover { background: rgba(255,255,255,.08); }
+  .trend button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .trend .rank { font-weight: 800; color: var(--gold); text-align: center; }
+  .trend .nm { font-weight: 700; font-size: 0.92rem; }
+  .trend .mt { color: #C9D1EA; font-size: 0.72rem; text-align: right; }
+
+  .panel { background: var(--panel); border-radius: 18px; padding: 20px 16px 18px; box-shadow: 0 0 0 4px rgba(242,193,78,.35); }
+
+  .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px dashed var(--line); }
+  .step:last-of-type { border-bottom: 0; margin-bottom: 8px; padding-bottom: 6px; }
+  .num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--soft); color: var(--muted); font-weight: 800; font-size: 0.9rem;
+  }
+  .step.is-done .num { background: var(--gold); color: #3A2A05; }
+  .step h2 { font-size: 1rem; font-weight: 800; margin: 2px 0 8px; line-height: 1.4; }
+  .opt { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+  .hint { font-size: 0.8rem; color: var(--muted); margin: 6px 0 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: inherit; font-size: 0.82rem; font-weight: 700;
+    padding: 6px 12px; border-radius: 999px;
+    border: 2px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
+  .chip:disabled { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
+  .chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+  input[type="text"], textarea {
+    width: 100%; font: inherit; color: var(--ink); background: var(--panel);
+    border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--gold); }
+  .count { text-align: right; font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+  .pack-filter { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 0.85rem; color: var(--muted); font-weight: 700; }
+  .pack-filter select {
+    flex: 1; min-width: 0; font: inherit; font-weight: 700; color: var(--ink); background: var(--panel);
+    border: 2px solid var(--line); border-radius: 10px; padding: 7px 10px;
+  }
+  .pack-filter select:focus { outline: none; border-color: var(--gold); }
+  .pack-filter select.on { border-color: var(--ink); }
+
+  .suggest {
+    list-style: none; margin: 6px 0 0; padding: 4px;
+    border: 2px solid var(--line); border-radius: 12px; background: var(--panel);
+    max-height: 280px; overflow-y: auto;
+  }
+  .suggest li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  .suggest li .meta { color: var(--muted); font-size: 0.72rem; text-align: right; }
+  .suggest li[aria-selected="true"], .suggest li:hover { background: var(--soft); }
+  .suggest .empty { display: block; color: var(--muted); font-size: 0.85rem; cursor: default; }
+  .suggest .empty.bad { color: var(--error); font-weight: 700; }
+  .suggest .empty:hover { background: transparent; }
+  .picked { margin-top: 8px; padding: 8px 12px; border-radius: 10px; background: var(--soft); font-size: 0.85rem; line-height: 1.6; }
+  .picked .name { color: var(--ok); font-weight: 800; }
+  .picked .row { color: var(--ink); }
+  .picked .row b { color: var(--muted); font-weight: 700; margin-right: 6px; }
+  .picked .wait { color: var(--muted); font-size: 0.78rem; }
+
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  .send {
+    width: 100%; font: inherit; font-weight: 800; font-size: 1rem; border: 0;
+    border-radius: 14px; padding: 14px 12px; cursor: pointer;
+    background: var(--gold); color: #2B1F03; box-shadow: 0 5px 0 var(--gold-deep);
+  }
+  .send:disabled { background: var(--soft); color: var(--muted); box-shadow: none; cursor: default; }
+  .send:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .status { min-height: 1.5em; margin: 10px 0 0; font-size: 0.88rem; text-align: center; }
+  .status.error { color: var(--error); }
+
+  .done { text-align: center; padding: 18px 6px 10px; }
+  .done .big { font-size: 2.4rem; color: var(--gold); line-height: 1; margin-bottom: 10px; }
+  .done .big.pop { animation: pop 420ms cubic-bezier(.2,1.6,.4,1); }
+  @keyframes pop { from { transform: scale(.3) rotate(-30deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+  .done h2 { font-size: 1.15rem; margin: 0 0 4px; }
+  .done p { margin: 0 0 4px; }
+  .done .sub { color: var(--muted); font-size: 0.88rem; }
+  .again { margin-top: 16px; width: 100%; font: inherit; font-weight: 700; padding: 12px; border-radius: 12px; border: 2px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+
+  /* 公式LINE */
+  .line-box { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); text-align: center; }
+  .line-box p { margin: 0 0 10px; font-size: 0.85rem; color: var(--muted); }
+  .line-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 12px; border-radius: 12px;
+    background: #06C755; color: #fff; font-weight: 800; text-decoration: none;
+  }
+  .line-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .line-btn svg { width: 22px; height: 22px; flex: none; }
+  .foot-line { display: inline-block; margin-top: 6px; color: #9FE8BF; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+  .note { color: #C9D1EA; font-size: 0.8rem; margin-top: 22px; text-align: center; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .done .big.pop { animation: none; } }
+  .tabs { display: flex; gap: 6px; padding: 4px; margin: 0 0 20px; background: rgba(16,25,58,.95); border: 1px solid rgba(242,193,78,.35); border-radius: 999px; position: relative; z-index: 2; }
+  .tabs a { flex: 1; text-align: center; padding: 9px 8px; border-radius: 999px; color: #C9D1EA; font-weight: 800; font-size: .9rem; text-decoration: none; line-height: 1.4; }
+  .tabs a:hover { color: #fff; }
+  .tabs a[aria-current="page"] { background: var(--gold); color: #2B1F03; box-shadow: 0 3px 0 var(--gold-deep); }
+  .tabs a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true">
+  <span class="gstar" style="left:92%;top:14%;font-size:18px">★</span>
+  <span class="gstar" style="left:88%;top:5%;font-size:14px">★</span>
+  <span class="gstar" style="left:14%;top:34%;font-size:11px">★</span>
+  <span class="gstar" style="left:93%;top:28%;font-size:20px">★</span>
+  <span class="gstar" style="left:4%;top:62%;font-size:15px">★</span>
+  <span class="gstar" style="left:90%;top:55%;font-size:12px">★</span>
+  <span class="gstar" style="left:10%;top:88%;font-size:22px">★</span>
+  <span class="gstar" style="left:84%;top:82%;font-size:16px">★</span>
+  <span class="gstar" style="left:62%;top:2%;font-size:10px">★</span>
+  <span class="gstar" style="left:72%;top:95%;font-size:12px">★</span>
+</div>
+
+<main>
+  <nav class="tabs" aria-label="ページの切り替え">
+    <a aria-current="page" href="./">カードリクエスト</a>
+    <a href="roulette.html">配布ルーレット</a>
+  </nav>
+  <header>
+    <h1><span class="mark" aria-hidden="true">★</span>カードリクエスト箱</h1>
+    <p class="lead">配布してほしいカードを匿名でリクエストできます。名前もメールアドレスもいりません。</p>
+  </header>
+
+  <section class="trend" id="trend" hidden aria-labelledby="trend-title">
+    <h2 id="trend-title"><span aria-hidden="true">★</span> 今週の注目カード</h2>
+    <p class="sub">この1週間でリクエストが多いカードです。タップするとそのカードを選べます。</p>
+    <ol id="trend-list"></ol>
+  </section>
+
+  <div class="panel">
+    <form id="form" novalidate>
+
+      <section class="step" id="step2">
+        <span class="num">1</span>
+        <div>
+          <h2><label for="card">カード名を入れて選ぶ</label></h2>
+          <div class="pack-filter">
+            <label for="packFilter">パック</label>
+            <select id="packFilter"><option value="">すべてのパック</option></select>
+          </div>
+          <input type="text" id="card" maxlength="40" autocomplete="off" placeholder="例：ぴかちゅう"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="suggest">
+          <ul class="suggest" id="suggest" role="listbox" hidden></ul>
+          <div class="picked" id="picked" hidden></div>
+          <ul class="suggest" id="packChoice" role="listbox" aria-label="パックとレアリティを選ぶ" hidden></ul>
+        </div>
+      </section>
+
+      <section class="step" id="step3">
+        <span class="num">2</span>
+        <div>
+          <h2 id="rarity-label">レアリティを選ぶ</h2>
+          <div class="chips" id="chips" role="group" aria-labelledby="rarity-label"></div>
+          <p class="hint" id="rarity-hint"></p>
+        </div>
+      </section>
+
+      <section class="step" id="step4">
+        <span class="num">3</span>
+        <div>
+          <h2><label for="message">ひとこと</label> <span class="opt">（なくてもOK）</span></h2>
+          <textarea id="message" maxlength="200" placeholder="理由や、ほかにほしいものなど"></textarea>
+          <div class="count"><span id="msg-count">0</span> / 200</div>
+        </div>
+      </section>
+
+      <div class="hp" aria-hidden="true">
+        <label for="website">この欄は空のままにしてください</label>
+        <input type="text" id="website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <button type="submit" class="send" id="submit" disabled>カード名を入れてください</button>
+      <p class="status" id="status" role="status"></p>
+    </form>
+
+    <div class="done" id="done" hidden>
+      <div class="big" id="doneStar" aria-hidden="true">★</div>
+      <h2 id="done-main">リクエストを送りました</h2>
+      <p id="done-card"></p>
+      <p class="sub" id="done-sub"></p>
+      <button type="button" class="again" id="again" hidden>もう1件送る</button>
+      <div class="line-box" id="line-box" hidden>
+        <p>配布のお知らせは公式LINEでお届けします。</p>
+        <a class="line-btn" id="line-btn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 3C6.5 3 2 6.6 2 11c0 3.9 3.5 7.2 8.3 7.9.3.1.8.2.9.5.1.3.1.7 0 1l-.1.9c0 .3-.2 1 .9.5s6-3.5 8.1-6C21.6 14.3 22 12.7 22 11c0-4.4-4.5-8-10-8z"/></svg>LINEで友だち追加</a>
+      </div>
+    </div>
+  </div>
+
+  <p class="note"><span id="note">送った内容は匿名で届きます。</span><br>
+    <a class="foot-line" id="foot-line" href="#" target="_blank" rel="noopener" hidden>公式LINEはこちら</a></p>
+</main>
+
+<script>
+  // ===== 設定 =====
+  const CONFIG = {
+    // Google Apps Script の「ウェブアプリのURL」をここに貼り付けます
+    GAS_URL: "https://script.google.com/macros/s/AKfycbxfcJFpA0QjPY07_Cw_bJiaeXmeElMYDphnG_cjHZF4X6tf_IAF3ItcBJySQWFuIu6H/exec",
+    // 同じスマホ・ブラウザから1日に送れる回数（0にすると無制限）
+    DAILY_MAX: 5,
+    // true: 一覧にないカード名も送れる / false: 一覧のカードだけ送れる
+    ALLOW_FREE_TEXT: false,
+    // 候補の最大表示数 / 「もしかして」の最大表示数
+    MAX_SUGGEST: 8,
+    MAX_ALT: 5,
+    // 公式LINEの友だち追加URL（空にするとLINEの案内を出さない）
+    LINE_URL: "https://lin.ee/Scc5lrJO",
+    // true: 見た目確認用（送信しない・サンプルのカードを使う）
+    PREVIEW: false
+  };
+
+  // レアリティ（スプレッドシートの番号：1 虹 / 2 黒 / 4 トレーナー / 5 ★1色違い / 6 ★2色違い　※3は使わない）
+  const RARITIES = ["虹", "黒", "トレーナー", "★1色違い", "★2色違い"];
+
+  // スプレッドシートを使わないとき用のサンプル：["カード名", "パック名", "レアリティ"]
+  const SAMPLE_CARDS = [
+    ["ピカチュウ", "サンプルパックA", "黒"],
+    ["ピカチュウex", "サンプルパックA", "黒"],
+    ["ピカチュウex", "サンプルパックA", "虹"],
+    ["ピカチュウex", "サンプルパックB", "★2色違い"],
+    ["ピカチュウex", "サンプルパックC", "★2色違い"],
+    ["ミュウツーex", "サンプルパックA", "黒"],
+    ["ミュウツーex", "サンプルパックA", "虹"],
+    ["リザードンex", "サンプルパックA", "★2色違い"],
+    ["ミュウ", "サンプルパックB", "★1色違い"],
+    ["ナツメ", "サンプルパックA", "トレーナー"],
+    ["カスミ", "サンプルパックA", "トレーナー"]
+  ];
+  // プレビュー用の「今週の注目カード」サンプル
+  const SAMPLE_TRENDING = [
+    { card: "ピカチュウex", rarity: "★2色違い", pack: "サンプルパックC" },
+    { card: "ミュウツーex", rarity: "虹", pack: "サンプルパックA" },
+    { card: "リザードンex", rarity: "★2色違い", pack: "サンプルパックA" },
+    { card: "ナツメ", rarity: "トレーナー", pack: "サンプルパックA" },
+    { card: "ミュウ", rarity: "★1色違い", pack: "サンプルパックB" }
+  ];
+  // ================
+
+  const STORAGE_KEY = "cardRequestBox:sentCount";
+  const $ = (id) => document.getElementById(id);
+  const form = $("form"), cardInput = $("card"), msgInput = $("message");
+  const statusEl = $("status"), submitBtn = $("submit");
+  const suggestEl = $("suggest"), pickedEl = $("picked"), chipsEl = $("chips"), hintEl = $("rarity-hint");
+
+  // ---- 表記ゆれ吸収 ----
+  function norm(s) {
+    return String(s).normalize("NFKC").toLowerCase()
+      .replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
+      .replace(/[ァィゥェォッャュョヮ]/g, (c) => "アイウエオツヤユヨワ"["ァィゥェォッャュョヮ".indexOf(c)])
+      .replace(/[\s・ー〜~\-]/g, "");
+  }
+
+  // ---- カードデータ ----
+  let cardList = [];
+  function loadCards(rows) {
+    const byName = new Map();
+    for (const row of rows) {
+      const name = String(row[0] || "").trim();
+      const pack = String(row[1] || "").trim();
+      const rarity = String(row[2] || "").trim();
+      if (!name || RARITIES.indexOf(rarity) < 0) continue;
+      if (!byName.has(name)) byName.set(name, { name, key: norm(name), versions: [] });
+      const c = byName.get(name);
+      if (!c.versions.some((v) => v.rarity === rarity && v.pack === pack)) c.versions.push({ rarity, pack });
+    }
+    for (const c of byName.values()) c.versions.sort((a, b) => (RARITIES.indexOf(a.rarity) - RARITIES.indexOf(b.rarity)) || a.pack.localeCompare(b.pack, "ja"));
+    cardList = Array.from(byName.values());
+    packOrder = [];
+    for (const row of rows) { const p = String(row[1] || "").trim(); if (p && packOrder.indexOf(p) < 0) packOrder.push(p); }
+  }
+  let packOrder = [];
+  const raritiesOf = (c) => Array.from(new Set(c.versions.map((v) => v.rarity)));
+  const packsOf = (c, r) => c.versions.filter((v) => v.rarity === r).map((v) => v.pack);
+  const hasRarity = (c, r) => c.versions.some((v) => v.rarity === r);
+  // レアリティ・パックの条件に合うバージョンだけ
+  const versionsIn = (c, r, p) => c.versions.filter((v) => (!r || v.rarity === r) && (!p || v.pack === p));
+
+  // パックの一覧（新しいパックが上、プロモは最後）
+  let packFilter = "";
+  function renderPackFilter() {
+    const sel = $("packFilter");
+    const order = packOrder.slice();
+    const promo = order.filter((p) => p.indexOf("プロモ") === 0);
+    const packs = order.filter((p) => p.indexOf("プロモ") !== 0).reverse().concat(promo);
+    sel.length = 1;
+    for (const p of packs) { const o = document.createElement("option"); o.value = p; o.textContent = p; sel.appendChild(o); }
+    sel.value = packs.indexOf(packFilter) >= 0 ? packFilter : "";
+    packFilter = sel.value;
+  }
+  function filterLabel() { return [packFilter, selRarity].filter(Boolean).join("・"); }
+
+  // ---- 状態 ----
+  let selRarity = null;
+  let picked = null;
+  let matches = [];
+  let active = -1;
+  let altMode = false;
+  let selPack = null;   // 同じカード・同じレアリティが複数パックにあるときに選んだパック
+
+  // 選択中のカード＋レアリティ（＋パック）が1つに決まっていればそれを返す
+  function currentVersion() {
+    if (!picked || !selRarity) return null;
+    const vs = picked.versions.filter((v) => v.rarity === selRarity);
+    if (vs.length === 1) return vs[0];
+    return vs.find((v) => v.pack === selPack) || null;
+  }
+  const needsPack = () => !!(picked && selRarity && packsOf(picked, selRarity).length > 1);
+
+  // ---- 手順の進み具合と送信ボタン ----
+  function readiness() {
+    const text = cardInput.value.trim();
+    if (!text) return { ok: false, label: "カード名を入れてください" };
+    if (picked) {
+      if (!selRarity) return { ok: false, label: "レアリティを選んでください" };
+      const pv = currentVersion();
+      if (!pv) return { ok: false, label: "パックを選んでください" };
+      return { ok: true, label: "★ " + picked.name + "（" + selRarity + (pv && pv.pack ? "／" + pv.pack : "") + "）をリクエスト" };
+    }
+    if (!cardList.length && !CONFIG.ALLOW_FREE_TEXT) return { ok: false, label: "カード一覧を読み込み中…" };
+    if (matches.length) return { ok: false, label: "候補からカードを選んでください" };
+    if (!CONFIG.ALLOW_FREE_TEXT) return { ok: false, label: "このカードはリクエストできません" };
+    return { ok: true, label: "★ 「" + text + "」をリクエスト" };
+  }
+
+  function refresh() {
+    const r = readiness();
+    submitBtn.disabled = !r.ok;
+    submitBtn.textContent = r.label;
+    $("step2").classList.toggle("is-done", !!picked || (CONFIG.ALLOW_FREE_TEXT && !!cardInput.value.trim() && !matches.length));
+    $("step3").classList.toggle("is-done", !!currentVersion());
+    $("step4").classList.toggle("is-done", !!msgInput.value.trim());
+  }
+
+  // ---- レアリティ ----
+  function renderChips() {
+    chipsEl.innerHTML = "";
+    const allowed = picked ? raritiesOf(picked) : null;
+    const opts = [{ label: "すべて", value: null }].concat(RARITIES.map((r) => ({ label: r, value: r })));
+    for (const o of opts) {
+      if (o.value === null && picked) continue; // カード選択後は「すべて」を出さない
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = o.label;
+      b.setAttribute("aria-pressed", selRarity === o.value ? "true" : "false");
+      if (allowed && allowed.indexOf(o.value) < 0) b.disabled = true;
+      b.addEventListener("click", () => setRarity(o.value));
+      chipsEl.appendChild(b);
+    }
+    if (picked) {
+      hintEl.textContent = allowed.length > 1
+        ? "このカードにあるレアリティだけ選べます。"
+        : "このカードのレアリティは1種類なので、自動で選びました。";
+    } else {
+      hintEl.textContent = selRarity
+        ? "「" + selRarity + "」のカードだけから探します。"
+        : "カードを選ぶと、そのカードにあるレアリティだけ選べるようになります。先に選んで絞り込むこともできます。";
+    }
+  }
+
+  function setRarity(r) {
+    selRarity = r;
+    selPack = null;
+    if (picked && packFilter && r && versionsIn(picked, r, packFilter).length) selPack = packFilter;
+    statusEl.textContent = "";
+    renderChips();
+    renderPackChoice();
+    renderPicked();
+    if (!picked && (cardInput.value.trim() || packFilter)) runSearch();
+    refresh();
+  }
+
+  // ---- 検索（1文字：前方一致のみ / 2文字以上：途中一致も） ----
+  // パックだけ選んで名前が空のときは、そのパックのカードを一覧表示する
+  function search(q, rarity, pack, limit) {
+    const k = norm(q);
+    const byN = (a, b) => a.name.localeCompare(b.name, "ja");
+    if (!k) {
+      if (!pack) return [];
+      return cardList.filter((c) => versionsIn(c, rarity, pack).length).sort(byN);
+    }
+    const starts = [], contains = [];
+    for (const c of cardList) {
+      if ((rarity || pack) && !versionsIn(c, rarity, pack).length) continue;
+      if (c.key.startsWith(k)) starts.push(c);
+      else if (k.length >= 2 && c.key.includes(k)) contains.push(c);
+    }
+    return starts.sort(byN).concat(contains.sort(byN)).slice(0, limit || CONFIG.MAX_SUGGEST);
+  }
+
+  function runSearch() {
+    matches = search(cardInput.value, selRarity, packFilter);
+    altMode = false;
+    if (!matches.length && (selRarity || packFilter) && cardInput.value.trim()) {
+      const other = search(cardInput.value, null, "", CONFIG.MAX_ALT);
+      if (other.length) { matches = other; altMode = true; }
+    }
+    active = matches.length ? 0 : -1;
+    renderSuggest();
+  }
+
+  function addEmpty(text, bad) {
+    const li = document.createElement("li");
+    li.className = "empty" + (bad ? " bad" : "");
+    li.textContent = text;
+    suggestEl.appendChild(li);
+  }
+
+  function renderSuggest() {
+    suggestEl.innerHTML = "";
+    if ((!cardInput.value.trim() && !packFilter) || picked) { closeSuggest(); return; }
+
+    if (altMode) {
+      addEmpty("「" + filterLabel() + "」には一致するカードがありません。もしかして：");
+    } else if (!cardInput.value.trim() && matches.length) {
+      addEmpty("「" + filterLabel() + "」のカード（" + matches.length + "枚）");
+    } else if (!matches.length) {
+      if (!cardList.length) addEmpty("カード一覧を読み込み中です…");
+      else if (!cardInput.value.trim()) addEmpty("「" + filterLabel() + "」のカードはありません。", true);
+      else if (selRarity || packFilter) addEmpty("「" + filterLabel() + "」にこのカードは存在しません。", true);
+      else addEmpty(CONFIG.ALLOW_FREE_TEXT ? "カードが見つかりません。このまま送ることもできます。" : "カードが見つかりません。登録されているカードだけリクエストできます。", !CONFIG.ALLOW_FREE_TEXT);
+    }
+
+    matches.forEach((c, idx) => {
+      const li = document.createElement("li");
+      li.id = "opt-" + idx;
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", idx === active ? "true" : "false");
+      const n = document.createElement("span");
+      n.textContent = c.name;
+      const m = document.createElement("span");
+      m.className = "meta";
+      if (packFilter && !altMode) {
+        m.textContent = Array.from(new Set(versionsIn(c, selRarity, packFilter).map((v) => v.rarity))).join("・");
+      } else if (selRarity && !altMode) {
+        m.textContent = packsOf(c, selRarity).filter(Boolean).join("・");
+      } else {
+        m.textContent = raritiesOf(c).join("・");
+      }
+      li.append(n, m);
+      li.addEventListener("mousedown", (e) => { e.preventDefault(); pick(c); });
+      suggestEl.appendChild(li);
+    });
+
+    suggestEl.hidden = false;
+    cardInput.setAttribute("aria-expanded", "true");
+    if (active >= 0) {
+      cardInput.setAttribute("aria-activedescendant", "opt-" + active);
+      $("opt-" + active).scrollIntoView({ block: "nearest" });
+    } else {
+      cardInput.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  function closeSuggest() {
+    suggestEl.hidden = true;
+    cardInput.setAttribute("aria-expanded", "false");
+    cardInput.removeAttribute("aria-activedescendant");
+  }
+
+  function pick(c) {
+    picked = c;
+    cardInput.value = c.name;
+    const rs = raritiesOf(c);
+    if (selRarity && rs.indexOf(selRarity) < 0) selRarity = null;
+    if (rs.length === 1) selRarity = rs[0];
+    selPack = null;
+    // パックで絞り込んでいるときは、そのパックの中で決まるものは自動で選ぶ
+    if (packFilter) {
+      const vs = versionsIn(c, selRarity, packFilter);
+      if (vs.length === 1) { selRarity = vs[0].rarity; selPack = vs[0].pack; }
+      else if (vs.length && selRarity) selPack = packFilter;
+    }
+    closeSuggest();
+    statusEl.textContent = "";
+    renderChips();
+    renderPackChoice();
+    renderPicked();
+    refresh();
+  }
+
+  function unpick() {
+    picked = null;
+    selPack = null;
+    renderChips();
+    renderPackChoice();
+    renderPicked();
+  }
+
+  function renderPicked() {
+    if (!picked) { pickedEl.hidden = true; return; }
+    pickedEl.innerHTML = "";
+    const line = (label, value, cls) => {
+      const d = document.createElement("div");
+      d.className = cls || "row";
+      if (label) { const b = document.createElement("b"); b.textContent = label; d.appendChild(b); }
+      d.appendChild(document.createTextNode(value));
+      pickedEl.appendChild(d);
+    };
+    line("", "✓ " + picked.name, "name");
+    const v = currentVersion();
+    if (v) {
+      line("パック", v.pack || "（未登録）");
+      line("レアリティ", v.rarity);
+    } else if (needsPack()) {
+      line("パック", packsOf(picked, selRarity).join("／"));
+      line("レアリティ", selRarity);
+      line("", "下の一覧からパックを選んでください。", "wait");
+    } else {
+      // レアリティ未選択：パックごとにどのレアリティがあるかを表示
+      const byPack = new Map();
+      for (const x of picked.versions) {
+        const k = x.pack || "（未登録）";
+        if (!byPack.has(k)) byPack.set(k, []);
+        if (byPack.get(k).indexOf(x.rarity) < 0) byPack.get(k).push(x.rarity);
+      }
+      if (byPack.size === 1) {
+        line("パック", Array.from(byPack.keys())[0]);
+      } else {
+        line("パック", Array.from(byPack, ([k, rs]) => k + "（" + rs.join("・") + "）").join("、"));
+        line("", "下の一覧から選ぶか、レアリティを選んでください。", "wait");
+      }
+    }
+    pickedEl.hidden = false;
+  }
+
+  // ---- パック選択（同じカード・同じレアリティが複数パックにあるとき） ----
+  function renderPackChoice() {
+    const box = $("packChoice");
+    box.innerHTML = "";
+    if (!picked || picked.versions.length < 2) { box.hidden = true; return; }
+    const cur = currentVersion();
+    const head = document.createElement("li");
+    head.className = "empty";
+    head.textContent = cur ? "ほかのパック・レアリティに変えることもできます。" : "どれにしますか？（パック・レアリティを選んでください）";
+    box.appendChild(head);
+    picked.versions.forEach((v) => {
+      const on = !!cur && cur.pack === v.pack && cur.rarity === v.rarity;
+      const li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", on ? "true" : "false");
+      li.tabIndex = 0;
+      const n = document.createElement("span");
+      n.textContent = (on ? "✓ " : "") + (v.pack || "（パック未登録）");
+      const m = document.createElement("span");
+      m.className = "meta";
+      m.textContent = v.rarity;
+      li.append(n, m);
+      const choose = () => {
+        selRarity = v.rarity; selPack = v.pack; statusEl.textContent = "";
+        renderChips(); renderPackChoice(); renderPicked(); refresh();
+      };
+      li.addEventListener("click", choose);
+      li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(); } });
+      box.appendChild(li);
+    });
+    box.hidden = false;
+  }
+
+  cardInput.addEventListener("input", () => {
+    if (picked) unpick();
+    runSearch();
+    refresh();
+  });
+  cardInput.addEventListener("keydown", (e) => {
+    if (suggestEl.hidden || !matches.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); active = (active + 1) % matches.length; renderSuggest(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = (active - 1 + matches.length) % matches.length; renderSuggest(); }
+    else if (e.key === "Enter" && active >= 0 && !e.isComposing) { e.preventDefault(); pick(matches[active]); }
+    else if (e.key === "Escape") { closeSuggest(); }
+  });
+  cardInput.addEventListener("blur", () => setTimeout(closeSuggest, 100));
+  cardInput.addEventListener("focus", () => { if (!picked && (cardInput.value.trim() || packFilter)) runSearch(); });
+  $("packFilter").addEventListener("change", (e) => {
+    packFilter = e.target.value;
+    e.target.classList.toggle("on", !!packFilter);
+    statusEl.textContent = "";
+    if (picked) { unpick(); cardInput.value = ""; }
+    // 選んだパックにないレアリティが選ばれていたら外す
+    if (packFilter && selRarity && !cardList.some((c) => versionsIn(c, selRarity, packFilter).length)) { selRarity = null; renderChips(); }
+    runSearch();
+    refresh();
+  });
+  msgInput.addEventListener("input", () => { $("msg-count").textContent = msgInput.value.length; refresh(); });
+
+  // ---- 1日1回 ----
+  function todayJST() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
+  function sentCount() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      return s && s.date === todayJST() ? Number(s.count) || 0 : 0;
+    } catch (e) { return 0; }
+  }
+  const limited = () => CONFIG.DAILY_MAX > 0;
+  const remaining = () => Math.max(0, CONFIG.DAILY_MAX - sentCount());
+  const usedUp = () => limited() && remaining() <= 0;
+  function markSent() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayJST(), count: sentCount() + 1 })); } catch (e) {}
+  }
+  function unmarkSent() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayJST(), count: Math.max(0, sentCount() - 1) })); } catch (e) {}
+  }
+
+  // ---- 完了画面 ----
+  function showDone(justSent, summary) {
+    form.hidden = true;
+    $("done").hidden = false;
+    const star = $("doneStar");
+    star.classList.remove("pop");
+    if (justSent) { void star.offsetWidth; star.classList.add("pop"); }
+    $("done-main").textContent = justSent ? "リクエストを送りました" : "今日のリクエスト回数に達しました";
+    $("done-card").textContent = summary || "";
+    if (!limited()) {
+      $("done-sub").textContent = "";
+      $("again").hidden = false;
+    } else if (remaining() > 0) {
+      $("done-sub").textContent = "今日はあと" + remaining() + "回送れます。";
+      $("again").hidden = false;
+    } else {
+      $("done-sub").textContent = "今日のリクエストは" + CONFIG.DAILY_MAX + "回までです。明日の0時（日本時間）からまた送れます。";
+      $("again").hidden = true;
+    }
+  }
+
+  function showForm() {
+    $("done").hidden = true;
+    form.hidden = false;
+    form.reset();
+    picked = null; selRarity = null; selPack = null;
+    packFilter = ""; $("packFilter").classList.remove("on");
+    $("msg-count").textContent = "0";
+    closeSuggest(); renderChips(); renderPackChoice(); renderPicked(); refresh();
+    statusEl.textContent = "";
+    cardInput.focus();
+  }
+  $("again").addEventListener("click", showForm);
+
+  function setError(text) { statusEl.className = "status error"; statusEl.textContent = text; }
+
+  // ---- 送信 ----
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = cardInput.value.trim();
+    if (!text) return;
+
+    // 候補を選ばずに正確な名前を入れた場合は、そのカードとして扱う
+    if (!picked) {
+      const exact = cardList.find((c) => c.key === norm(text));
+      if (exact) {
+        if (selRarity && !hasRarity(exact, selRarity)) { setError("「" + selRarity + "」にこのカードは存在しません。"); return; }
+        pick(exact);
+        if (!selRarity) { setError("レアリティを選んでください。"); return; }
+      }
+    }
+    if (!readiness().ok) return;
+
+    let card, rarity, pack;
+    if (picked) {
+      const v = currentVersion();
+      card = picked.name; rarity = selRarity; pack = v ? v.pack : "";
+    } else {
+      card = text; rarity = selRarity || ""; pack = "";
+    }
+    const summary = card + (rarity ? "（" + rarity + (pack ? "／" + pack : "") + "）" : "");
+
+    if (usedUp() && !CONFIG.PREVIEW) { showDone(false); return; }
+    if (CONFIG.PREVIEW) { showDone(true, summary + "　※プレビューのため実際には送信していません"); return; }
+    if (!/^https:\/\//.test(CONFIG.GAS_URL)) { setError("送信先が設定されていません。管理者の方は GAS_URL を設定してください。"); return; }
+
+    // 待たせないように、先に完了画面を出して裏で送信する
+    const body = JSON.stringify({ card, rarity, pack, message: msgInput.value.trim(), website: $("website").value });
+    markSent();
+    statusEl.textContent = "";
+    showDone(true, summary);
+
+    try {
+      const res = await fetch(CONFIG.GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body,
+        keepalive: true // 画面を閉じても送信を続ける
+      });
+      let ok = res.ok, code = "";
+      try { const data = await res.json(); ok = data && data.ok === true; code = (data && data.error) || ""; } catch (err) {}
+      if (!ok) throw new Error(code || "rejected");
+    } catch (err) {
+      // 失敗したときだけ、完了画面をエラー表示に切り替える（回数は戻す）
+      unmarkSent();
+      $("done-main").textContent = "送信できませんでした";
+      $("done-sub").textContent = String(err.message) === "unknown_card"
+        ? "このカードは登録されていないため、リクエストできません。"
+        : "通信状況を確認して、もう一度お試しください。";
+      $("again").hidden = false;
+    }
+  });
+
+  // ---- 今週の注目カード ----
+  function renderTrending(items) {
+    const list = $("trend-list");
+    list.innerHTML = "";
+    const shown = (items || []).filter((t) => {
+      const c = cardList.find((x) => x.name === t.card);
+      return c && c.versions.some((v) => v.rarity === t.rarity && v.pack === t.pack);
+    });
+    if (!shown.length) { $("trend").hidden = true; return; }
+    shown.forEach((t, i) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      const r = document.createElement("span"); r.className = "rank"; r.textContent = i + 1;
+      const n = document.createElement("span"); n.className = "nm"; n.textContent = t.card;
+      const m = document.createElement("span"); m.className = "mt"; m.textContent = t.rarity + (t.pack ? "／" + t.pack : "");
+      b.append(r, n, m);
+      b.setAttribute("aria-label", (i + 1) + "位 " + t.card + " " + t.rarity + " " + t.pack + " を選ぶ");
+      b.addEventListener("click", () => chooseTrending(t));
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    $("trend").hidden = false;
+  }
+
+  // 注目カードをタップしたら、そのカード・レアリティ・パックを選んだ状態にする
+  function chooseTrending(t) {
+    const c = cardList.find((x) => x.name === t.card);
+    if (!c) return;
+    if (form.hidden) {
+      // 完了画面のときは、送れる回数が残っていれば入力画面に戻してから選ぶ
+      if (usedUp() && !CONFIG.PREVIEW) { $("done").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+      showForm();
+    }
+    pick(c);
+    selRarity = t.rarity;
+    selPack = t.pack;
+    renderChips(); renderPackChoice(); renderPicked(); refresh();
+    $("step2").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function loadTrending() {
+    if (CONFIG.PREVIEW || !/^https:\/\//.test(CONFIG.GAS_URL)) { renderTrending(SAMPLE_TRENDING); return; }
+    try {
+      const res = await fetch(CONFIG.GAS_URL + "?action=trending");
+      const data = await res.json();
+      renderTrending(data && data.ok ? data.items : []);
+    } catch (err) {
+      $("trend").hidden = true;
+    }
+  }
+
+  // ---- 起動 ----
+  if (/^https:\/\//.test(CONFIG.LINE_URL)) {
+    $("line-btn").href = CONFIG.LINE_URL; $("line-box").hidden = false;
+    $("foot-line").href = CONFIG.LINE_URL; $("foot-line").hidden = false;
+  }
+  async function init() {
+    renderChips(); refresh();
+    if (CONFIG.PREVIEW) $("note").textContent = "見た目確認用のプレビューです。サンプルのカードで試せます（送信はされません）。";
+    if (usedUp() && !CONFIG.PREVIEW) showDone(false);
+
+    if (CONFIG.PREVIEW || !/^https:\/\//.test(CONFIG.GAS_URL)) { loadCards(SAMPLE_CARDS); renderPackFilter(); refresh(); loadTrending(); return; }
+    try {
+      const res = await fetch(CONFIG.GAS_URL + "?action=cards");
+      const data = await res.json();
+      if (!data.ok || !Array.isArray(data.cards)) throw new Error("bad");
+      loadCards(data.cards);
+      renderPackFilter();
+    } catch (err) {
+      loadCards([]);
+      console.warn("カード一覧を読み込めませんでした", err);
+    }
+    if (cardInput.value.trim() && !picked) runSearch();
+    refresh();
+    loadTrending();
+  }
+  init();
+</script>
+</body>
+</html>
