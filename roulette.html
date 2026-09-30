@@ -326,6 +326,7 @@
       <ol class="rules">
         <li>下の表から<b>空いている枠</b>をタップ</li>
         <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
+        <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
         <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます</li>
         <li>合言葉がほしい方は、ポストを<b>引用RP</b>してください（引用RPには <b>#ポケポケトレード</b> と <b>#ポケポケ配布</b> を入れてください）。引用RPのあと、<b>DMで合言葉をお送りします</b></li>
         <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
@@ -384,7 +385,7 @@
       <h2 id="entry-title"><span class="no" id="entry-no">1</span>番の枠に参加</h2>
       <p class="sub">入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの人には見えません（枠にはトレーナーネーム、当選したときは当選者の一覧にXの名前も出ます）。</p>
       <p class="prefill" id="prefill-note" hidden>ログイン中の内容が入っています。そのままでも、変更してもOKです。</p>
-      <div class="field"><label for="f-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><input id="f-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
+      <div class="field"><label for="f-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><p class="hint" style="margin:0 0 4px;color:var(--error);font-weight:700">※カードを受け取るアカウントのIDを入れてください。違うアカウントには配布できません</p><input id="f-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
       <div class="field"><label for="f-trainer">トレーナーネーム</label><input id="f-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
       <div class="field"><label for="f-xname">Xの名前</label><input id="f-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
       <div class="field"><label for="f-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="f-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
