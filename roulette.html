@@ -147,6 +147,9 @@
   .at input { padding-left: 28px; }
   .code-box { margin: 12px 0; padding: 10px 12px; border-radius: 12px; background: var(--soft); }
   .code-box p { margin: 0 0 6px; font-size: .8rem; color: var(--muted); }
+  .code-ask { margin: 0 0 12px; padding: 12px; border-radius: 12px; background: var(--soft); border: 2px solid var(--gold); font-size: .86rem; }
+  .code-ask p { margin: 0 0 6px; }
+  .choices button.picked { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 22%, var(--panel)); }
   .warn { font-size: .82rem; color: var(--error); font-weight: 700; margin: 6px 0 10px; }
   .confirm { list-style: none; margin: 0 0 12px; padding: 0; border: 2px solid var(--line); border-radius: 12px; }
   .confirm li { display: grid; grid-template-columns: 8.5em 1fr; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .9rem; }
@@ -397,6 +400,13 @@
       <h2><span class="no" id="entry-no2">1</span>番の枠に参加</h2>
       <p class="sub">入力内容に間違いがないか、よく確認してください。</p>
       <ul class="confirm" id="entry-confirm"></ul>
+      <div class="code-ask" id="code-ask" hidden>
+        <p><b>1枠目にはもう参加していますか？</b><br>合言葉は<b>2枠目に参加するとき</b>に使います。まだ1枠目に参加していない場合は、合言葉を使わずに参加できます（合言葉はそのまま残るので、2枠目で使えます）。</p>
+        <div class="choices">
+          <button type="button" id="ask-first">まだ参加していない（今回は合言葉を使わない）</button>
+          <button type="button" id="ask-second">もう参加している（合言葉を使って2枠目に参加）</button>
+        </div>
+      </div>
       <p class="warn">※枠はあとから変更できません</p>
       <button type="button" class="btn primary" id="entry-submit">この内容で参加する</button>
       <p class="status" id="entry-status2" role="status"></p>
@@ -1012,7 +1022,7 @@
     selected = n;
     txt($("entry-no"), n); txt($("entry-no2"), n);
     $("entry-step1").hidden = false; $("entry-step2").hidden = true;
-    setStatus("entry-status1", ""); setStatus("entry-status2", "");
+    setStatus("entry-status1", ""); setStatus("entry-status2", ""); txt($("entry-submit"), "この内容で参加する"); useCode = false;
     txt($("code-note"), mySlots().length ? "2枠目の参加には合言葉が必要です。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。" : "2枠目に参加する人だけ入力してください。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。");
     // ログイン中は最初から入力しておく。ログインしていなければ毎回空にする
     const prof = getProfile();
@@ -1037,10 +1047,28 @@
     const p = readPerson("f-");
     const err = checkPerson(p, "f-");
     if (err) return setStatus("entry-status1", err, true);
-    fillConfirm($("entry-confirm"), p, $("f-code").value.trim());
+    // 合言葉が入っているのに、このスマホではまだ1枠目に参加していないときは、どちらか聞く
+    const code = $("f-code").value.trim();
+    useCode = !!code && mySlots().length > 0;
+    const ask = !!code && mySlots().length === 0;
+    $("code-ask").hidden = !ask;
+    document.querySelectorAll("#code-ask button").forEach((b) => b.classList.remove("picked"));
+    $("entry-submit").disabled = ask;
+    fillConfirm($("entry-confirm"), p, useCode ? code : "");
     $("entry-step1").hidden = true; $("entry-step2").hidden = false;
-    $("entry-submit").focus();
+    (ask ? $("ask-first") : $("entry-submit")).focus();
   });
+  let useCode = false;
+  function pickCode(use) {
+    useCode = use;
+    $("ask-first").classList.toggle("picked", !use); $("ask-second").classList.toggle("picked", use);
+    fillConfirm($("entry-confirm"), readPerson("f-"), use ? $("f-code").value.trim() : "");
+    $("entry-submit").disabled = false;
+    txt($("entry-submit"), use ? "合言葉を使って2枠目に参加する" : "この内容で参加する（合言葉は使わない）");
+    $("entry-submit").focus();
+  }
+  $("ask-first").addEventListener("click", () => pickCode(false));
+  $("ask-second").addEventListener("click", () => pickCode(true));
   $("entry-back").addEventListener("click", () => { $("entry-step2").hidden = true; $("entry-step1").hidden = false; $("f-poke").focus(); });
   let submitting = false;
   // 返事が来なかったときに、本当は参加できていたかを確かめる
@@ -1049,7 +1077,7 @@
   }
   $("entry-submit").addEventListener("click", async () => {
     if (!selected || !cur || submitting) return;
-    const p = readPerson("f-"), slot = selected, code = $("f-code").value.trim(), rid = cur.id;
+    const p = readPerson("f-"), slot = selected, code = useCode ? $("f-code").value.trim() : "", rid = cur.id;
     submitting = true;
     $("entry-submit").disabled = true; $("entry-back").disabled = true;
     setStatus("entry-status2", "参加しています…（混み合っているときは30秒ほどかかります。画面を閉じずにお待ちください）");
@@ -1062,8 +1090,16 @@
       if (r.ok) {
         saveMine(cur.id, slot); saveInfo(cur.id, slot, p); cur.taken.push([slot, p.trainer]);
         justJoined.push({ rid: cur.id, slot, trainer: p.trainer, at: Date.now() });
+        // 合言葉を使わなかったときは、2枠目のためにとっておく
+        const typed = $("f-code").value.trim();
+        if (code) delete linkCodes[rid]; else if (typed) linkCodes[rid] = typed;
         closeSheets(); renderDetail(); $("f-code").value = "";
-        toast(slot + "番で参加しました！"); refreshDetail(); return;
+        toast(slot + "番で参加しました！" + (!code && typed ? "合言葉は2枠目で使えます。" : "")); refreshDetail(); return;
+      }
+      // 実は1枠目に参加済みだった場合は、入っている合言葉を使ってそのままやり直す
+      if (r.error === "need_code" && !code && $("f-code").value.trim()) {
+        useCode = true; setStatus("entry-status2", "1枠目に参加済みだったので、合言葉を使って参加しています…");
+        setTimeout(() => $("entry-submit").click(), 0); return;
       }
       if (r.error === "taken") { if (r.taken) cur.taken = r.taken; renderDetail(); slotTaken(slot); return; }
       if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは2枠までです。" }[r.error], true); refreshDetail(); return; }
