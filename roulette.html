@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-01b -->
+<!-- version 2026-10-01c -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -1581,6 +1581,7 @@
       btn("ghost", "編集", () => openUpdate(r));
       btn("ghost", "ページを見る", () => { location.hash = "r=" + r.id; });
       if (r.quote) btn("ghost", "引用ポストを確認", () => window.open(r.quote + "/quotes", "_blank", "noopener"));
+      if (r.quote && !r.quoteTotal) it.insertBefore(mk("div", "m", "引用の確認：「投稿済み」ボタンで合言葉を受け取った人はまだいません"), it.querySelector("button"));
       if (r.quote && r.quoteTotal) {
         const left = r.quoteTotal - (r.quoteChecked || 0);
         const soon = !r.drawn && r.deadline - now() < 3600e3;
