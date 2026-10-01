@@ -644,7 +644,8 @@
           if (al) return { ok: false, error: "taken", taken: pub(r).taken };
           if (r.entries.length >= r.slots) return { ok: false, error: "full" };
           if (d.dev && r.entries.filter((e) => e.dev === d.dev).length >= 2) return { ok: false, error: "device_limit" };
-          if (r.entries.some((e) => (e.pokeId === d.pokeId) !== (e.xId.toLowerCase() === d.xId.toLowerCase()))) return { ok: false, error: "mismatch" };
+          if (r.entries.some((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() !== d.xId.toLowerCase())) return { ok: false, error: "mismatch_x" };
+          if (r.entries.some((e) => e.xId.toLowerCase() === d.xId.toLowerCase() && e.pokeId !== d.pokeId)) return { ok: false, error: "mismatch_poke" };
           const mine = r.entries.filter((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() === d.xId.toLowerCase());
           if (mine.length >= 2) return { ok: false, error: "limit" };
           if (mine.length) {
@@ -1104,7 +1105,9 @@
       }
       if (r.error === "taken") { if (r.taken) cur.taken = r.taken; renderDetail(); slotTaken(slot); return; }
       if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは2枠までです。" }[r.error], true); refreshDetail(); return; }
-      const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", used_code: "この合言葉はすでに使われています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
+      const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。",
+        mismatch_poke: "このXのID（@" + p.xId + "）は、別のポケポケのIDで参加済みです。1枠目と同じポケポケのIDを入れてください（数字を1つずつ確認してください）。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。",
+        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", used_code: "この合言葉はすでに使われています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
       if (back) {
         $("entry-step2").hidden = true; $("entry-step1").hidden = false;
         setStatus("entry-status1", back, true);
