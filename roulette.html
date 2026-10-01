@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-01c -->
+<!-- version 2026-10-01f -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -267,6 +267,10 @@
   .codes .chk { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 800; flex-basis: 100%; margin-top: 4px; cursor: pointer; }
   .codes .chk input { width: 20px; height: 20px; accent-color: var(--ok); }
   .codes li.checked { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+  .about summary { cursor: pointer; font-weight: 800; font-size: .95rem; }
+  .about-list { margin: 10px 0 0; padding-left: 1.2em; font-size: .86rem; color: var(--muted); }
+  .about-list li { margin: 4px 0; }
+  .about-list b { color: var(--ink); }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) {
     .wheel-wrap svg.wheel { transition-duration: .01s; }
@@ -347,7 +351,7 @@
         <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
         <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
         <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
-        <li>入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの人には見えません</li>
+        <li>入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの参加者には見えません。<b>当選した場合は、当選発表のポストでXのIDをお知らせします</b></li>
       </ol>
     </section>
 
@@ -405,6 +409,20 @@
     </div>
   </section>
 
+  <details class="panel about" id="about">
+    <summary>このサイトについて（はじめての方へ）</summary>
+    <ul class="about-list">
+      <li>このサイトは、主催者「そす」が配布ルーレットのために作ったものです</li>
+      <li><b>Xのログイン連携はしません。</b>パスワード・お金・クレジットカードを入力することはありません</li>
+      <li><b>アプリのインストールやファイルのダウンロードもありません</b></li>
+      <li>入力するのは<b>ポケポケのID・トレーナーネーム・Xの名前・XのIDの4つだけ</b>です（カードを送るのに必要なため）</li>
+      <li>ポケポケのIDとXのIDは、<b>ほかの参加者には見えません</b>。主催者だけが見て、配布の連絡にだけ使います（当選した場合は、当選発表のポストでXのIDをお知らせします）</li>
+      <li>右上の「ログイン」は、入力した4つを<b>このスマホに覚えておくだけ</b>の機能です。どこかのアカウントにログインするわけではありません</li>
+      <li>アドレスが <b>card-request-box.github.io</b> になっているか確認してください。ほかのアドレスで似た画面が出ても、このサイトではありません</li>
+      <li>このサイトが、上の4つ以外（パスワードなど）を聞くことはありません。聞かれたら入力しないでください</li>
+    </ul>
+  </details>
+
   <p class="note" id="note"></p>
 </main>
 
@@ -414,7 +432,7 @@
   <form id="entry-form" novalidate>
     <div id="entry-step1">
       <h2 id="entry-title"><span class="no" id="entry-no">1</span>番の枠に参加</h2>
-      <p class="sub">入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの人には見えません（枠にはトレーナーネーム、当選したときは当選者の一覧にXの名前も出ます）。</p>
+      <p class="sub">入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの参加者には見えません（枠にはトレーナーネーム、当選したときは当選者の一覧にXの名前も出ます）。<b>当選した場合は、当選発表のポストでXのIDをお知らせします。</b></p>
       <p class="prefill" id="prefill-note" hidden>ログイン中の内容が入っています。そのままでも、変更してもOKです。</p>
       <div class="field"><label for="f-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><p class="hint" style="margin:0 0 4px;color:var(--error);font-weight:700">※カードを受け取るアカウントのIDを入れてください。違うアカウントには配布できません</p><input id="f-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
       <div class="field"><label for="f-trainer">トレーナーネーム</label><input id="f-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
@@ -572,6 +590,17 @@
     <p class="sub">空いている枠を選んで2枠目に参加してください。合言葉は自動で入ります。</p>
     <button type="button" class="btn primary" id="quote-done">枠をえらぶ</button>
   </div>
+</div>
+
+<!-- 当選発表（管理者） -->
+<div class="sheet" id="ann-sheet" role="dialog" aria-modal="true" aria-labelledby="ann-title" hidden>
+  <h2 id="ann-title">当選者を発表する</h2>
+  <p class="sub">下の文章をコピーして、Xアプリで新しく投稿を作って貼り付けてください。配布ポストのURLが入っているので引用RPになり、@IDの当選者に通知が届きます。</p>
+  <pre class="dm-preview" id="ann-text" style="font-size:.85rem;color:var(--ink)"></pre>
+  <p class="hint" id="ann-len"></p>
+  <button type="button" class="btn primary" id="ann-copy">文章をコピー</button>
+  <p class="status" id="ann-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
 </div>
 
 <!-- 参加禁止にする（管理者） -->
@@ -865,6 +894,7 @@
   }
   let listBusy = false;
   async function showList() {
+    $("about").hidden = false;
     $("list-view").hidden = false; $("detail-view").hidden = true; $("admin-view").hidden = true;
     txt($("h1-text"), "配布ルーレット"); txt($("lead"), "参加したいルーレットを選んでください。");
     curId = null; cur = null;
@@ -958,6 +988,7 @@
 
   // ---- 詳細 ----
   async function openDetail(id) {
+    $("about").hidden = false;
     $("list-view").hidden = true; $("admin-view").hidden = true; $("detail-view").hidden = false;
     if (curId !== id) { txt($("count"), "読み込み中…"); txt($("deadline-text"), ""); $("prize").innerHTML = ""; $("prize").dataset.id = ""; cur = null; spinning = false; shownFor = null; $("grid").innerHTML = ""; $("result-panel").hidden = true; $("winners").innerHTML = ""; $("myres").innerHTML = ""; $("result").textContent = ""; $("claim-note").hidden = true; }
     curId = id;
@@ -1118,7 +1149,7 @@
     document.body.style.overflow = "hidden";
   }
   function closeSheets(keepSel) {
-    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet", "quote-sheet", "ban-sheet", "bans-sheet"].forEach((i) => { $(i).hidden = true; });
+    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet", "quote-sheet", "ban-sheet", "bans-sheet", "ann-sheet"].forEach((i) => { $(i).hidden = true; });
     $("sheet-bg").hidden = true;
     document.body.style.overflow = "";
     if (!keepSel) selected = null;
@@ -1540,6 +1571,7 @@
 
   // ---- 管理者画面 ----
   function showAdmin() {
+    $("about").hidden = true;
     $("list-view").hidden = true; $("detail-view").hidden = true; $("admin-view").hidden = false;
     txt($("h1-text"), "配布ルーレット 管理"); txt($("lead"), "ルーレットの作成・編集、合言葉の発行、当選者の確認ができます。");
     curId = null; cur = null;
@@ -1576,6 +1608,7 @@
       if (!r.quote && now() <= r.deadline) it.appendChild(mk("div", "m alert", "引用してもらうポストのURLが未設定です。「編集」で入れると、参加者が合言葉を受け取れるようになります。"));
       const btn = (cls, label, fn) => { const b = mk("button", "btn small " + cls, label); b.type = "button"; b.addEventListener("click", fn); it.appendChild(b); };
       if (r.drawn) btn("primary", "当選者", () => openWinners(r));
+      if (r.drawn && r.winners.length) btn("primary", "当選者を発表", () => openAnnounce(r));
       else btn("primary", "合言葉", () => openCodes(r));
       btn("ghost", "参加者", () => openEntries(r));
       btn("ghost", "編集", () => openUpdate(r));
@@ -1948,6 +1981,41 @@
     finally { $("quote-go").disabled = false; }
   });
   $("quote-done").addEventListener("click", () => { closeSheets(); $("grid").scrollIntoView({ behavior: "smooth", block: "center" }); });
+
+  // ---- 当選発表（管理者） ----
+  let annText = "";
+  // Xの文字数（日本語などは2文字、URLは23文字として数える）
+  function xLength(t) {
+    let n = 0;
+    t.replace(/https?:\/\/\S+/g, (u) => { n += 23; return ""; }).split("").forEach((ch) => { n += /[\u0000-\u10FF\u2000-\u200D\u2010-\u201F\u2032-\u2037]/.test(ch) ? 1 : 2; });
+    return n;
+  }
+  async function openAnnounce(r) {
+    annText = ""; txt($("ann-text"), "読み込んでいます…"); txt($("ann-len"), ""); setStatus("ann-status", "");
+    $("ann-copy").disabled = true;
+    openSheet("ann-sheet");
+    try {
+      const res = await apiPost({ action: "rl_winners", key: adminKey, rid: r.id });
+      if (!res.ok) { txt($("ann-text"), ""); return setStatus("ann-status", ADMIN_ERR[res.error] || "読み込めませんでした。", true); }
+      const ws = res.winners.filter((w) => w.xId);
+      const lines = ["#ポケポケトレード #ポケポケ配布", "", "【当選発表】" + r.title, "", "当選おめでとうございます🎉"];
+      ws.forEach((w) => lines.push("@" + w.xId + "（" + w.slot + "番）"));
+      lines.push("");
+      if (r.claim) lines.push("配布期限（" + fmtTime(r.claim) + "）までに、" + CONFIG.DM_NAME + "にDMをお送りください。", "");
+      if (r.quote) lines.push(r.quote);
+      annText = lines.join("\n");
+      txt($("ann-text"), annText);
+      const len = xLength(annText);
+      txt($("ann-len"), "文字数の目安：" + len + " / 280" + (len > 280 ? "（多すぎます。当選者を2つの投稿に分けてください）" : ""));
+      $("ann-len").style.color = len > 280 ? "var(--error)" : "";
+      $("ann-copy").disabled = false;
+      if (!r.quote) setStatus("ann-status", "配布ポストのURLが設定されていないため、引用RPにはなりません（ふつうの投稿になります）。");
+    } catch (e) { txt($("ann-text"), ""); setStatus("ann-status", "混み合っています。少し待ってから開き直してください。", true); }
+  }
+  $("ann-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(annText); toast("コピーしました。Xアプリで新しく投稿を作って貼り付けてください。"); }
+    catch (e) { toast("コピーできませんでした。文章を長押しでコピーしてください。", true); }
+  });
 
   // ---- 参加禁止（管理者） ----
   let banFor = null;
