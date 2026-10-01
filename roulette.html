@@ -252,6 +252,20 @@
   .loginbar button.main { background: var(--gold); color: #2B1F03; border-color: var(--gold); }
   .loginbar button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
   .prefill { font-size: .8rem; color: var(--ok); font-weight: 700; margin: -4px 0 10px; }
+  .getcode { margin: 0 0 12px; padding: 12px; border-radius: 12px; background: var(--soft); border: 2px solid var(--gold); font-size: .86rem; }
+  .getcode p { margin: 0 0 8px; }
+  .getcode .have { font-weight: 700; }
+  .getcode code, .quote-code code { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; letter-spacing: 1px; user-select: all; }
+  .quote-rules { margin: 0 0 12px; padding-left: 1.2em; font-size: .88rem; }
+  .quote-rules li { margin: 4px 0; }
+  .quote-rules .danger { color: var(--error); font-weight: 800; }
+  .ban-row { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: .85rem; }
+  .ban-row b { word-break: break-all; }
+  .b-ban { background: var(--error); color: #fff; }
+  .m.alert { color: var(--error); font-weight: 800; }
+  .codes .chk { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 800; flex-basis: 100%; margin-top: 4px; cursor: pointer; }
+  .codes .chk input { width: 20px; height: 20px; accent-color: var(--ok); }
+  .codes li.checked { background: color-mix(in srgb, var(--ok) 14%, transparent); }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) {
     .wheel-wrap svg.wheel { transition-duration: .01s; }
@@ -328,7 +342,7 @@
         <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
         <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
         <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます</li>
-        <li>合言葉がほしい方は、ポストを<b>引用RP</b>してください（引用RPには <b>#ポケポケトレード</b> と <b>#ポケポケ配布</b> を入れてください）。引用RPのあと、<b>DMで合言葉をお送りします</b></li>
+        <li id="rule-code">合言葉がほしい方は、ポストを<b>引用RP</b>してください（引用RPには <b>#ポケポケトレード</b> と <b>#ポケポケ配布</b> を入れてください）。引用RPのあと、<b>DMで合言葉をお送りします</b>。<b>鍵アカウントでの引用は無効</b>です。合言葉をもらったのに引用していなかった場合や、<b>抽選前に引用を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
         <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
         <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
         <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
@@ -339,6 +353,11 @@
     <section class="panel" aria-labelledby="grid-title">
       <h2 id="grid-title">枠をえらぶ <span id="left" style="font-weight:700;color:var(--muted);font-size:.85rem"></span></h2>
       <p class="mine" id="mine" hidden></p>
+      <div class="getcode" id="getcode" hidden>
+        <p id="getcode-text"></p>
+        <p class="have" id="getcode-have" hidden></p>
+        <button type="button" class="btn primary" id="getcode-btn">合言葉を獲得する</button>
+      </div>
       <div class="legend" aria-hidden="true"><span><i></i>空き</span><span><i class="l-taken"></i>うまっている</span><span><i class="l-mine"></i>あなたの枠</span></div>
       <div class="grid" id="grid" role="group" aria-label="枠の一覧"></div>
       <p class="hint" id="grid-hint"></p>
@@ -361,6 +380,7 @@
         <div class="field"><label for="c-img">画像 <span class="ex">（なくてもOK。ないときはタイトルだけ表示）</span></label><input id="c-img" type="file" accept="image/*"><img id="c-img-prev" class="preview-img" alt="" hidden><p class="hint" id="c-copy-note" hidden></p></div>
         <div class="field"><label for="c-deadline">抽選時刻 <span class="ex">（この時刻で受付終了）</span></label><input id="c-deadline" type="datetime-local"></div>
         <div class="field"><label for="c-claim">配布期限 <span class="ex">（当選者がDMを送る期限）</span></label><input id="c-claim" type="datetime-local"></div>
+        <div class="field"><label for="c-quote">引用してもらうポストのURL <span class="ex">（入れると「合言葉を獲得する」ボタンが出ます。空ならDMで渡す方式）</span></label><input id="c-quote" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://x.com/sosuPOKEPOKE2/status/…"></div>
         <div class="field"><label for="c-win">当選数</label><input id="c-win" type="number" min="1" max="100" value="1"></div>
         <div class="field"><label for="c-slots">枠の数</label><input id="c-slots" type="number" min="1" max="100" value="100"></div>
         <button type="button" class="btn primary" id="c-create">ルーレットを作る</button>
@@ -368,6 +388,7 @@
       </div>
       <div class="panel">
         <h2>ルーレット一覧</h2>
+        <button type="button" class="btn ghost small" id="open-bans" style="margin:0 0 8px">参加禁止リスト</button>
         <p class="hint" id="adm-updated" style="margin:-4px 0 6px"></p>
         <div id="adm-list"></div>
       </div>
@@ -511,10 +532,59 @@
   <div class="field" id="u-rmimg-row"><label><input type="checkbox" id="u-rmimg" style="width:auto"> 画像を消す（タイトルだけにする）</label></div>
   <div class="field"><label for="u-deadline">抽選時刻</label><input id="u-deadline" type="datetime-local"></div>
   <div class="field"><label for="u-claim">配布期限</label><input id="u-claim" type="datetime-local"></div>
+  <div class="field"><label for="u-quote">引用してもらうポストのURL <span class="ex">（空ならDMで渡す方式）</span></label><input id="u-quote" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
   <div class="field"><label for="u-win">当選数</label><input id="u-win" type="number" min="1" max="100"></div>
   <div class="field"><label for="u-slots">枠の数</label><input id="u-slots" type="number" min="1" max="100"></div>
   <button type="button" class="btn primary" id="u-save">保存する</button>
   <p class="status" id="u-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<!-- 合言葉を獲得する（確認画面） -->
+<div class="sheet" id="quote-sheet" role="dialog" aria-modal="true" aria-labelledby="quote-title" hidden>
+  <div id="quote-step1">
+    <h2 id="quote-title">合言葉をもらう前に確認してください</h2>
+    <ol class="quote-rules">
+      <li>このあと開くXの画面で、配布ポストを<b>引用して投稿</b>してください（#ポケポケトレード #ポケポケ配布 は最初から入っています）</li>
+      <li>投稿は<b>ログイン中のXアカウント（<span id="quote-xid"></span>）</b>でしてください。合言葉はこのアカウント専用です</li>
+      <li><b>鍵アカウントでの投稿は確認できないため無効</b>です</li>
+      <li class="danger">投稿していない場合や、抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</li>
+      <li>抽選が終わったあとなら、投稿を消しても大丈夫です</li>
+    </ol>
+    <button type="button" class="btn primary" id="quote-go">わかりました。投稿する</button>
+    <p class="status" id="quote-status" role="status"></p>
+    <button type="button" class="btn ghost" data-close>キャンセル</button>
+  </div>
+  <div id="quote-step2" hidden>
+    <h2>合言葉</h2>
+    <div class="next-code quote-code"><p id="quote-code-head">あなたの合言葉です</p><code id="quote-code"></code></div>
+    <p class="sub">Xで引用ポストを投稿したら、空いている枠を選んで2枠目に参加してください。合言葉は自動で入ります。</p>
+    <button type="button" class="btn primary" id="quote-done">枠をえらぶ</button>
+    <button type="button" class="btn ghost" id="quote-again">Xの投稿画面をもう一度開く</button>
+    <p class="hint" style="margin:14px 0 4px">Xの投稿画面に配布ポスト（URL）が入っていなかったときは、下のボタンでコピーして投稿に貼り付けてください。URLが入っていない投稿は引用になりません。</p>
+    <button type="button" class="btn ghost" id="quote-copy" style="margin-top:4px">投稿する文章をコピー（URLが入っていなかったとき用）</button>
+  </div>
+</div>
+
+<!-- 参加禁止にする（管理者） -->
+<div class="sheet" id="ban-sheet" role="dialog" aria-modal="true" aria-labelledby="ban-title" hidden>
+  <h2 id="ban-title">参加禁止にする</h2>
+  <p class="sub">禁止した人は、どのルーレットにも参加できず、合言葉ももらえません。このXのIDで参加したことのあるポケポケのIDもまとめて禁止します。</p>
+  <div class="field"><label for="b-xid">XのID</label><div class="at"><span aria-hidden="true">@</span><input id="b-xid" autocomplete="off" maxlength="16" autocapitalize="off" spellcheck="false"></div></div>
+  <div class="field"><label for="b-poke">ポケポケのID <span class="ex">（わかれば）</span></label><input id="b-poke" inputmode="numeric" autocomplete="off" maxlength="30"></div>
+  <div class="field"><label for="b-reason">理由 <span class="ex">（自分用のメモ）</span></label><input id="b-reason" maxlength="100"></div>
+  <div class="field" id="b-remove-row"><label><input type="checkbox" id="b-remove" style="width:auto" checked> <span id="b-remove-text">このルーレットの枠も消す</span></label></div>
+  <button type="button" class="btn primary" id="b-save">参加禁止にする</button>
+  <p class="status" id="ban-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>やめる</button>
+</div>
+
+<!-- 参加禁止リスト（管理者） -->
+<div class="sheet" id="bans-sheet" role="dialog" aria-modal="true" aria-labelledby="bans-title" hidden>
+  <h2 id="bans-title">参加禁止リスト</h2>
+  <button type="button" class="btn ghost small" id="bans-add">手で追加する</button>
+  <div id="bans-list"></div>
+  <p class="status" id="bans-status" role="status"></p>
   <button type="button" class="btn ghost" data-close>閉じる</button>
 </div>
 
@@ -599,7 +669,7 @@
     const svg = (a, b, label) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${a}'/><stop offset='1' stop-color='${b}'/></linearGradient></defs><rect width='1200' height='630' fill='url(#g)'/><text x='600' y='300' font-size='88' font-weight='900' fill='#fff' text-anchor='middle' font-family='sans-serif'>${label}</text><text x='600' y='400' font-size='40' fill='#fff' text-anchor='middle' font-family='sans-serif'>（送ってもらった画像がここに出ます）</text></svg>`);
     const H = 3600e3;
     const R = [
-      { id: "demo1", title: "メガルカリオex 配布ルーレット", img: svg("#3E6FB0", "#8A63C9", "サンプル画像"), deadline: t + 2 * H + 15 * 60e3, claim: t + 26 * H, slots: 100, winCount: 2, winners: [], drawn: false, visible: true, entries: [] },
+      { id: "demo1", title: "メガルカリオex 配布ルーレット", img: svg("#3E6FB0", "#8A63C9", "サンプル画像"), deadline: t + 2 * H + 15 * 60e3, claim: t + 26 * H, slots: 100, winCount: 2, winners: [], drawn: false, visible: true, entries: [], quote: "https://x.com/sosuPOKEPOKE2/status/1900000000000000000" },
       { id: "demo2", title: "アイリス（トレーナー）配布", img: "", deadline: t + 5 * H, claim: t + 29 * H, slots: 10, winCount: 1, winners: [], drawn: false, visible: true, entries: [] },
       { id: "demo3", title: "デデンネex ★2色違い 配布", img: svg("#D2557A", "#F2C14E", "サンプル画像"), deadline: t - 60e3, claim: t + 23 * H, slots: 100, winCount: 2, winners: [], drawn: false, visible: true, entries: [] }
     ];
@@ -611,7 +681,9 @@
     // プレビューでは「あなたの枠」を1つ入れておく（あたり・はずれの表示確認用）
     addE(R[2], 27, "あなた", "3999000011112222", DEVICE);
     if (CONFIG.PREVIEW) try { const v = mineAll(); v.demo3 = [27]; localStorage.setItem(MY_KEY, JSON.stringify(v)); } catch (e) {}
-    const codes = { "Ab3#kP9x": { rid: "demo1", used: false }, "Zq7!mR2s": { rid: "demo1", used: false } };
+    const codes = { "Ab3#kP9x": { rid: "demo1", used: false }, "Zq7!mR2s": { rid: "demo1", used: false }, "Hm4=tW8c": { rid: "demo1", used: false } };
+    const bans = [];
+    const banned = (p) => bans.some((b) => (b.xId && b.xId.toLowerCase() === String(p.xId).toLowerCase()) || b.pokeIds.indexOf(p.pokeId) >= 0);
     const same = (a, b) => a.pokeId === b.pokeId || a.xId.toLowerCase() === b.xId.toLowerCase();
     const sameIn = (e, p) => e.pokeId === p.pokeId && e.trainer === p.trainer && e.xName === p.xName && e.xId.toLowerCase() === p.xId.toLowerCase();
     const shuffle = (a) => a.sort(() => Math.random() - 0.5);
@@ -623,7 +695,7 @@
       for (const e of pool) { if (won.length >= r.winCount) break; if (won.some((w) => same(w, e))) continue; won.push(e); }
       r.winners = won.map((e) => e.slot); r.drawn = true;
     }
-    const pub = (r) => ({ ok: true, id: r.id, title: r.title, img: r.img, deadline: r.deadline, claim: r.claim, slots: r.slots, winCount: r.winCount, winners: r.winners, drawn: r.drawn, taken: r.entries.map((e) => [e.slot, e.trainer]), winnersInfo: r.drawn ? r.winners.map((s) => { const e = r.entries.find((x) => x.slot === s); return [s, e ? e.trainer : "", e ? e.xName : ""]; }) : [], now: Date.now() });
+    const pub = (r) => ({ ok: true, id: r.id, title: r.title, img: r.img, deadline: r.deadline, claim: r.claim, slots: r.slots, winCount: r.winCount, winners: r.winners, drawn: r.drawn, quote: r.quote || "", taken: r.entries.map((e) => [e.slot, e.trainer]), winnersInfo: r.drawn ? r.winners.map((s) => { const e = r.entries.find((x) => x.slot === s); return [s, e ? e.trainer : "", e ? e.xName : ""]; }) : [], now: Date.now() });
     const find = (id) => R.find((r) => r.id === id);
     const info = (r, s) => { const e = r.entries.find((x) => x.slot === s); return e ? { slot: s, pokeId: e.pokeId, trainer: e.trainer, xName: e.xName, xId: e.xId } : { slot: s }; };
     return {
@@ -639,6 +711,7 @@
         if (d.action === "rl_entry") {
           if (!r) return { ok: false, error: "not_found" };
           if (Date.now() > r.deadline) return { ok: false, error: "closed" };
+          if (banned(d)) return { ok: false, error: "banned" };
           const al = r.entries.find((e) => e.slot === d.slot);
           if (al && sameIn(al, d)) return { ok: true, slot: d.slot, already: true };
           if (al) return { ok: false, error: "taken", taken: pub(r).taken };
@@ -650,12 +723,36 @@
           if (mine.length >= 2) return { ok: false, error: "limit" };
           if (mine.length) {
             if (!d.code) return { ok: false, error: "need_code" };
-            const c = codes[d.code]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (c.used) return { ok: false, error: "used_code" }; c.used = true;
+            const c = codes[d.code]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (c.used) return { ok: false, error: "used_code" }; if (c.to && c.to.toLowerCase() !== d.xId.toLowerCase()) return { ok: false, error: "code_other" }; c.used = true;
           }
           r.entries.push({ slot: d.slot, trainer: d.trainer, pokeId: d.pokeId, xId: d.xId, xName: d.xName, dev: d.dev, code: d.code || "" }); return { ok: true, slot: d.slot };
         }
+        if (d.action === "rl_getcode") {
+          if (!r || Date.now() > r.deadline) return { ok: false, error: "closed" };
+          if (!r.quote) return { ok: false, error: "no_quote" };
+          if (banned(d)) return { ok: false, error: "banned" };
+          const mine = r.entries.filter((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() === d.xId.toLowerCase());
+          if (!mine.length) return { ok: false, error: "need_first" };
+          const g = Object.keys(codes).find((c) => codes[c].rid === r.id && (codes[c].to || "").toLowerCase() === d.xId.toLowerCase());
+          if (g) return { ok: true, code: g, again: true, used: codes[g].used };
+          if (mine.length >= 2) return { ok: false, error: "limit" };
+          let k = Object.keys(codes).find((c) => codes[c].rid === r.id && !codes[c].used && !codes[c].handed);
+          if (!k) { k = "Nw" + Math.random().toString(36).slice(2, 6) + "#5"; codes[k] = { rid: r.id, used: false }; }
+          codes[k].handed = true; codes[k].to = d.xId; codes[k].via = "ボタン"; return { ok: true, code: k };
+        }
+        if (d.action === "rl_code_check") { if (codes[d.code]) codes[d.code].checked = !!d.on; return { ok: true }; }
+        if (d.action === "rl_bans") return { ok: true, bans: bans.map((b, i) => Object.assign({ row: i + 2 }, b)) };
+        if (d.action === "rl_ban") {
+          const pokeIds = d.pokeId ? [d.pokeId] : [];
+          R.forEach((x) => x.entries.forEach((e) => { if (d.xId && e.xId.toLowerCase() === d.xId.toLowerCase() && pokeIds.indexOf(e.pokeId) < 0) pokeIds.push(e.pokeId); }));
+          bans.push({ at: Date.now(), pokeIds, xId: d.xId, reason: d.reason });
+          let removed = [];
+          if (d.remove && r && !r.drawn) { const hit = r.entries.filter((e) => (d.xId && e.xId.toLowerCase() === d.xId.toLowerCase()) || pokeIds.indexOf(e.pokeId) >= 0); removed = hit.map((e) => e.slot); r.entries = r.entries.filter((e) => hit.indexOf(e) < 0); }
+          return { ok: true, pokeIds, removed };
+        }
+        if (d.action === "rl_unban") { bans.splice(d.row - 2, 1); return { ok: true }; }
         if (d.action === "rl_mystatus") { const out = {}; R.forEach((x) => x.entries.forEach((e) => { if (!sameIn(e, d)) return; const o = out[x.id] = out[x.id] || { slots: [], won: [] }; o.slots.push(e.slot); if (x.drawn && x.winners.indexOf(e.slot) >= 0) o.won.push(e.slot); })); return { ok: true, mine: out }; }
-        if (d.action === "rl_entries") return { ok: true, entries: r.entries.slice().sort((a, b) => a.slot - b.slot).map((e) => ({ slot: e.slot, pokeId: e.pokeId, trainer: e.trainer, xName: e.xName, xId: e.xId, code: !!e.code })) };
+        if (d.action === "rl_entries") return { ok: true, entries: r.entries.slice().sort((a, b) => a.slot - b.slot).map((e) => ({ slot: e.slot, pokeId: e.pokeId, trainer: e.trainer, xName: e.xName, xId: e.xId, code: !!e.code, banned: banned(e) })) };
         if (d.action === "rl_codes_next") {
           const to = (d.to || "").toLowerCase();
           if (to) { const g = Object.keys(codes).find((c) => codes[c].rid === d.rid && (codes[c].to || "").toLowerCase() === to); if (g) return { ok: false, error: "already_given", code: g, status: codes[g].used ? "使用済み" : "未使用" }; }
@@ -672,16 +769,16 @@
           if (r.entries.some((e) => mineE.indexOf(e) < 0 && (e.pokeId === d.next.pokeId || e.xId.toLowerCase() === d.next.xId.toLowerCase()))) return { ok: false, error: "conflict" };
           mineE.forEach((e) => Object.assign(e, d.next)); return { ok: true, slots: mineE.map((e) => e.slot) };
         }
-        if (d.action === "rl_admin_list") return { ok: true, now: Date.now(), items: R.map((x) => ({ id: x.id, title: x.title, img: x.img, deadline: x.deadline, claim: x.claim, slots: x.slots, winCount: x.winCount, visible: x.visible, taken: x.entries.length, winners: x.winners, drawn: x.drawn, contacted: (x.contacted || []).filter((n) => x.winners.indexOf(n) >= 0).length, codesUnused: Object.values(codes).filter((c) => c.rid === x.id && !c.used && !c.handed).length, codesHanded: Object.values(codes).filter((c) => c.rid === x.id && !c.used && c.handed).length, codesUsed: Object.values(codes).filter((c) => c.rid === x.id && c.used).length })) };
+        if (d.action === "rl_admin_list") return { ok: true, now: Date.now(), items: R.map((x) => ({ id: x.id, title: x.title, img: x.img, deadline: x.deadline, claim: x.claim, slots: x.slots, winCount: x.winCount, visible: x.visible, taken: x.entries.length, winners: x.winners, drawn: x.drawn, quote: x.quote || "", quoteTotal: Object.values(codes).filter((c) => c.rid === x.id && c.via === "ボタン" && !banned({ xId: c.to, pokeId: "" })).length, quoteChecked: Object.values(codes).filter((c) => c.rid === x.id && c.via === "ボタン" && c.checked && !banned({ xId: c.to, pokeId: "" })).length, contacted: (x.contacted || []).filter((n) => x.winners.indexOf(n) >= 0).length, codesUnused: Object.values(codes).filter((c) => c.rid === x.id && !c.used && !c.handed).length, codesHanded: Object.values(codes).filter((c) => c.rid === x.id && !c.used && c.handed).length, codesUsed: Object.values(codes).filter((c) => c.rid === x.id && c.used).length })) };
         if (d.action === "rl_codes_issue") { const out = []; for (let i = 0; i < d.count; i++) { const c = Math.random().toString(36).slice(2, 6) + "#" + Math.floor(Math.random() * 90 + 10) + "Q"; codes[c] = { rid: d.rid, used: false }; out.push(c); } return { ok: true, codes: out }; }
-        if (d.action === "rl_codes_list") return { ok: true, codes: Object.entries(codes).filter(([, c]) => c.rid === d.rid).map(([code, c]) => ({ code, status: c.used ? "使用済み" : "未使用", slot: "", handed: !!c.handed, to: c.to || "" })) };
-        if (d.action === "rl_create") { const id = "demo" + (R.length + 1); for (let i = 0; i < d.slots; i++) codes["demo" + (R.length + 1) + "-" + Math.random().toString(36).slice(2, 6) + "#" + (i % 8 + 2)] = { rid: "demo" + (R.length + 1), used: false }; R.push({ id, title: d.title, img: d.image ? "data:" + d.image.type + ";base64," + d.image.data : d.copyFrom ? (find(d.copyFrom) || {}).img || "" : "", deadline: d.deadline, claim: d.claim, slots: d.slots, winCount: d.winCount, winners: [], drawn: false, visible: true, entries: [] }); return { ok: true, id }; }
+        if (d.action === "rl_codes_list") return { ok: true, codes: Object.entries(codes).filter(([, c]) => c.rid === d.rid).map(([code, c]) => ({ code, status: c.used ? "使用済み" : "未使用", slot: "", handed: !!c.handed, to: c.to || "", via: c.via || (c.handed ? "DM" : ""), checked: !!c.checked, banned: !!c.to && banned({ xId: c.to, pokeId: "" }) })) };
+        if (d.action === "rl_create") { const id = "demo" + (R.length + 1); for (let i = 0; i < d.slots; i++) codes["demo" + (R.length + 1) + "-" + Math.random().toString(36).slice(2, 6) + "#" + (i % 8 + 2)] = { rid: "demo" + (R.length + 1), used: false }; R.push({ id, title: d.title, img: d.image ? "data:" + d.image.type + ";base64," + d.image.data : d.copyFrom ? (find(d.copyFrom) || {}).img || "" : "", deadline: d.deadline, claim: d.claim, slots: d.slots, winCount: d.winCount, winners: [], drawn: false, visible: true, entries: [], quote: d.quote || "" }); return { ok: true, id }; }
         if (d.action === "rl_update") {
           if (!r) return { ok: false, error: "not_found" };
           const base = r.drawn ? r.deadline : d.deadline;
           if (!r.drawn && !(d.deadline > Date.now())) return { ok: false, error: "bad_deadline" };
           if (!(d.claim > base)) return { ok: false, error: "bad_claim" };
-          r.title = d.title; r.claim = d.claim;
+          r.title = d.title; r.claim = d.claim; r.quote = d.quote || "";
           if (d.image) r.img = "data:" + d.image.type + ";base64," + d.image.data;
           if (d.removeImage) r.img = "";
           if (!r.drawn) { r.deadline = d.deadline; r.winCount = d.winCount; r.slots = d.slots; }
@@ -928,6 +1025,7 @@
       mineEl.innerHTML = ""; mineEl.append("あなたの枠：", txt(mk("b"), mine.map((n) => n + "番").join("・")));
       if (mine.length < 2 && !isClosed) mineEl.append("（合言葉があればもう1枠参加できます）");
     }
+    renderGetCode(mine, isClosed);
     txt($("grid-hint"), isClosed ? "受付は終了しました。ご参加ありがとうございました。" : full ? "満員になりました。抽選時刻になるとルーレットを回せます。" : "空き状況は数秒ごとに自動で更新されます。");
     $("edit-row").hidden = isClosed;
     renderResultPanel();
@@ -1005,7 +1103,7 @@
     document.body.style.overflow = "hidden";
   }
   function closeSheets(keepSel) {
-    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet"].forEach((i) => { $(i).hidden = true; });
+    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet", "quote-sheet", "ban-sheet", "bans-sheet"].forEach((i) => { $(i).hidden = true; });
     $("sheet-bg").hidden = true;
     document.body.style.overflow = "";
     if (!keepSel) selected = null;
@@ -1015,7 +1113,7 @@
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", tryClose));
   $("sheet-bg").addEventListener("click", tryClose);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") tryClose(); });
-  ["f-xid", "e-xid", "n-xid", "l-xid", "codes-to"].forEach((id) => $(id).addEventListener("input", (e) => { const v = e.target.value.replace(/^[@＠]+/, ""); if (v !== e.target.value) e.target.value = v; }));
+  ["f-xid", "e-xid", "n-xid", "l-xid", "codes-to", "b-xid"].forEach((id) => $(id).addEventListener("input", (e) => { const v = e.target.value.replace(/^[@＠]+/, ""); if (v !== e.target.value) e.target.value = v; }));
 
   function openEntry(n) {
     if (submitting) { toast("前の参加の処理中です。少しお待ちください。", true); return; }
@@ -1025,7 +1123,8 @@
     txt($("entry-no"), n); txt($("entry-no2"), n);
     $("entry-step1").hidden = false; $("entry-step2").hidden = true;
     setStatus("entry-status1", ""); setStatus("entry-status2", ""); txt($("entry-submit"), "この内容で参加する"); useCode = false;
-    txt($("code-note"), mySlots().length ? "2枠目の参加には合言葉が必要です。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。" : "2枠目に参加する人だけ入力してください。合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。");
+    const how = cur.quote ? "合言葉は、1枠目に参加したあと、ページの「合言葉を獲得する」ボタンからもらえます。" : "合言葉は、ポストを引用RP（#ポケポケトレード #ポケポケ配布 を入れて）した方にDMでお送りします。";
+    txt($("code-note"), (mySlots().length ? "2枠目の参加には合言葉が必要です。" : "2枠目に参加する人だけ入力してください。") + how);
     // ログイン中は最初から入力しておく。ログインしていなければ毎回空にする
     const prof = getProfile();
     $("f-poke").value = prof ? prof.pokeId : ""; $("f-trainer").value = prof ? prof.trainer : ""; $("f-xname").value = prof ? prof.xName : ""; $("f-xid").value = prof ? prof.xId : "";
@@ -1033,6 +1132,7 @@
     ["f-poke", "f-trainer", "f-xname", "f-xid", "f-code"].forEach((id) => $(id).setAttribute("aria-invalid", "false"));
     $("prefill-note").hidden = !prof;
     if (linkCodes[cur.id]) { $("f-code").value = linkCodes[cur.id]; txt($("code-note"), "合言葉入りのリンクから開いたので、合言葉が入っています（2枠目のときに使われます）。"); }
+    else if (getGot(cur.id) && mySlots().length) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「合言葉を獲得する」でもらった合言葉が入っています。"); }
     openSheet("entry-sheet");
     const first = ["f-poke", "f-trainer", "f-xname", "f-xid"].map($).find((i) => !i.value) || (mySlots().length ? $("f-code") : $("to-confirm"));
     setTimeout(() => first.focus(), 50);
@@ -1107,7 +1207,7 @@
       if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは2枠までです。" }[r.error], true); refreshDetail(); return; }
       const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。",
         mismatch_poke: "このXのID（@" + p.xId + "）は、別のポケポケのIDで参加済みです。1枠目と同じポケポケのIDを入れてください（数字を1つずつ確認してください）。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。",
-        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", used_code: "この合言葉はすでに使われています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
+        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", used_code: "この合言葉はすでに使われています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
       if (back) {
         $("entry-step2").hidden = true; $("entry-step1").hidden = false;
         setStatus("entry-status1", back, true);
@@ -1174,7 +1274,7 @@
         const prof = getProfile();
         if (prof && prof.pokeId === editCtx.old.pokeId && prof.xId.toLowerCase() === editCtx.old.xId.toLowerCase() && prof.trainer === editCtx.old.trainer && prof.xName === editCtx.old.xName) { setProfile(editCtx.next); renderLoginBar(); }
         closeSheets(); toast(done.map((sl) => sl + "番").join("・") + "の入力を変更しました。"); ["poke", "trainer", "xname", "xid"].forEach((k) => { $("f-" + k).value = $("n-" + k).value; }); refreshDetail(); return; }
-      setStatus("edit-status4", { conflict: "そのポケポケのIDかXのIDは、ほかの人の枠で使われています。", closed: "抽選時刻を過ぎたため変更できません。", not_found: "枠が見つかりませんでした。最初からやり直してください。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "変更できませんでした。", true);
+      setStatus("edit-status4", { banned: "ルール違反のため、そのポケポケのIDまたはXのIDには変更できません。", conflict: "そのポケポケのIDかXのIDは、ほかの人の枠で使われています。", closed: "抽選時刻を過ぎたため変更できません。", not_found: "枠が見つかりませんでした。最初からやり直してください。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "変更できませんでした。", true);
     } catch (e) { setStatus("edit-status4", "混み合っています。少し待ってからもう一度押してください。", true); }
     finally { $("n-save").disabled = false; }
   });
@@ -1446,13 +1546,20 @@
       it.appendChild(mk("div", "m", "抽選 " + fmtTime(r.deadline) + "／配布期限 " + (r.claim ? fmtTime(r.claim) : "未設定")));
       const st = st0 + (r.drawn && r.winners.length ? "（連絡済み " + (r.contacted || 0) + " / " + r.winners.length + "）" : "");
       it.appendChild(mk("div", "m", "参加 " + r.taken + " / " + r.slots + "／当選 " + r.winCount + "／" + st));
-      it.appendChild(mk("div", "m", "合言葉：まだ渡していない " + r.codesUnused + "・渡し済み " + (r.codesHanded || 0) + "・使用済み " + r.codesUsed));
+      it.appendChild(mk("div", "m", "合言葉（" + (r.quote ? "ボタンで渡す" : "DMで渡す") + "）：まだ渡していない " + r.codesUnused + "・渡し済み " + (r.codesHanded || 0) + "・使用済み " + r.codesUsed));
       const btn = (cls, label, fn) => { const b = mk("button", "btn small " + cls, label); b.type = "button"; b.addEventListener("click", fn); it.appendChild(b); };
       if (r.drawn) btn("primary", "当選者", () => openWinners(r));
       else btn("primary", "合言葉", () => openCodes(r));
       btn("ghost", "参加者", () => openEntries(r));
       btn("ghost", "編集", () => openUpdate(r));
       btn("ghost", "ページを見る", () => { location.hash = "r=" + r.id; });
+      if (r.quote) btn("ghost", "引用ポストを確認", () => window.open(r.quote + "/quotes", "_blank", "noopener"));
+      if (r.quote && r.quoteTotal) {
+        const left = r.quoteTotal - (r.quoteChecked || 0);
+        const soon = !r.drawn && r.deadline - now() < 3600e3;
+        const line = mk("div", "m" + (soon && left ? " alert" : ""), "引用の確認：済み " + (r.quoteChecked || 0) + " / " + r.quoteTotal + " 人" + (left ? (soon ? "（未確認 " + left + "人・まもなく抽選です）" : "（未確認 " + left + "人）") : "（全員確認済み）"));
+        it.insertBefore(line, it.querySelector("button"));
+      }
       btn("ghost", "複製", () => copyRoulette(r));
       if (r.drawn) btn("ghost", "合言葉", () => openCodes(r));
       btn("ghost", r.visible ? "一覧から隠す" : "一覧に出す", async () => { await apiPost({ action: "rl_visible", key: adminKey, rid: r.id, visible: !r.visible }); loadAdmin(); });
@@ -1464,7 +1571,7 @@
   const pad2 = (x) => String(x).padStart(2, "0");
   function toLocalInput(ms) { const d = new Date(ms); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
   const fromLocalInput = (v) => v ? new Date(v).getTime() : NaN;
-  const ADMIN_ERR = { bad_key: "管理キーがちがいます。", bad_deadline: "抽選時刻は今より後にしてください。", bad_claim: "配布期限は抽選時刻より後にしてください。", bad_slots: "すでに参加者がいる番号より少ない枠の数にはできません。", busy: "混み合っています。少し待ってからもう一度押してください。", invalid: "入力を確認してください。" };
+  const ADMIN_ERR = { bad_quote: "引用してもらうポストのURLは、Xのポストを開いて「リンクをコピー」したものを貼り付けてください。", bad_key: "管理キーがちがいます。", bad_deadline: "抽選時刻は今より後にしてください。", bad_claim: "配布期限は抽選時刻より後にしてください。", bad_slots: "すでに参加者がいる番号より少ない枠の数にはできません。", busy: "混み合っています。少し待ってからもう一度押してください。", invalid: "入力を確認してください。" };
 
   // ---- 当選者 ----
   let winFor = null;
@@ -1533,10 +1640,12 @@
         d.appendChild(mk("b", "", w.trainer));
         if ((r.winners || []).indexOf(w.slot) >= 0) d.appendChild(mk("span", "badge b-hit", "当選"));
         if (w.code) d.appendChild(mk("span", "badge b-wait", "合言葉で2枠目"));
+        if (w.banned) d.appendChild(mk("span", "badge b-ban", "参加禁止"));
         d.appendChild(mk("span", "full", "ポケポケID：" + w.pokeId.replace(/(\d{4})(?=\d)/g, "$1-")));
         const x = mk("span", "full", "X：" + w.xName + " ");
         const a = mk("a", "", "@" + w.xId); a.href = "https://x.com/" + encodeURIComponent(w.xId); a.target = "_blank"; a.rel = "noopener";
         x.appendChild(a); d.appendChild(x);
+        if (!w.banned) { const bb = mk("button", "btn ghost small", "参加禁止にする"); bb.type = "button"; bb.addEventListener("click", () => openBan({ xId: w.xId, pokeId: w.pokeId, r })); d.appendChild(bb); }
         box.appendChild(d);
       });
     } catch (e) { setStatus("ent-status", "混み合っています。少し待ってから開き直してください。", true); }
@@ -1551,7 +1660,7 @@
     $("u-title").value = r.title;
     $("u-deadline").value = toLocalInput(r.deadline);
     $("u-claim").value = r.claim ? toLocalInput(r.claim) : toLocalInput(r.deadline + 24 * 3600e3);
-    $("u-win").value = r.winCount; $("u-slots").value = r.slots;
+    $("u-win").value = r.winCount; $("u-slots").value = r.slots; $("u-quote").value = r.quote || "";
     ["u-deadline", "u-win", "u-slots"].forEach((id) => { $(id).disabled = drawn; });
     $("u-img").value = ""; $("u-img-prev").hidden = true; $("u-rmimg").checked = false;
     $("u-rmimg-row").hidden = !r.img;
@@ -1575,7 +1684,7 @@
     if (!(claim > deadline)) return setStatus("u-status", ADMIN_ERR.bad_claim, true);
     $("u-save").disabled = true; setStatus("u-status", "保存しています…");
     try {
-      const res = await apiPost({ action: "rl_update", key: adminKey, rid: r.id, title, deadline, claim, winCount: Number($("u-win").value), slots: Number($("u-slots").value),
+      const res = await apiPost({ action: "rl_update", key: adminKey, rid: r.id, title, deadline, claim, quote: $("u-quote").value.trim(), winCount: Number($("u-win").value), slots: Number($("u-slots").value),
         image: updImg ? { type: updImg.type, data: updImg.data } : null, removeImage: !updImg && $("u-rmimg").checked });
       if (!res.ok) return setStatus("u-status", ADMIN_ERR[res.error] || "保存できませんでした。", true);
       closeSheets(); toast("保存しました。"); loadAdmin();
@@ -1604,7 +1713,7 @@
   function clearCopy() { copyFrom = null; $("c-copy-note").hidden = true; }
   // 前のルーレットを複製（タイトル・画像・当選数・枠の数を引き継ぐ。抽選時刻と配布期限は次の22:00から）
   function copyRoulette(r) {
-    $("c-title").value = r.title; $("c-win").value = r.winCount; $("c-slots").value = r.slots;
+    $("c-title").value = r.title; $("c-win").value = r.winCount; $("c-slots").value = r.slots; $("c-quote").value = "";
     $("c-img").value = ""; pendingImg = null;
     copyFrom = r.img ? r.id : null;
     $("c-img-prev").hidden = !r.img; if (r.img) $("c-img-prev").src = r.img;
@@ -1637,10 +1746,10 @@
     if (!(claim > deadline)) return setStatus("c-status", ADMIN_ERR.bad_claim, true);
     $("c-create").disabled = true; setStatus("c-status", "作成しています…");
     try {
-      const r = await apiPost({ action: "rl_create", key: adminKey, title, deadline, claim, winCount: Number($("c-win").value), slots: Number($("c-slots").value), image: pendingImg ? { type: pendingImg.type, data: pendingImg.data } : null, copyFrom: pendingImg ? null : copyFrom });
+      const r = await apiPost({ action: "rl_create", key: adminKey, title, deadline, claim, quote: $("c-quote").value.trim(), winCount: Number($("c-win").value), slots: Number($("c-slots").value), image: pendingImg ? { type: pendingImg.type, data: pendingImg.data } : null, copyFrom: pendingImg ? null : copyFrom });
       if (!r.ok) return setStatus("c-status", ADMIN_ERR[r.error] || "作成できませんでした。入力を確認してください。", true);
       setStatus("c-status", "作成しました！");
-      $("c-title").value = ""; $("c-img").value = ""; pendingImg = null; $("c-img-prev").hidden = true; clearCopy();
+      $("c-title").value = ""; $("c-quote").value = ""; $("c-img").value = ""; pendingImg = null; $("c-img-prev").hidden = true; clearCopy();
       loadAdmin();
     } catch (e) { setStatus("c-status", "混み合っています。少し待ってからもう一度押してください。", true); }
     finally { $("c-create").disabled = false; }
@@ -1649,7 +1758,8 @@
   let codesFor = null;
   async function openCodes(r) {
     codesFor = r;
-    txt($("codes-sub"), r.title + " の合言葉です。ルーレットを作ったときに枠の数と同じ数だけ用意してあります（枠を増やすと自動で足されます）。1つにつき1回だけ使えます。引用RTしてくれた人のXのIDを入れてボタンを押すと、合言葉入りのDM用の文章がコピーされます。");
+    if (r.quote) { txt($("codes-sub"), r.title + " の合言葉です。このルーレットは「合言葉を獲得する」ボタンで渡す方式です。「（ボタン）」と付いている人が、ボタンで合言葉を受け取った人です。抽選の前に、ルーレット一覧の「引用ポストを確認」で、引用していない人・消した人がいないか確認してください。DMで渡すこともできます。"); }
+    else txt($("codes-sub"), r.title + " の合言葉です。ルーレットを作ったときに枠の数と同じ数だけ用意してあります（枠を増やすと自動で足されます）。1つにつき1回だけ使えます。引用RTしてくれた人のXのIDを入れてボタンを押すと、合言葉入りのDM用の文章がコピーされます。");
     setStatus("codes-status", ""); $("next-code").hidden = true; $("codes-to").value = "";
     openSheet("codes-sheet");
     loadCodes();
@@ -1665,17 +1775,41 @@
     r.codes.slice().sort((a, b) => rank(a) - rank(b)).forEach((c) => {
       const k = rank(c);
       const li = mk("li", k === 2 ? "used" : k === 1 ? "handed" : "");
-      const cw = mk("span"); cw.appendChild(mk("code", "", c.code)); if (c.to) cw.appendChild(mk("span", "to", "→ @" + c.to));
+      const cw = mk("span"); cw.appendChild(mk("code", "", c.code)); if (c.to) cw.appendChild(mk("span", "to", "→ @" + c.to + (c.via === "ボタン" ? "（ボタン）" : "")));
       li.appendChild(cw);
+      if (c.to && c.via === "ボタン" && !c.banned) {
+        const lab = mk("label", "chk"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!c.checked;
+        lab.append(cb, "引用を確認した"); li.classList.toggle("checked", !!c.checked);
+        cb.addEventListener("change", async () => {
+          cb.disabled = true;
+          try { const res = await apiPost({ action: "rl_code_check", key: adminKey, rid: codesFor.id, code: c.code, on: cb.checked }); if (!res.ok) throw 0; c.checked = cb.checked; li.classList.toggle("checked", cb.checked); renderQuoteCount(); loadAdmin(true); }
+          catch (e) { cb.checked = !cb.checked; toast("混み合っています。少し待ってからもう一度押してください。", true); }
+          finally { cb.disabled = false; }
+        });
+        li.appendChild(lab);
+      }
+      if (c.banned) li.appendChild(mk("span", "badge b-ban", "参加禁止"));
+      if (c.to && c.via === "ボタン" && !c.banned) {
+        const x = mk("a", "btn ghost small", "@" + c.to + " のXを開く"); x.href = "https://x.com/" + encodeURIComponent(c.to); x.target = "_blank"; x.rel = "noopener"; li.appendChild(x);
+        const bb = mk("button", "btn ghost small", "参加禁止にする"); bb.type = "button"; bb.addEventListener("click", () => openBan({ xId: c.to, r: codesFor })); li.appendChild(bb);
+      }
       if (k === 2) li.appendChild(mk("span", "tag", "使用済み" + (c.slot ? "（" + c.slot + "番）" : "")));
       else if (k === 1) {
         const b = mk("button", "btn ghost small", "渡し済み・コピー"); b.type = "button";
         b.addEventListener("click", () => { showNext(c.code, c.to, "渡し済みの合言葉です" + (c.to ? "（@" + c.to + "）" : "")); copyText(lastDm); });
-        li.appendChild(b);
+        if (c.via !== "ボタン") li.appendChild(b); else li.appendChild(mk("span", "tag", "渡し済み"));
       } else li.appendChild(mk("span", "tag", "まだ渡していない"));
       ul.appendChild(li);
     });
     if (!r.codes.length) ul.appendChild(mk("li", "", "まだ発行していません。"));
+    lastCodes = r.codes; renderQuoteCount();
+  }
+  let lastCodes = [];
+  function renderQuoteCount() {
+    const btnCodes = lastCodes.filter((c) => c.via === "ボタン" && !c.banned);
+    if (!codesFor || !codesFor.quote || !btnCodes.length) return;
+    const n = btnCodes.filter((c) => c.checked).length;
+    txt($("codes-status"), $("codes-status").textContent.replace(/　引用の確認.*$/, "") + "　引用の確認：済み " + n + " / " + btnCodes.length + " 人");
   }
   async function copyText(t, quiet) {
     try { await navigator.clipboard.writeText(t); toast(quiet ? "DM用の文章をコピーしました。" : "コピーしました：" + t); return true; }
@@ -1723,6 +1857,126 @@
     } catch (e) { setStatus("codes-status", "通信できませんでした。", true); }
     finally { $("codes-issue").disabled = false; }
   });
+
+  // ---- 合言葉を獲得する（引用ポスト） ----
+  const GOT_KEY = "cardRoulette:gotcode";
+  const gotMem = {};
+  function getGot(rid) { try { return (JSON.parse(localStorage.getItem(GOT_KEY) || "{}"))[rid] || gotMem[rid] || ""; } catch (e) { return gotMem[rid] || ""; } }
+  function saveGot(rid, code) { gotMem[rid] = code; try { const v = JSON.parse(localStorage.getItem(GOT_KEY) || "{}"); v[rid] = code; localStorage.setItem(GOT_KEY, JSON.stringify(v)); } catch (e) {} }
+  const RULE_DM = $("rule-code").innerHTML;
+  function renderGetCode(mine, isClosed) {
+    const rule = $("rule-code");
+    if (cur.quote) rule.innerHTML = "合言葉がほしい方は、1枠目に参加したあと<b>「合言葉を獲得する」ボタン</b>から配布ポストを<b>引用ポスト</b>してください（#ポケポケトレード #ポケポケ配布 入り）。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）";
+    else rule.innerHTML = RULE_DM;
+    const box = $("getcode");
+    const show = !!cur.quote && !isClosed && mine.length < 2;
+    box.hidden = !show;
+    if (!show) return;
+    const got = getGot(cur.id);
+    txt($("getcode-text"), mine.length ? "配布ポストを引用ポストすると、2枠目に参加するための合言葉がもらえます。" : "1枠目に参加したあと、配布ポストを引用ポストすると2枠目の合言葉がもらえます。");
+    $("getcode-have").hidden = !got;
+    if (got) { const h = $("getcode-have"); h.innerHTML = ""; h.append("あなたの合言葉：", mk("code", "", got), "（空いている枠を選ぶと自動で入ります）"); }
+    txt($("getcode-btn"), got ? "合言葉をもう一度見る" : "合言葉を獲得する");
+  }
+  function quoteIntent() {
+    return "https://x.com/intent/post?text=" + encodeURIComponent("#ポケポケトレード #ポケポケ配布\n") + "&url=" + encodeURIComponent(cur.quote);
+  }
+  function showGot(code, head) {
+    txt($("quote-code"), code); txt($("quote-code-head"), head);
+    $("quote-step1").hidden = true; $("quote-step2").hidden = false;
+  }
+  $("getcode-btn").addEventListener("click", () => {
+    if (!cur || !cur.quote) return;
+    const prof = getProfile();
+    if (!prof) { toast("合言葉をもらうには、先にログインしてください。", true); openLogin(); return; }
+    if (!mySlots().length) { toast("先に1枠目に参加してください。", true); return; }
+    txt($("quote-xid"), "@" + prof.xId);
+    setStatus("quote-status", ""); $("quote-go").disabled = false;
+    const got = getGot(cur.id);
+    $("quote-step1").hidden = !!got; $("quote-step2").hidden = !got;
+    if (got) showGot(got, "あなたの合言葉です");
+    openSheet("quote-sheet");
+  });
+  $("quote-go").addEventListener("click", async () => {
+    const prof = getProfile();
+    if (!cur || !prof) return;
+    const rid = cur.id;
+    // 先にXの投稿画面を開く（通信のあとに開くと、スマホでは開けないことがあるため）
+    window.open(quoteIntent(), "_blank", "noopener");
+    $("quote-go").disabled = true; setStatus("quote-status", "合言葉を用意しています…");
+    try {
+      const r = await apiPost(Object.assign({ action: "rl_getcode", rid }, prof));
+      if (r.ok) {
+        saveGot(rid, r.code);
+        showGot(r.code, r.used ? "この合言葉はもう使われています" : r.again ? "前にもらった合言葉です" : "あなたの合言葉です");
+        if (cur && cur.id === rid) renderDetail();
+        return;
+      }
+      setStatus("quote-status", { need_first: "先に1枠目に参加してください（ログイン中の4つと同じ内容で参加した枠が必要です）。", banned: "ルール違反のため、合言葉をお渡しできません。", limit: "参加できるのは2枠までです。", closed: "抽選時刻を過ぎたため、合言葉はもらえません。", no_quote: "このルーレットではボタンで合言葉を渡していません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "合言葉をもらえませんでした。", true);
+    } catch (e) { setStatus("quote-status", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("quote-go").disabled = false; }
+  });
+  $("quote-copy").addEventListener("click", async () => {
+    if (!cur || !cur.quote) return;
+    try { await navigator.clipboard.writeText("#ポケポケトレード #ポケポケ配布\n" + cur.quote); toast("コピーしました。Xの投稿に貼り付けてください。"); }
+    catch (e) { toast("コピーできませんでした。", true); }
+  });
+  $("quote-again").addEventListener("click", () => { if (cur && cur.quote) window.open(quoteIntent(), "_blank", "noopener"); });
+  $("quote-done").addEventListener("click", () => { closeSheets(); $("grid").scrollIntoView({ behavior: "smooth", block: "center" }); });
+
+  // ---- 参加禁止（管理者） ----
+  let banFor = null;
+  function openBan(o) {
+    banFor = o || {};
+    $("b-xid").value = banFor.xId || ""; $("b-poke").value = banFor.pokeId || ""; $("b-reason").value = banFor.r && banFor.r.quote ? "引用ポストなし／抽選前に削除" : "";
+    const canRemove = !!(banFor.r && !banFor.r.drawn);
+    $("b-remove-row").hidden = !canRemove; $("b-remove").checked = canRemove;
+    if (canRemove) txt($("b-remove-text"), "「" + banFor.r.title + "」のこの人の枠も消す（2枠とも消えます）");
+    setStatus("ban-status", "");
+    openSheet("ban-sheet");
+  }
+  $("b-save").addEventListener("click", async () => {
+    const xId = $("b-xid").value.normalize("NFKC").trim().replace(/^[@＠]+/, "");
+    const pokeId = $("b-poke").value.normalize("NFKC").replace(/\D/g, "");
+    if (xId && !/^[A-Za-z0-9_]{1,15}$/.test(xId)) return setStatus("ban-status", "XのIDは英数字と _ で入力してください。", true);
+    if (!xId && pokeId.length < 8) return setStatus("ban-status", "XのIDかポケポケのIDを入力してください。", true);
+    $("b-save").disabled = true; setStatus("ban-status", "登録しています…");
+    try {
+      const rid = banFor && banFor.r ? banFor.r.id : "";
+      const r = await apiPost({ action: "rl_ban", key: adminKey, xId, pokeId, reason: $("b-reason").value.trim(), rid, remove: !$("b-remove-row").hidden && $("b-remove").checked });
+      if (!r.ok) return setStatus("ban-status", ADMIN_ERR[r.error] || "登録できませんでした。", true);
+      closeSheets();
+      toast("参加禁止にしました" + (r.removed && r.removed.length ? "（" + r.removed.map((n) => n + "番").join("・") + "を消しました）" : "") + "。");
+      loadAdmin(true);
+    } catch (e) { setStatus("ban-status", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("b-save").disabled = false; }
+  });
+  async function openBans() {
+    $("bans-list").innerHTML = ""; setStatus("bans-status", "読み込んでいます…");
+    openSheet("bans-sheet");
+    try {
+      const r = await apiPost({ action: "rl_bans", key: adminKey });
+      if (!r.ok) return setStatus("bans-status", ADMIN_ERR[r.error] || "読み込めませんでした。", true);
+      setStatus("bans-status", r.bans.length ? "" : "参加禁止の人はいません。");
+      const box = $("bans-list");
+      r.bans.slice().reverse().forEach((b) => {
+        const d = mk("div", "ban-row");
+        d.appendChild(mk("b", "", b.xId ? "@" + b.xId : "（XのIDなし）"));
+        if (b.pokeIds.length) d.appendChild(mk("div", "", "ポケポケID：" + b.pokeIds.map((x) => x.replace(/(\d{4})(?=\d)/g, "$1-")).join("、")));
+        d.appendChild(mk("div", "hint", (b.at ? fmtTime(b.at) : "") + (b.reason ? "　" + b.reason : "")));
+        const u = mk("button", "btn ghost small", "解除する"); u.type = "button";
+        u.addEventListener("click", async () => {
+          u.disabled = true;
+          try { const res = await apiPost({ action: "rl_unban", key: adminKey, row: b.row, xId: b.xId }); if (!res.ok) throw 0; toast("解除しました。"); openBans(); }
+          catch (e) { u.disabled = false; toast("解除できませんでした。開き直してからもう一度押してください。", true); }
+        });
+        d.appendChild(u);
+        box.appendChild(d);
+      });
+    } catch (e) { setStatus("bans-status", "混み合っています。少し待ってから開き直してください。", true); }
+  }
+  $("open-bans").addEventListener("click", openBans);
+  $("bans-add").addEventListener("click", () => openBan({}));
 
   // ---- お知らせ ----
   let toastTimer = null;
