@@ -412,7 +412,7 @@
       <div class="field"><label for="f-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="f-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
       <div class="code-box">
         <p id="code-note">2枠目に参加する人だけ入力してください。合言葉は、1枠目に参加したあと、ページの「合言葉を獲得する」ボタンからもらえます。</p>
-        <div class="field" style="margin:0"><label for="f-code">合言葉 <span class="ex">（2枠目のみ・大文字小文字も正確に）</span></label><input id="f-code" autocomplete="off" maxlength="30" autocapitalize="off" spellcheck="false"></div>
+        <div class="field" style="margin:0"><label for="f-code">合言葉 <span class="ex">（2枠目のみ・大文字小文字はどちらでもOK）</span></label><input id="f-code" autocomplete="off" autocorrect="off" maxlength="40" autocapitalize="off" spellcheck="false"></div>
       </div>
       <button type="submit" class="btn primary" id="to-confirm">確認する</button>
       <p class="status" id="entry-status1" role="status"></p>
@@ -725,7 +725,7 @@
           if (mine.length >= 2) return { ok: false, error: "limit" };
           if (mine.length) {
             if (!d.code) return { ok: false, error: "need_code" };
-            const c = codes[d.code]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (c.used) return { ok: false, error: "used_code" }; if (c.to && c.to.toLowerCase() !== d.xId.toLowerCase()) return { ok: false, error: "code_other" }; c.used = true;
+            const ck = Object.keys(codes).find((k) => k.toUpperCase() === cleanCode(d.code).toUpperCase()); const c = codes[ck]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (c.used) return { ok: false, error: "used_code" }; if (c.to && c.to.toLowerCase() !== d.xId.toLowerCase()) return { ok: false, error: "code_other" }; c.used = true;
           }
           r.entries.push({ slot: d.slot, trainer: d.trainer, pokeId: d.pokeId, xId: d.xId, xName: d.xName, dev: d.dev, code: d.code || "" }); return { ok: true, slot: d.slot };
         }
@@ -833,10 +833,17 @@
   // ---- 画面の切り替え ----
   // 合言葉入りのリンク（#r=ID&c=合言葉）から開いたとき
   const linkCodes = {};
+  // 合言葉の入力をきれいにする（「合言葉：」ごと貼られた場合や、空白・全角を直す）
+  function cleanCode(v) { return String(v || "").normalize("NFKC").replace(/^[\s\S]*?合言葉\s*[:：]?/, "").replace(/\s+/g, ""); }
+  // このスマホで使った合言葉（使用済みの合言葉を入力欄に入れないため）
+  const USED_KEY = "cardRoulette:usedcodes";
+  const usedMem = new Set();
+  function isUsedCode(c) { const k = String(c).toUpperCase(); if (usedMem.has(k)) return true; try { return (JSON.parse(localStorage.getItem(USED_KEY) || "[]")).indexOf(k) >= 0; } catch (e) { return false; } }
+  function markUsedCode(c) { const k = String(c).toUpperCase(); usedMem.add(k); try { const v = JSON.parse(localStorage.getItem(USED_KEY) || "[]"); if (v.indexOf(k) < 0) v.push(k); localStorage.setItem(USED_KEY, JSON.stringify(v.slice(-50))); } catch (e) {} }
   function route() {
     const m = location.hash.match(/r=([\w-]+)/);
     const c = location.hash.match(/[#&]c=([^&]+)/);
-    if (m && c) { try { linkCodes[m[1]] = decodeURIComponent(c[1]); } catch (e) {} }
+    if (m && c) { let v = c[1]; try { v = decodeURIComponent(v); } catch (e) {} v = cleanCode(v); if (v && !isUsedCode(v)) linkCodes[m[1]] = v; }
     closeSheets();
     if (ADMIN && !m) { showAdmin(); return; }
     if (m) openDetail(m[1]); else showList();
@@ -1133,8 +1140,9 @@
     $("f-code").value = "";
     ["f-poke", "f-trainer", "f-xname", "f-xid", "f-code"].forEach((id) => $(id).setAttribute("aria-invalid", "false"));
     $("prefill-note").hidden = !prof;
+    if (linkCodes[cur.id] && isUsedCode(linkCodes[cur.id])) delete linkCodes[cur.id];
     if (linkCodes[cur.id]) { $("f-code").value = linkCodes[cur.id]; txt($("code-note"), "合言葉入りのリンクから開いたので、合言葉が入っています（2枠目のときに使われます）。"); }
-    else if (getGot(cur.id) && mySlots().length) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「合言葉を獲得する」でもらった合言葉が入っています。"); }
+    else if (getGot(cur.id) && !isUsedCode(getGot(cur.id)) && mySlots().length) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「合言葉を獲得する」でもらった合言葉が入っています。"); }
     openSheet("entry-sheet");
     const first = ["f-poke", "f-trainer", "f-xname", "f-xid"].map($).find((i) => !i.value) || (mySlots().length ? $("f-code") : $("to-confirm"));
     setTimeout(() => first.focus(), 50);
@@ -1152,7 +1160,8 @@
     const err = checkPerson(p, "f-");
     if (err) return setStatus("entry-status1", err, true);
     // 合言葉が入っているのに、このスマホではまだ1枠目に参加していないときは、どちらか聞く
-    const code = $("f-code").value.trim();
+    $("f-code").value = cleanCode($("f-code").value);
+    const code = $("f-code").value;
     useCode = !!code && mySlots().length > 0;
     const ask = !!code && mySlots().length === 0;
     $("code-ask").hidden = !ask;
@@ -1181,7 +1190,7 @@
   }
   $("entry-submit").addEventListener("click", async () => {
     if (!selected || !cur || submitting) return;
-    const p = readPerson("f-"), slot = selected, code = useCode ? $("f-code").value.trim() : "", rid = cur.id;
+    const p = readPerson("f-"), slot = selected, code = useCode ? cleanCode($("f-code").value) : "", rid = cur.id;
     submitting = true;
     $("entry-submit").disabled = true; $("entry-back").disabled = true;
     setStatus("entry-status2", "参加しています…（混み合っているときは30秒ほどかかります。画面を閉じずにお待ちください）");
@@ -1196,7 +1205,7 @@
         justJoined.push({ rid: cur.id, slot, trainer: p.trainer, at: Date.now() });
         // 合言葉を使わなかったときは、2枠目のためにとっておく
         const typed = $("f-code").value.trim();
-        if (code) delete linkCodes[rid]; else if (typed) linkCodes[rid] = typed;
+        if (code) { delete linkCodes[rid]; markUsedCode(code); } else if (typed) linkCodes[rid] = cleanCode(typed);
         closeSheets(); renderDetail(); $("f-code").value = "";
         toast(slot + "番で参加しました！" + (!code && typed ? "合言葉は2枠目で使えます。" : "")); refreshDetail(); return;
       }
@@ -1205,11 +1214,20 @@
         useCode = true; setStatus("entry-status2", "1枠目に参加済みだったので、合言葉を使って参加しています…");
         setTimeout(() => $("entry-submit").click(), 0); return;
       }
+      // すでに2枠参加していた（通信が遅くて、参加できていたのに失敗に見えた場合など）
+      if ((r.error === "limit" || r.error === "used_code_mine") && r.slots && r.slots.length) {
+        r.slots.forEach((sl) => { saveMine(rid, sl); saveInfo(rid, sl, p); });
+        if (code) markUsedCode(code);
+        delete linkCodes[rid]; $("f-code").value = "";
+        closeSheets(); shownFor = null; renderDetail(); refreshDetail();
+        toast("すでに " + r.slots.map((n) => n + "番").join("・") + " に参加しています（参加できるのは2枠までです）。");
+        return;
+      }
       if (r.error === "taken") { if (r.taken) cur.taken = r.taken; renderDetail(); slotTaken(slot); return; }
       if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは2枠までです。" }[r.error], true); refreshDetail(); return; }
       const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。",
         mismatch_poke: "このXのID（@" + p.xId + "）は、別のポケポケのIDで参加済みです。1枠目と同じポケポケのIDを入れてください（数字を1つずつ確認してください）。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。",
-        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", used_code: "この合言葉はすでに使われています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
+        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", used_code: "この合言葉はすでに使われています。", used_code_mine: "この合言葉は、あなたがすでに使っています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
       if (back) {
         $("entry-step2").hidden = true; $("entry-step1").hidden = false;
         setStatus("entry-status1", back, true);
@@ -1909,7 +1927,7 @@
     try {
       const r = await apiPost(Object.assign({ action: "rl_getcode", rid }, prof));
       if (r.ok) {
-        saveGot(rid, r.code);
+        saveGot(rid, r.code); if (r.used) markUsedCode(r.code);
         showGot(r.code, r.used ? "この合言葉はもう使われています" : r.again ? "前にもらった合言葉です" : "あなたの合言葉です");
         if (cur && cur.id === rid) renderDetail();
         return;
