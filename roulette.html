@@ -342,7 +342,7 @@
         <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
         <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
         <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます</li>
-        <li id="rule-code">合言葉がほしい方は、1枠目に参加したあと<b>「合言葉を獲得する」ボタン</b>から配布ポストを<b>引用ポスト</b>してください（#ポケポケトレード #ポケポケ配布 入り）。合言葉は<b>その場で自動で表示</b>されます。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
+        <li id="rule-code">合言葉がほしい方は、1枠目に参加したあと、枠の上の<b>「投稿内容をコピー」</b>でコピーした文章をXに貼り付けて<b>引用ポスト</b>し、<b>「投稿済み」</b>を押してください（#ポケポケトレード #ポケポケ配布 入り）。合言葉は<b>その場で表示</b>されます。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
         <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
         <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
         <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
@@ -356,7 +356,16 @@
       <div class="getcode" id="getcode" hidden>
         <p id="getcode-text"></p>
         <p class="have" id="getcode-have" hidden></p>
-        <button type="button" class="btn primary" id="getcode-btn">合言葉を獲得する</button>
+        <div id="getcode-steps">
+          <ol class="quote-rules" style="margin-bottom:10px">
+            <li>「投稿内容をコピー」を押す</li>
+            <li>Xアプリを開いて新しく投稿を作り、<b>貼り付けて投稿</b>する（配布ポストのURLが入っていれば引用ポストになります）</li>
+            <li>このページに戻って「投稿済み」を押す</li>
+          </ol>
+          <button type="button" class="btn ghost" id="getcode-copy" style="margin:0 0 10px">投稿内容をコピー</button>
+          <pre class="dm-preview" id="getcode-textbox" hidden></pre>
+        </div>
+        <button type="button" class="btn primary" id="getcode-btn">投稿済み（合言葉をもらう）</button>
       </div>
       <div class="legend" aria-hidden="true"><span><i></i>空き</span><span><i class="l-taken"></i>うまっている</span><span><i class="l-mine"></i>あなたの枠</span></div>
       <div class="grid" id="grid" role="group" aria-label="枠の一覧"></div>
@@ -380,7 +389,7 @@
         <div class="field"><label for="c-img">画像 <span class="ex">（なくてもOK。ないときはタイトルだけ表示）</span></label><input id="c-img" type="file" accept="image/*"><img id="c-img-prev" class="preview-img" alt="" hidden><p class="hint" id="c-copy-note" hidden></p></div>
         <div class="field"><label for="c-deadline">抽選時刻 <span class="ex">（この時刻で受付終了）</span></label><input id="c-deadline" type="datetime-local"></div>
         <div class="field"><label for="c-claim">配布期限 <span class="ex">（当選者がDMを送る期限）</span></label><input id="c-claim" type="datetime-local"></div>
-        <div class="field"><label for="c-quote">引用してもらうポストのURL <span class="ex">（必須。参加者は「合言葉を獲得する」ボタンからこのポストを引用して、合言葉を自動で受け取ります）</span></label><input id="c-quote" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://x.com/sosuPOKEPOKE2/status/…"></div>
+        <div class="field"><label for="c-quote">引用してもらうポストのURL <span class="ex">（必須。参加者はこのポストを引用して「投稿済み」を押すと、合言葉を自動で受け取ります）</span></label><input id="c-quote" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://x.com/sosuPOKEPOKE2/status/…"></div>
         <div class="field"><label for="c-win">当選数</label><input id="c-win" type="number" min="1" max="100" value="1"></div>
         <div class="field"><label for="c-slots">枠の数</label><input id="c-slots" type="number" min="1" max="100" value="100"></div>
         <button type="button" class="btn primary" id="c-create">ルーレットを作る</button>
@@ -411,7 +420,7 @@
       <div class="field"><label for="f-xname">Xの名前</label><input id="f-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
       <div class="field"><label for="f-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="f-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
       <div class="code-box">
-        <p id="code-note">2枠目に参加する人だけ入力してください。合言葉は、1枠目に参加したあと、ページの「合言葉を獲得する」ボタンからもらえます。</p>
+        <p id="code-note">2枠目に参加する人だけ入力してください。合言葉は、1枠目に参加したあと、ページの「投稿済み」ボタンからもらえます。</p>
         <div class="field" style="margin:0"><label for="f-code">合言葉 <span class="ex">（2枠目のみ・大文字小文字はどちらでもOK）</span></label><input id="f-code" autocomplete="off" autocorrect="off" maxlength="40" autocapitalize="off" spellcheck="false"></div>
       </div>
       <button type="submit" class="btn primary" id="to-confirm">確認する</button>
@@ -534,7 +543,7 @@
   <div class="field" id="u-rmimg-row"><label><input type="checkbox" id="u-rmimg" style="width:auto"> 画像を消す（タイトルだけにする）</label></div>
   <div class="field"><label for="u-deadline">抽選時刻</label><input id="u-deadline" type="datetime-local"></div>
   <div class="field"><label for="u-claim">配布期限</label><input id="u-claim" type="datetime-local"></div>
-  <div class="field"><label for="u-quote">引用してもらうポストのURL <span class="ex">（「合言葉を獲得する」ボタンで引用してもらうポスト）</span></label><input id="u-quote" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+  <div class="field"><label for="u-quote">引用してもらうポストのURL <span class="ex">（参加者に引用してもらうポスト）</span></label><input id="u-quote" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
   <div class="field"><label for="u-win">当選数</label><input id="u-win" type="number" min="1" max="100"></div>
   <div class="field"><label for="u-slots">枠の数</label><input id="u-slots" type="number" min="1" max="100"></div>
   <button type="button" class="btn primary" id="u-save">保存する</button>
@@ -545,26 +554,22 @@
 <!-- 合言葉を獲得する（確認画面） -->
 <div class="sheet" id="quote-sheet" role="dialog" aria-modal="true" aria-labelledby="quote-title" hidden>
   <div id="quote-step1">
-    <h2 id="quote-title">合言葉をもらう前に確認してください</h2>
+    <h2 id="quote-title">投稿しましたか？</h2>
     <ol class="quote-rules">
-      <li>このあと開くXの画面で、配布ポストを<b>引用して投稿</b>してください（#ポケポケトレード #ポケポケ配布 は最初から入っています）</li>
-      <li>投稿は<b>ログイン中のXアカウント（<span id="quote-xid"></span>）</b>でしてください。合言葉はこのアカウント専用です</li>
+      <li>配布ポストのURL入りの投稿を、<b>ログイン中のXアカウント（<span id="quote-xid"></span>）</b>で投稿しましたか？合言葉はこのアカウント専用です</li>
       <li><b>鍵アカウントでの投稿は確認できないため無効</b>です</li>
-      <li class="danger">投稿していない場合や、抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</li>
+      <li class="danger">投稿していないのに「投稿しました」を押した場合や、抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります（あとで主催者が確認します）</li>
       <li>抽選が終わったあとなら、投稿を消しても大丈夫です</li>
     </ol>
-    <button type="button" class="btn primary" id="quote-go">わかりました。投稿する</button>
+    <button type="button" class="btn primary" id="quote-go">投稿しました（合言葉をもらう）</button>
     <p class="status" id="quote-status" role="status"></p>
-    <button type="button" class="btn ghost" data-close>キャンセル</button>
+    <button type="button" class="btn ghost" data-close>まだ投稿していない</button>
   </div>
   <div id="quote-step2" hidden>
     <h2>合言葉</h2>
     <div class="next-code quote-code"><p id="quote-code-head">あなたの合言葉です</p><code id="quote-code"></code></div>
-    <p class="sub">Xで引用ポストを投稿したら、空いている枠を選んで2枠目に参加してください。合言葉は自動で入ります。</p>
+    <p class="sub">空いている枠を選んで2枠目に参加してください。合言葉は自動で入ります。</p>
     <button type="button" class="btn primary" id="quote-done">枠をえらぶ</button>
-    <button type="button" class="btn ghost" id="quote-again">Xの投稿画面をもう一度開く</button>
-    <p class="hint" style="margin:14px 0 4px">Xの投稿画面に配布ポスト（URL）が入っていなかったときは、下のボタンでコピーして投稿に貼り付けてください。URLが入っていない投稿は引用になりません。</p>
-    <button type="button" class="btn ghost" id="quote-copy" style="margin-top:4px">投稿する文章をコピー（URLが入っていなかったとき用）</button>
   </div>
 </div>
 
@@ -1132,7 +1137,7 @@
     txt($("entry-no"), n); txt($("entry-no2"), n);
     $("entry-step1").hidden = false; $("entry-step2").hidden = true;
     setStatus("entry-status1", ""); setStatus("entry-status2", ""); txt($("entry-submit"), "この内容で参加する"); useCode = false;
-    const how = "合言葉は、1枠目に参加したあと、ページの「合言葉を獲得する」ボタンからもらえます。";
+    const how = "合言葉は、1枠目に参加したあと、配布ポストを引用ポストして、ページの「投稿済み」ボタンを押すともらえます。";
     txt($("code-note"), (mySlots().length ? "2枠目の参加には合言葉が必要です。" : "2枠目に参加する人だけ入力してください。") + how);
     // ログイン中は最初から入力しておく。ログインしていなければ毎回空にする
     const prof = getProfile();
@@ -1142,7 +1147,7 @@
     $("prefill-note").hidden = !prof;
     if (linkCodes[cur.id] && isUsedCode(linkCodes[cur.id])) delete linkCodes[cur.id];
     if (linkCodes[cur.id]) { $("f-code").value = linkCodes[cur.id]; txt($("code-note"), "合言葉入りのリンクから開いたので、合言葉が入っています（2枠目のときに使われます）。"); }
-    else if (getGot(cur.id) && !isUsedCode(getGot(cur.id)) && mySlots().length) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「合言葉を獲得する」でもらった合言葉が入っています。"); }
+    else if (getGot(cur.id) && !isUsedCode(getGot(cur.id)) && mySlots().length) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「投稿済み」でもらった合言葉が入っています。"); }
     openSheet("entry-sheet");
     const first = ["f-poke", "f-trainer", "f-xname", "f-xid"].map($).find((i) => !i.value) || (mySlots().length ? $("f-code") : $("to-confirm"));
     setTimeout(() => first.focus(), 50);
@@ -1567,7 +1572,7 @@
       const st = st0 + (r.drawn && r.winners.length ? "（連絡済み " + (r.contacted || 0) + " / " + r.winners.length + "）" : "");
       it.appendChild(mk("div", "m", "参加 " + r.taken + " / " + r.slots + "／当選 " + r.winCount + "／" + st));
       it.appendChild(mk("div", "m", "合言葉：まだ渡していない " + r.codesUnused + "・渡し済み " + (r.codesHanded || 0) + "・使用済み " + r.codesUsed));
-      if (!r.quote && now() <= r.deadline) it.appendChild(mk("div", "m alert", "引用してもらうポストのURLが未設定です。「編集」で入れると、合言葉を獲得するボタンが出ます。"));
+      if (!r.quote && now() <= r.deadline) it.appendChild(mk("div", "m alert", "引用してもらうポストのURLが未設定です。「編集」で入れると、参加者が合言葉を受け取れるようになります。"));
       const btn = (cls, label, fn) => { const b = mk("button", "btn small " + cls, label); b.type = "button"; b.addEventListener("click", fn); it.appendChild(b); };
       if (r.drawn) btn("primary", "当選者", () => openWinners(r));
       else btn("primary", "合言葉", () => openCodes(r));
@@ -1780,7 +1785,7 @@
   let codesFor = null;
   async function openCodes(r) {
     codesFor = r;
-    txt($("codes-sub"), r.title + " の合言葉です。参加者が「合言葉を獲得する」ボタンを押すと、自動で1人1つ渡されます（足りなくなったら自動で増えます）。「（ボタン）」と付いている人がボタンで受け取った人です。抽選の前に、ルーレット一覧の「引用ポストを確認」で、引用していない人・消した人がいないか確認して「引用を確認した」にチェックしてください。");
+    txt($("codes-sub"), r.title + " の合言葉です。参加者が「投稿済み」ボタンを押すと、自動で1人1つ渡されます（足りなくなったら自動で増えます）。「（ボタン）」と付いている人がボタンで受け取った人です。抽選の前に、ルーレット一覧の「引用ポストを確認」で、引用していない人・消した人がいないか確認して「引用を確認した」にチェックしてください。");
     setStatus("codes-status", ""); $("next-code").hidden = true; $("codes-to").value = "";
     openSheet("codes-sheet");
     loadCodes();
@@ -1891,16 +1896,22 @@
     if (!show) return;
     // 引用元のポストがまだ設定されていないとき
     $("getcode-btn").hidden = !cur.quote;
-    if (!cur.quote) { $("getcode-have").hidden = true; txt($("getcode-text"), "2枠目の合言葉の受け取りは、まだ始まっていません。準備ができると、ここに「合言葉を獲得する」ボタンが出ます。"); return; }
+    if (!cur.quote) { $("getcode-have").hidden = true; $("getcode-steps").hidden = true; txt($("getcode-text"), "2枠目の合言葉の受け取りは、まだ始まっていません。準備ができると、ここにボタンが出ます。"); return; }
     const got = getGot(cur.id);
     txt($("getcode-text"), mine.length ? "配布ポストを引用ポストすると、2枠目に参加するための合言葉がもらえます。" : "1枠目に参加したあと、配布ポストを引用ポストすると2枠目の合言葉がもらえます。");
+    if ($("getcode-textbox").dataset.rid !== cur.id) { $("getcode-textbox").hidden = true; $("getcode-textbox").dataset.rid = cur.id; }
     $("getcode-have").hidden = !got;
     if (got) { const h = $("getcode-have"); h.innerHTML = ""; h.append("あなたの合言葉：", mk("code", "", got), "（空いている枠を選ぶと自動で入ります）"); }
-    txt($("getcode-btn"), got ? "合言葉をもう一度見る" : "合言葉を獲得する");
+    $("getcode-steps").hidden = !!got;
+    txt($("getcode-btn"), got ? "合言葉をもう一度見る" : "投稿済み（合言葉をもらう）");
   }
-  function quoteIntent() {
-    return "https://x.com/intent/post?text=" + encodeURIComponent("#ポケポケトレード #ポケポケ配布\n") + "&url=" + encodeURIComponent(cur.quote);
-  }
+  const quoteText = () => "#ポケポケトレード #ポケポケ配布\n" + cur.quote;
+  $("getcode-copy").addEventListener("click", async () => {
+    if (!cur || !cur.quote) return;
+    const box = $("getcode-textbox");
+    try { await navigator.clipboard.writeText(quoteText()); toast("コピーしました。Xアプリで新しく投稿を作って貼り付けてください。"); box.hidden = true; }
+    catch (e) { txt(box, quoteText()); box.hidden = false; toast("コピーできませんでした。下の文章を長押しでコピーしてください。", true); }
+  });
   function showGot(code, head) {
     txt($("quote-code"), code); txt($("quote-code-head"), head);
     $("quote-step1").hidden = true; $("quote-step2").hidden = false;
@@ -1921,8 +1932,6 @@
     const prof = getProfile();
     if (!cur || !prof) return;
     const rid = cur.id;
-    // 先にXの投稿画面を開く（通信のあとに開くと、スマホでは開けないことがあるため）
-    window.open(quoteIntent(), "_blank", "noopener");
     $("quote-go").disabled = true; setStatus("quote-status", "合言葉を用意しています…");
     try {
       const r = await apiPost(Object.assign({ action: "rl_getcode", rid }, prof));
@@ -1936,12 +1945,6 @@
     } catch (e) { setStatus("quote-status", "混み合っています。少し待ってからもう一度押してください。", true); }
     finally { $("quote-go").disabled = false; }
   });
-  $("quote-copy").addEventListener("click", async () => {
-    if (!cur || !cur.quote) return;
-    try { await navigator.clipboard.writeText("#ポケポケトレード #ポケポケ配布\n" + cur.quote); toast("コピーしました。Xの投稿に貼り付けてください。"); }
-    catch (e) { toast("コピーできませんでした。", true); }
-  });
-  $("quote-again").addEventListener("click", () => { if (cur && cur.quote) window.open(quoteIntent(), "_blank", "noopener"); });
   $("quote-done").addEventListener("click", () => { closeSheets(); $("grid").scrollIntoView({ behavior: "smooth", block: "center" }); });
 
   // ---- 参加禁止（管理者） ----
