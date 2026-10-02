@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-01f -->
+<!-- version 2026-10-02a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -346,7 +346,7 @@
         <li>下の表から<b>空いている枠</b>をタップ</li>
         <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
         <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
-        <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます</li>
+        <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます。多く拡散してくださった方には、主催者から<b>3枠目の合言葉</b>をDMでお送りすることがあります</li>
         <li id="rule-code">合言葉がほしい方は、1枠目に参加したあと、枠の上の<b>「投稿内容をコピー」</b>でコピーした文章をXに貼り付けて<b>引用ポスト</b>し、<b>「投稿済み」</b>を押してください（#ポケポケトレード #ポケポケ配布 入り）。合言葉は<b>その場で表示</b>されます。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
         <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
         <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
@@ -509,12 +509,12 @@
 <div class="sheet" id="codes-sheet" role="dialog" aria-modal="true" aria-labelledby="codes-title" hidden>
   <h2 id="codes-title">合言葉</h2>
   <p class="sub" id="codes-sub"></p>
-  <div id="dm-tools" hidden>
-  <div class="field"><label for="codes-to">渡す相手のXのID <span class="ex">（引用RTしてくれた人。入れておくと同じ人に2つ渡しません）</span></label><div class="at"><span aria-hidden="true">@</span><input id="codes-to" autocomplete="off" maxlength="16" autocapitalize="off" spellcheck="false" placeholder="example_id"></div></div>
-  <button type="button" class="btn primary" id="codes-next">合言葉を出してDM用の文章をコピー</button>
+  <div id="dm-tools">
+  <div class="field"><label for="codes-to">3枠目の合言葉を渡す相手のXのID <span class="ex">（多く拡散してくれた人など。その人のXのID専用になります）</span></label><div class="at"><span aria-hidden="true">@</span><input id="codes-to" autocomplete="off" maxlength="16" autocapitalize="off" spellcheck="false" placeholder="example_id"></div></div>
+  <button type="button" class="btn primary" id="codes-next">3枠目の合言葉を出してDM用の文章をコピー</button>
   <div class="next-code" id="next-code" hidden><p id="next-code-head">DMに貼り付けて送ってください（「渡し済み」にしました）</p><code id="next-code-text"></code><pre class="dm-preview" id="next-dm"></pre><button type="button" class="btn ghost small" id="next-copy">DM用の文章をもう一度コピー</button> <a class="btn ghost small" id="next-profile" href="#" target="_blank" rel="noopener" hidden>相手のXを開く</a></div>
-  <div class="field"><label for="codes-count">足りないときに追加で発行する数</label><input id="codes-count" type="number" min="1" max="100" value="1"></div>
-  <button type="button" class="btn ghost" id="codes-issue">追加で発行する</button>
+  <div hidden><div class="field"><label for="codes-count">足りないときに追加で発行する数</label><input id="codes-count" type="number" min="1" max="100" value="1"></div>
+  <button type="button" class="btn ghost" id="codes-issue">追加で発行する</button></div>
   </div>
   <p class="status" id="codes-status" role="status"></p>
   <ul class="codes" id="codes-list"></ul>
@@ -753,14 +753,15 @@
           if (al && sameIn(al, d)) return { ok: true, slot: d.slot, already: true };
           if (al) return { ok: false, error: "taken", taken: pub(r).taken };
           if (r.entries.length >= r.slots) return { ok: false, error: "full" };
-          if (d.dev && r.entries.filter((e) => e.dev === d.dev).length >= 2) return { ok: false, error: "device_limit" };
+          if (d.dev && r.entries.filter((e) => e.dev === d.dev).length >= 3) return { ok: false, error: "device_limit" };
           if (r.entries.some((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() !== d.xId.toLowerCase())) return { ok: false, error: "mismatch_x" };
           if (r.entries.some((e) => e.xId.toLowerCase() === d.xId.toLowerCase() && e.pokeId !== d.pokeId)) return { ok: false, error: "mismatch_poke" };
           const mine = r.entries.filter((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() === d.xId.toLowerCase());
-          if (mine.length >= 2) return { ok: false, error: "limit" };
+          const lim = { ok: false, error: "limit", slots: mine.map((e) => e.slot) };
+          if (mine.length >= 3) return lim;
           if (mine.length) {
-            if (!d.code) return { ok: false, error: "need_code" };
-            const ck = Object.keys(codes).find((k) => k.toUpperCase() === cleanCode(d.code).toUpperCase()); const c = codes[ck]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (c.used) return { ok: false, error: "used_code" }; if (c.to && c.to.toLowerCase() !== d.xId.toLowerCase()) return { ok: false, error: "code_other" }; c.used = true;
+            if (!d.code) return mine.length >= 2 ? lim : { ok: false, error: "need_code" };
+            const ck = Object.keys(codes).find((k) => k.toUpperCase() === cleanCode(d.code).toUpperCase()); const c = codes[ck]; if (!c || c.rid !== r.id) return { ok: false, error: "bad_code" }; if (mine.length >= 2 && c.via !== "3枠目") return lim; if (c.via === "3枠目" && mine.length < 2) return { ok: false, error: "bonus_early" }; if (c.used) return { ok: false, error: "used_code" }; if (c.to && c.to.toLowerCase() !== d.xId.toLowerCase()) return { ok: false, error: "code_other" }; c.used = true;
           }
           r.entries.push({ slot: d.slot, trainer: d.trainer, pokeId: d.pokeId, xId: d.xId, xName: d.xName, dev: d.dev, code: d.code || "" }); return { ok: true, slot: d.slot };
         }
@@ -770,12 +771,17 @@
           if (banned(d)) return { ok: false, error: "banned" };
           const mine = r.entries.filter((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() === d.xId.toLowerCase());
           if (!mine.length) return { ok: false, error: "need_first" };
-          const g = Object.keys(codes).find((c) => codes[c].rid === r.id && (codes[c].to || "").toLowerCase() === d.xId.toLowerCase());
+          const g = Object.keys(codes).find((c) => codes[c].rid === r.id && codes[c].via !== "3枠目" && (codes[c].to || "").toLowerCase() === d.xId.toLowerCase());
           if (g) return { ok: true, code: g, again: true, used: codes[g].used };
           if (mine.length >= 2) return { ok: false, error: "limit" };
           let k = Object.keys(codes).find((c) => codes[c].rid === r.id && !codes[c].used && !codes[c].handed);
           if (!k) { k = "Nw" + Math.random().toString(36).slice(2, 6) + "#5"; codes[k] = { rid: r.id, used: false }; }
           codes[k].handed = true; codes[k].to = d.xId; codes[k].via = "ボタン"; return { ok: true, code: k };
+        }
+        if (d.action === "rl_bonus_code") {
+          const g = Object.keys(codes).find((c) => codes[c].rid === d.rid && codes[c].via === "3枠目" && (codes[c].to || "").toLowerCase() === d.to.toLowerCase());
+          if (g) return { ok: false, error: "already_given", code: g, status: codes[g].used ? "使用済み" : "未使用" };
+          const k = "B" + Math.random().toString(36).slice(2, 9).toUpperCase(); codes[k] = { rid: d.rid, used: false, handed: true, to: d.to, via: "3枠目" }; return { ok: true, code: k };
         }
         if (d.action === "rl_code_check") { if (codes[d.code]) codes[d.code].checked = !!d.on; return { ok: true }; }
         if (d.action === "rl_bans") return { ok: true, bans: bans.map((b, i) => Object.assign({ row: i + 2 }, b)) };
@@ -1164,13 +1170,13 @@
   function openEntry(n) {
     if (submitting) { toast("前の参加の処理中です。少しお待ちください。", true); return; }
     if (closed() || takenMap().has(n)) return;
-    if (mySlots().length >= 2) { toast("このスマホ（ブラウザ）から参加できるのは2枠までです。", true); return; }
+    if (mySlots().length >= 3) { toast("参加できるのは3枠までです。", true); return; }
     selected = n;
     txt($("entry-no"), n); txt($("entry-no2"), n);
     $("entry-step1").hidden = false; $("entry-step2").hidden = true;
     setStatus("entry-status1", ""); setStatus("entry-status2", ""); txt($("entry-submit"), "この内容で参加する"); useCode = false;
     const how = "合言葉は、1枠目に参加したあと、配布ポストを引用ポストして、ページの「投稿済み」ボタンを押すともらえます。";
-    txt($("code-note"), (mySlots().length ? "2枠目の参加には合言葉が必要です。" : "2枠目に参加する人だけ入力してください。") + how);
+    txt($("code-note"), mySlots().length >= 2 ? "3枠目の参加には、主催者からDMで届いた特別な合言葉が必要です。" : (mySlots().length ? "2枠目の参加には合言葉が必要です。" : "2枠目に参加する人だけ入力してください。") + how);
     // ログイン中は最初から入力しておく。ログインしていなければ毎回空にする
     const prof = getProfile();
     $("f-poke").value = prof ? prof.pokeId : ""; $("f-trainer").value = prof ? prof.trainer : ""; $("f-xname").value = prof ? prof.xName : ""; $("f-xid").value = prof ? prof.xId : "";
@@ -1179,7 +1185,7 @@
     $("prefill-note").hidden = !prof;
     if (linkCodes[cur.id] && isUsedCode(linkCodes[cur.id])) delete linkCodes[cur.id];
     if (linkCodes[cur.id]) { $("f-code").value = linkCodes[cur.id]; txt($("code-note"), "合言葉入りのリンクから開いたので、合言葉が入っています（2枠目のときに使われます）。"); }
-    else if (getGot(cur.id) && !isUsedCode(getGot(cur.id)) && mySlots().length) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「投稿済み」でもらった合言葉が入っています。"); }
+    else if (getGot(cur.id) && !isUsedCode(getGot(cur.id)) && mySlots().length === 1) { $("f-code").value = getGot(cur.id); txt($("code-note"), "「投稿済み」でもらった合言葉が入っています。"); }
     openSheet("entry-sheet");
     const first = ["f-poke", "f-trainer", "f-xname", "f-xid"].map($).find((i) => !i.value) || (mySlots().length ? $("f-code") : $("to-confirm"));
     setTimeout(() => first.focus(), 50);
@@ -1199,6 +1205,7 @@
     // 合言葉が入っているのに、このスマホではまだ1枠目に参加していないときは、どちらか聞く
     $("f-code").value = cleanCode($("f-code").value);
     const code = $("f-code").value;
+    if (!code && mySlots().length >= 2) { $("f-code").setAttribute("aria-invalid", "true"); return setStatus("entry-status1", "すでに2枠参加しています。3枠目の参加には、主催者からDMで届いた特別な合言葉が必要です。", true); }
     useCode = !!code && mySlots().length > 0;
     const ask = !!code && mySlots().length === 0;
     $("code-ask").hidden = !ask;
@@ -1254,17 +1261,17 @@
       // すでに2枠参加していた（通信が遅くて、参加できていたのに失敗に見えた場合など）
       if ((r.error === "limit" || r.error === "used_code_mine") && r.slots && r.slots.length) {
         r.slots.forEach((sl) => { saveMine(rid, sl); saveInfo(rid, sl, p); });
-        if (code) markUsedCode(code);
+        if (code && r.error === "used_code_mine") markUsedCode(code);
         delete linkCodes[rid]; $("f-code").value = "";
         closeSheets(); shownFor = null; renderDetail(); refreshDetail();
-        toast("すでに " + r.slots.map((n) => n + "番").join("・") + " に参加しています（参加できるのは2枠までです）。");
+        toast("すでに " + r.slots.map((n) => n + "番").join("・") + " に参加しています。" + (r.slots.length >= 3 ? "参加できるのは3枠までです。" : "3枠目には、主催者からDMで届いた特別な合言葉が必要です。"), true);
         return;
       }
       if (r.error === "taken") { if (r.taken) cur.taken = r.taken; renderDetail(); slotTaken(slot); return; }
-      if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは2枠までです。" }[r.error], true); refreshDetail(); return; }
+      if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは3枠までです。" }[r.error], true); refreshDetail(); return; }
       const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。",
         mismatch_poke: "このXのID（@" + p.xId + "）は、別のポケポケのIDで参加済みです。1枠目と同じポケポケのIDを入れてください（数字を1つずつ確認してください）。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。",
-        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", used_code: "この合言葉はすでに使われています。", used_code_mine: "この合言葉は、あなたがすでに使っています。", limit: "参加できるのは2枠までです。", invalid: "入力内容を確認してください。" }[r.error];
+        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", used_code: "この合言葉はすでに使われています。", used_code_mine: "この合言葉は、あなたがすでに使っています。", limit: "これ以上は参加できません（2枠まで。3枠目には主催者からDMで届いた特別な合言葉が必要です）。", bonus_early: "この合言葉は3枠目用です。先に2枠目に参加してから使ってください（2枠目の合言葉は「投稿済み」ボタンからもらえます）。", invalid: "入力内容を確認してください。" }[r.error];
       if (back) {
         $("entry-step2").hidden = true; $("entry-step1").hidden = false;
         setStatus("entry-status1", back, true);
@@ -1820,7 +1827,7 @@
   let codesFor = null;
   async function openCodes(r) {
     codesFor = r;
-    txt($("codes-sub"), r.title + " の合言葉です。参加者が「投稿済み」ボタンを押すと、自動で1人1つ渡されます（足りなくなったら自動で増えます）。「（ボタン）」と付いている人がボタンで受け取った人です。抽選の前に、ルーレット一覧の「引用ポストを確認」で、引用していない人・消した人がいないか確認して「引用を確認した」にチェックしてください。");
+    txt($("codes-sub"), r.title + " の合言葉です。参加者が「投稿済み」ボタンを押すと、自動で1人1つ渡されます（足りなくなったら自動で増えます）。「（ボタン）」と付いている人がボタンで受け取った人です。3枠目の合言葉は、下の欄に相手のXのIDを入れて出し、DMで直接送ってください（「（3枠目用）」と付きます）。抽選の前に、ルーレット一覧の「引用ポストを確認」で、引用していない人・消した人がいないか確認して「引用を確認した」にチェックしてください。");
     setStatus("codes-status", ""); $("next-code").hidden = true; $("codes-to").value = "";
     openSheet("codes-sheet");
     loadCodes();
@@ -1836,7 +1843,7 @@
     r.codes.slice().sort((a, b) => rank(a) - rank(b)).forEach((c) => {
       const k = rank(c);
       const li = mk("li", k === 2 ? "used" : k === 1 ? "handed" : "");
-      const cw = mk("span"); cw.appendChild(mk("code", "", c.code)); if (c.to) cw.appendChild(mk("span", "to", "→ @" + c.to + (c.via === "ボタン" ? "（ボタン）" : "")));
+      const cw = mk("span"); cw.appendChild(mk("code", "", c.code)); if (c.to) cw.appendChild(mk("span", "to", "→ @" + c.to + (c.via === "ボタン" ? "（ボタン）" : c.via === "3枠目" ? "（3枠目用）" : "")));
       li.appendChild(cw);
       if (c.to && c.via === "ボタン" && !c.banned) {
         const lab = mk("label", "chk"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!c.checked;
@@ -1857,7 +1864,7 @@
       if (k === 2) li.appendChild(mk("span", "tag", "使用済み" + (c.slot ? "（" + c.slot + "番）" : "")));
       else if (k === 1) {
         const b = mk("button", "btn ghost small", "渡し済み・コピー"); b.type = "button";
-        b.addEventListener("click", () => { showNext(c.code, c.to, "渡し済みの合言葉です" + (c.to ? "（@" + c.to + "）" : "")); copyText(lastDm); });
+        b.addEventListener("click", () => { showNext(c.code, c.to, "渡し済みの合言葉です" + (c.to ? "（@" + c.to + "）" : ""), c.via === "3枠目"); copyText(lastDm); });
         if (c.via !== "ボタン") li.appendChild(b); else li.appendChild(mk("span", "tag", "渡し済み"));
       } else li.appendChild(mk("span", "tag", "まだ渡していない"));
       ul.appendChild(li);
@@ -1877,28 +1884,30 @@
     catch (e) { if (!quiet) toast("コピーできませんでした。長押しで選択してください。", true); return false; }
   }
   let lastDm = "";
-  function dmText(code) {
-    return "合言葉：" + code + "\n\n「" + codesFor.title + "」の2枠目に参加するときに使えます。下のリンクから開くと合言葉が入った状態になります。\n" + CONFIG.PAGE_URL + "#r=" + codesFor.id + "&c=" + encodeURIComponent(code);
+  function dmText(code, bonus) {
+    const use = bonus ? "の3枠目に参加するときに使える、特別な合言葉です（先に2枠参加してから使ってください）。" : "の2枠目に参加するときに使えます。";
+    return "合言葉：" + code + "\n\n「" + codesFor.title + "」" + use + "下のリンクから開くと合言葉が入った状態になります。\n" + CONFIG.PAGE_URL + "#r=" + codesFor.id + "&c=" + encodeURIComponent(code);
   }
-  function showNext(code, to, head) {
-    lastDm = dmText(code);
+  function showNext(code, to, head, bonus) {
+    lastDm = dmText(code, bonus);
     txt($("next-code-text"), code); txt($("next-dm"), lastDm); txt($("next-code-head"), head);
     $("next-profile").hidden = !to; if (to) $("next-profile").href = "https://x.com/" + encodeURIComponent(to);
     $("next-code").hidden = false;
   }
   $("codes-next").addEventListener("click", async () => {
     const to = $("codes-to").value.normalize("NFKC").trim().replace(/^[@＠]+/, "");
-    if (to && !/^[A-Za-z0-9_]{1,15}$/.test(to)) return setStatus("codes-status", "XのIDは英数字と _ で入力してください。", true);
+    if (!to) return setStatus("codes-status", "3枠目の合言葉を渡す相手のXのIDを入れてください。", true);
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(to)) return setStatus("codes-status", "XのIDは英数字と _ で入力してください。", true);
     $("codes-next").disabled = true;
     try {
-      const r = await apiPost({ action: "rl_codes_next", key: adminKey, rid: codesFor.id, to });
+      const r = await apiPost({ action: "rl_bonus_code", key: adminKey, rid: codesFor.id, to });
       if (r.error === "already_given") {
-        showNext(r.code, to, "@" + to + " さんにはもう渡しています" + (r.status === "使用済み" ? "（使用済み）" : "") + "。同じ合言葉を送り直せます");
+        showNext(r.code, to, "@" + to + " さんには3枠目の合言葉をもう渡しています" + (r.status === "使用済み" ? "（使用済み）" : "") + "。同じ合言葉を送り直せます", true);
         if (!(await copyText(lastDm, true))) txt($("next-copy"), "DM用の文章をコピー");
         return;
       }
       if (!r.ok) { setStatus("codes-status", r.error === "no_code" ? "まだ渡していない合言葉がありません。下の「追加で発行する」で増やしてください。" : "混み合っています。少し待ってからもう一度押してください。", true); return; }
-      showNext(r.code, to, "DMに貼り付けて送ってください（「渡し済み」にしました）");
+      showNext(r.code, to, "3枠目の合言葉です。DMに貼り付けて送ってください", true);
       $("codes-to").value = "";
       // iPhoneは通信のあとだと自動でコピーできないことがあるので、そのときはボタンで
       const ok = await copyText(lastDm, true);
@@ -1998,15 +2007,16 @@
       const res = await apiPost({ action: "rl_winners", key: adminKey, rid: r.id });
       if (!res.ok) { txt($("ann-text"), ""); return setStatus("ann-status", ADMIN_ERR[res.error] || "読み込めませんでした。", true); }
       const ws = res.winners.filter((w) => w.xId);
-      const lines = ["#ポケポケトレード #ポケポケ配布", "", "【当選発表】" + r.title, "", "当選おめでとうございます🎉"];
+      const lines = ["#ポケポケトレード #ポケポケ配布", "", "【当選発表】" + r.title, "当選おめでとうございます🎉"];
       ws.forEach((w) => lines.push("@" + w.xId + "（" + w.slot + "番）"));
       lines.push("");
-      if (r.claim) lines.push("配布期限（" + fmtTime(r.claim) + "）までに、" + CONFIG.DM_NAME + "にDMをお送りください。", "");
+      lines.push((r.claim ? fmtTime(r.claim) + "までに" : "") + CONFIG.DM_NAME + "へDMをお願いします");
+      lines.push("DMの文章は、ルーレットのページに当選者だけ出るボタンから作れます");
       if (r.quote) lines.push(r.quote);
       annText = lines.join("\n");
       txt($("ann-text"), annText);
       const len = xLength(annText);
-      txt($("ann-len"), "文字数の目安：" + len + " / 280" + (len > 280 ? "（多すぎます。当選者を2つの投稿に分けてください）" : ""));
+      txt($("ann-len"), "文字数の目安：" + len + " / 280" + (len > 280 ? "（長すぎます。タイトルを短くするか、当選者を2つの投稿に分けてください）" : ""));
       $("ann-len").style.color = len > 280 ? "var(--error)" : "";
       $("ann-copy").disabled = false;
       if (!r.quote) setStatus("ann-status", "配布ポストのURLが設定されていないため、引用RPにはなりません（ふつうの投稿になります）。");
