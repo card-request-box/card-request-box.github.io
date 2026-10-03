@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-03g -->
+<!-- version 2026-10-03h -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>カードの現在のレート表</title>
@@ -325,7 +325,7 @@
   </nav>
   <header>
     <h1><span class="mark" aria-hidden="true">★</span>カードの現在のレート表</h1>
-    <p class="lead">カードの強さをレート（数字）で表しています。数字が大きいほど強いカードです。配布してほしいカードを選ぶと、DMで送る文章を作れます。</p>
+    <p class="lead" id="lead" style="white-space:pre-wrap">カードの強さをレート（数字）で表しています。数字が大きいほど強いカードです。配布してほしいカードを選ぶと、DMで送る文章を作れます。</p>
   </header>
 
   <section class="panel">
@@ -485,6 +485,7 @@
   function apply(d) {
     items = d.items || [];
     if (d.dmHead) dmHead = d.dmHead;
+    if (typeof d.lead === "string") { $("lead").hidden = !d.lead; $("lead").textContent = d.lead; }
     $("notice").hidden = !d.notice; $("notice").textContent = d.notice || "";
     // なくなったカードは、えらんだ中からも外す
     const alive = new Set(items.map(keyOf)); Array.from(picked).forEach((k) => { if (!alive.has(k)) picked.delete(k); });
