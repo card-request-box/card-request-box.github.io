@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-02a -->
+<!-- version 2026-10-04a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -271,6 +271,8 @@
   .about-list { margin: 10px 0 0; padding-left: 1.2em; font-size: .86rem; color: var(--muted); }
   .about-list li { margin: 4px 0; }
   .about-list b { color: var(--ink); }
+  .claim-pre { margin: -8px 0 16px; padding: 9px 12px; border-radius: 12px; background: rgba(242,193,78,.14); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .82rem; }
+  .claim-pre b { color: var(--gold); }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) {
     .wheel-wrap svg.wheel { transition-duration: .01s; }
@@ -290,7 +292,7 @@
   <nav class="tabs" aria-label="ページの切り替え">
     <a href="./">カードリクエスト</a>
     <a aria-current="page" href="roulette.html">配布ルーレット</a>
-    <a href="tier.html">レート</a>
+    <a href="tier.html">現在レート</a>
   </nav>
   <div class="loginbar" id="loginbar">
     <div class="who" id="login-who"></div>
@@ -321,6 +323,7 @@
       <div><div class="label" id="timer-label">抽選まで</div><div class="count" id="count">--</div></div>
       <div class="dl" id="deadline-text"></div>
     </div>
+    <p class="claim-pre" id="claim-pre" hidden></p>
     <div class="cal" id="cal" hidden><span>抽選時刻を忘れないように：</span><a id="cal-google" href="#" target="_blank" rel="noopener">Googleカレンダーに登録</a><button type="button" id="cal-ics">iPhoneのカレンダーに登録</button></div>
     <div class="claim-note" id="claim-note" hidden>
       <p>当選した方は、上記の時間が <b>00:00:00</b> になるまでに「<span id="dm-name">そす</span>」までDMを送ってください。</p>
@@ -350,7 +353,7 @@
         <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
         <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます。多く拡散してくださった方には、主催者から<b>3枠目の合言葉</b>をDMでお送りすることがあります</li>
         <li id="rule-code">合言葉がほしい方は、1枠目に参加したあと、枠の上の<b>「投稿内容をコピー」</b>でコピーした文章をXに貼り付けて<b>引用ポスト</b>し、<b>「投稿済み」</b>を押してください（#ポケポケトレード #ポケポケ配布 入り）。合言葉は<b>その場で表示</b>されます。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
-        <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）</li>
+        <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）。参加の取り消しはできますが、<b>取り消すとそのルーレットにはもう参加できません</b></li>
         <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
         <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
         <li>入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの参加者には見えません。<b>当選した場合は、当選発表のポストでXのIDをお知らせします</b></li>
@@ -377,7 +380,7 @@
       <div class="legend" aria-hidden="true"><span><i></i>空き</span><span><i class="l-taken"></i>うまっている</span><span><i class="l-mine"></i>あなたの枠</span></div>
       <div class="grid" id="grid" role="group" aria-label="枠の一覧"></div>
       <p class="hint" id="grid-hint"></p>
-      <p class="hint" id="edit-row"><button type="button" class="linkbtn" id="open-edit">入力した内容を変更する</button></p>
+      <p class="hint" id="edit-row"><button type="button" class="linkbtn" id="open-edit">入力した内容を変更する</button>　<button type="button" class="linkbtn" id="open-cancel" style="color:var(--error)">参加を取り消す</button></p>
     </section>
   </section>
 
@@ -594,6 +597,20 @@
   </div>
 </div>
 
+<!-- 参加の取り消し -->
+<div class="sheet" id="cancel-sheet" role="dialog" aria-modal="true" aria-labelledby="cancel-title" hidden>
+  <h2 id="cancel-title">参加を取り消す</h2>
+  <p class="sub" id="cancel-who"></p>
+  <ol class="quote-rules">
+    <li>あなたの枠が<b>すべて</b>取り消されます（2枠・3枠参加している場合もまとめて）</li>
+    <li class="danger">取り消すと、このルーレットにはもう参加できません（参加し直すこともできません）</li>
+    <li>取り消した枠は空きに戻り、ほかの人が参加できるようになります</li>
+  </ol>
+  <button type="button" class="btn primary" id="cancel-go" style="background:var(--error);color:#fff;box-shadow:none">取り消す</button>
+  <p class="status" id="cancel-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>やめる（参加したままにする）</button>
+</div>
+
 <!-- 当選発表（管理者） -->
 <div class="sheet" id="ann-sheet" role="dialog" aria-modal="true" aria-labelledby="ann-title" hidden>
   <h2 id="ann-title">当選者を発表する</h2>
@@ -751,6 +768,7 @@
           if (!r) return { ok: false, error: "not_found" };
           if (Date.now() > r.deadline) return { ok: false, error: "closed" };
           if (banned(d)) return { ok: false, error: "banned" };
+          if ((r.cancelled || []).some((c) => c.pokeId === d.pokeId || c.xId.toLowerCase() === d.xId.toLowerCase())) return { ok: false, error: "cancelled" };
           const al = r.entries.find((e) => e.slot === d.slot);
           if (al && sameIn(al, d)) return { ok: true, slot: d.slot, already: true };
           if (al) return { ok: false, error: "taken", taken: pub(r).taken };
@@ -779,6 +797,13 @@
           let k = Object.keys(codes).find((c) => codes[c].rid === r.id && !codes[c].used && !codes[c].handed);
           if (!k) { k = "Nw" + Math.random().toString(36).slice(2, 6) + "#5"; codes[k] = { rid: r.id, used: false }; }
           codes[k].handed = true; codes[k].to = d.xId; codes[k].via = "ボタン"; return { ok: true, code: k };
+        }
+        if (d.action === "rl_cancel") {
+          if (!r || Date.now() > r.deadline) return { ok: false, error: "closed" };
+          const mine = r.entries.filter((e) => e.pokeId === d.pokeId && e.xId.toLowerCase() === d.xId.toLowerCase());
+          if (!mine.some((e) => sameIn(e, d))) return { ok: false, error: "not_found" };
+          r.entries = r.entries.filter((e) => mine.indexOf(e) < 0); (r.cancelled = r.cancelled || []).push({ pokeId: d.pokeId, xId: d.xId });
+          return { ok: true, slots: mine.map((e) => e.slot) };
         }
         if (d.action === "rl_bonus_code") {
           const g = Object.keys(codes).find((c) => codes[c].rid === d.rid && codes[c].via === "3枠目" && (codes[c].to || "").toLowerCase() === d.to.toLowerCase());
@@ -971,6 +996,7 @@
       const badge = { open: ["b-open", "受付中"], full: ["b-full", "満員"], wait: ["b-wait", "まもなく抽選"], done: ["b-done", "抽選済み"] }[st];
       meta.appendChild(mk("span", "badge " + badge[0], badge[1]));
       meta.appendChild(mk("span", "", "抽選 " + fmtTime(r.deadline)));
+      if (r.claim) meta.appendChild(mk("span", "", "配布期限 " + fmtTime(r.claim)));
       meta.appendChild(mk("span", "", "参加 " + r.taken + " / " + r.slots));
       // 自分の状況
       let myRow = null;
@@ -1085,10 +1111,14 @@
     renderResultPanel();
     renderClaim();
     renderCal();
+    const pre = $("claim-pre"); pre.hidden = isClosed || !cur.claim;
+    if (!pre.hidden) { pre.innerHTML = ""; pre.append("当選した方は、", mk("b", "", "配布期限（" + fmtTime(cur.claim) + "）まで"), "にDMとトレードが必要です。この時間に対応できる方だけ参加してください。"); }
     // 送信中は、自分の送った分で枠が埋まって見えることがあるので、ここでは判断しない
     if (selected && !submitting && (isClosed || map.has(selected))) { if (map.has(selected)) slotTaken(selected); else closeSheets(); }
   }
 
+  // 抽選時刻と配布期限は、いつも両方出す
+  const bothTimes = () => "抽選　　 " + fmtTime(cur.deadline) + (cur.claim ? "\n配布期限 " + fmtTime(cur.claim) : "");
   function tick() {
     if (!cur || $("detail-view").hidden) { if (list && !$("list-view").hidden) renderListTimers(); return; }
     const t = now();
@@ -1097,17 +1127,17 @@
       timer.classList.remove("closed");
       txt($("timer-label"), "抽選まで");
       txt($("count"), fmtLeft(cur.deadline - t));
-      txt($("deadline-text"), "抽選時刻\n" + fmtTime(cur.deadline));
+      txt($("deadline-text"), bothTimes());
     } else if (cur.claim && t <= cur.claim) {
       timer.classList.remove("closed");
       txt($("timer-label"), "配布期限まで");
       txt($("count"), fmtLeft(cur.claim - t));
-      txt($("deadline-text"), "配布期限\n" + fmtTime(cur.claim));
+      txt($("deadline-text"), bothTimes());
     } else {
       timer.classList.add("closed");
       txt($("timer-label"), "配布");
       txt($("count"), "配布期限を過ぎました");
-      txt($("deadline-text"), cur.claim ? "配布期限\n" + fmtTime(cur.claim) : "");
+      txt($("deadline-text"), bothTimes());
     }
     // 抽選時刻・配布期限をまたいだら表示を切り替える
     const phase = t <= cur.deadline ? 0 : (!cur.claim || t <= cur.claim) ? 1 : 2;
@@ -1157,7 +1187,7 @@
     document.body.style.overflow = "hidden";
   }
   function closeSheets(keepSel) {
-    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet", "quote-sheet", "ban-sheet", "bans-sheet", "ann-sheet"].forEach((i) => { $(i).hidden = true; });
+    ["entry-sheet", "edit-sheet", "codes-sheet", "win-sheet", "upd-sheet", "login-sheet", "ent-sheet", "quote-sheet", "ban-sheet", "bans-sheet", "ann-sheet", "cancel-sheet"].forEach((i) => { $(i).hidden = true; });
     $("sheet-bg").hidden = true;
     document.body.style.overflow = "";
     if (!keepSel) selected = null;
@@ -1273,7 +1303,7 @@
       if (r.error === "closed" || r.error === "full" || r.error === "device_limit") { closeSheets(); toast({ full: "満員になりました。", closed: "抽選時刻を過ぎたため参加できません。", device_limit: "このスマホ（ブラウザ）から参加できるのは3枠までです。" }[r.error], true); refreshDetail(); return; }
       const back = { mismatch: "ポケポケのIDかXのIDが、ほかの人の枠と重なっているため参加できません。",
         mismatch_poke: "このXのID（@" + p.xId + "）は、別のポケポケのIDで参加済みです。1枠目と同じポケポケのIDを入れてください（数字を1つずつ確認してください）。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。",
-        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", used_code: "この合言葉はすでに使われています。", used_code_mine: "この合言葉は、あなたがすでに使っています。", limit: "これ以上は参加できません（2枠まで。3枠目には主催者からDMで届いた特別な合言葉が必要です）。", bonus_early: "この合言葉は3枠目用です。先に2枠目に参加してから使ってください（2枠目の合言葉は「投稿済み」ボタンからもらえます）。", invalid: "入力内容を確認してください。" }[r.error];
+        mismatch_x: "このポケポケのIDは、別のXのIDで参加済みです。1枠目と同じXのIDを入れてください。1枠目の入力が間違っていた場合は、主催者にDMで連絡してください。", need_code: "2枠目の参加には合言葉が必要です。", bad_code: "合言葉がちがいます。", code_other: "この合言葉は、別のXのIDの人に渡されたものです。合言葉をもらったXのIDで参加してください。", banned: "ルール違反のため、このポケポケのIDまたはXのIDでは参加できません。", cancelled: "このルーレットは参加を取り消したため、もう参加できません。", used_code: "この合言葉はすでに使われています。", used_code_mine: "この合言葉は、あなたがすでに使っています。", limit: "これ以上は参加できません（2枠まで。3枠目には主催者からDMで届いた特別な合言葉が必要です）。", bonus_early: "この合言葉は3枠目用です。先に2枠目に参加してから使ってください（2枠目の合言葉は「投稿済み」ボタンからもらえます）。", invalid: "入力内容を確認してください。" }[r.error];
       if (back) {
         $("entry-step2").hidden = true; $("entry-step1").hidden = false;
         setStatus("entry-status1", back, true);
@@ -1987,11 +2017,43 @@
         if (cur && cur.id === rid) renderDetail();
         return;
       }
-      setStatus("quote-status", { need_first: "先に1枠目に参加してください（ログイン中の4つと同じ内容で参加した枠が必要です）。", banned: "ルール違反のため、合言葉をお渡しできません。", limit: "参加できるのは2枠までです。", closed: "抽選時刻を過ぎたため、合言葉はもらえません。", no_quote: "このルーレットではボタンで合言葉を渡していません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "合言葉をもらえませんでした。", true);
+      setStatus("quote-status", { need_first: "先に1枠目に参加してください（ログイン中の4つと同じ内容で参加した枠が必要です）。", banned: "ルール違反のため、合言葉をお渡しできません。", cancelled: "このルーレットは参加を取り消したため、合言葉はもらえません。", limit: "参加できるのは2枠までです。", closed: "抽選時刻を過ぎたため、合言葉はもらえません。", no_quote: "このルーレットではボタンで合言葉を渡していません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "合言葉をもらえませんでした。", true);
     } catch (e) { setStatus("quote-status", "混み合っています。少し待ってからもう一度押してください。", true); }
     finally { $("quote-go").disabled = false; }
   });
   $("quote-done").addEventListener("click", () => { closeSheets(); $("grid").scrollIntoView({ behavior: "smooth", block: "center" }); });
+
+  // ---- 参加の取り消し ----
+  $("open-cancel").addEventListener("click", () => {
+    if (!cur || closed()) return;
+    const prof = getProfile();
+    if (!prof) { toast("取り消すには、先にログインしてください（参加したときと同じ4つを入れます）。", true); openLogin(); return; }
+    const mine = mySlots();
+    if (!mine.length) { toast("ログイン中の内容で参加している枠が見つかりません。", true); findMine(true); return; }
+    txt($("cancel-who"), "「" + cur.title + "」の " + mine.map((n) => n + "番").join("・") + "（" + prof.trainer + " / @" + prof.xId + "）の参加を取り消します。");
+    setStatus("cancel-status", ""); $("cancel-go").disabled = false;
+    openSheet("cancel-sheet");
+  });
+  $("cancel-go").addEventListener("click", async () => {
+    const prof = getProfile();
+    if (!cur || !prof) return;
+    const rid = cur.id;
+    $("cancel-go").disabled = true; setStatus("cancel-status", "取り消しています…");
+    try {
+      const r = await apiPost(Object.assign({ action: "rl_cancel", rid }, prof));
+      if (r.ok) {
+        // このスマホに覚えている「自分の枠」も消す
+        try { const v = mineAll(); delete v[rid]; localStorage.setItem(MY_KEY, JSON.stringify(v)); } catch (e) {}
+        delete myStatus[rid]; justJoined = justJoined.filter((j) => j.rid !== rid);
+        if (cur && cur.id === rid) cur.taken = cur.taken.filter((t) => r.slots.indexOf(t[0]) < 0);
+        closeSheets(); renderDetail(); refreshDetail();
+        toast(r.slots.map((n) => n + "番").join("・") + " の参加を取り消しました。");
+        return;
+      }
+      setStatus("cancel-status", { not_found: "ログイン中の内容で参加している枠が見つかりません。参加したときと同じ4つでログインしてください。", closed: "抽選時刻を過ぎたため、取り消せません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "取り消せませんでした。", true);
+    } catch (e) { setStatus("cancel-status", "混み合っています。少し待ってからもう一度押してください。", true); }
+    finally { $("cancel-go").disabled = false; }
+  });
 
   // ---- 当選発表（管理者） ----
   let annText = "";
