@@ -834,14 +834,55 @@
     $("step2").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  // 前に読み込んだ内容をこのスマホに残しておき、次に開いたときはすぐ表示する（そのあと最新に更新）
+  const CACHE_CARDS = "cardRequest:cache:cards", CACHE_TREND = "cardRequest:cache:trend";
+  function cacheGet(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
+  function cacheSet(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+  // Apps Scriptはときどき返事が遅い・失敗するので、時間を区切ってやり直す
+  async function getJson(action) {
+    for (let i = 0; ; i++) {
+      const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timer = ctl ? setTimeout(() => ctl.abort(), 8000) : null;
+      try {
+        const res = await fetch(CONFIG.GAS_URL + "?action=" + action + "&t=" + Date.now(), ctl ? { signal: ctl.signal } : {});
+        if (!res.ok) throw new Error("http " + res.status);
+        return await res.json();
+      } catch (e) { if (i >= 2) throw e; await new Promise((r) => setTimeout(r, 500)); }
+      finally { if (timer) clearTimeout(timer); }
+    }
+  }
   async function loadTrending() {
     if (CONFIG.PREVIEW || !/^https:\/\//.test(CONFIG.GAS_URL)) { renderTrending(SAMPLE_TRENDING); return; }
     try {
-      const res = await fetch(CONFIG.GAS_URL + "?action=trending");
-      const data = await res.json();
-      renderTrending(data && data.ok ? data.items : []);
+      const data = await getJson("trending");
+      const items = data && data.ok ? data.items : [];
+      cacheSet(CACHE_TREND, items);
+      renderTrending(items);
     } catch (err) {
-      $("trend").hidden = true;
+      if (!cacheGet(CACHE_TREND)) $("trend").hidden = true;
+    }
+  }
+  // カード一覧を画面に反映する（選んでいる途中のカードはそのまま保つ）
+  function applyCards(rows) {
+    loadCards(rows);
+    if (picked) { const same = cardList.find((x) => x.name === picked.name); if (same) picked = same; }
+    renderPackFilter();
+    if (cardInput.value.trim() && !picked) runSearch();
+    refresh();
+  }
+  let cardsJson = "";
+  async function fetchCards() {
+    try {
+      const data = await getJson("cards");
+      if (!data.ok || !Array.isArray(data.cards)) throw new Error("bad");
+      const js = JSON.stringify(data.cards);
+      if (js !== cardsJson) { cardsJson = js; cacheSet(CACHE_CARDS, data.cards); applyCards(data.cards); renderTrending(cacheGet(CACHE_TREND) || []); }
+      return true;
+    } catch (err) {
+      console.warn("カード一覧を読み込めませんでした", err);
+      // まだ何も表示できていないときは、5秒後にもう一度読み込む
+      if (!cardList.length) setTimeout(fetchCards, 5000);
+      return false;
     }
   }
 
@@ -856,19 +897,15 @@
     if (usedUp() && !CONFIG.PREVIEW) showDone(false);
 
     if (CONFIG.PREVIEW || !/^https:\/\//.test(CONFIG.GAS_URL)) { loadCards(SAMPLE_CARDS); renderPackFilter(); refresh(); loadTrending(); return; }
-    try {
-      const res = await fetch(CONFIG.GAS_URL + "?action=cards");
-      const data = await res.json();
-      if (!data.ok || !Array.isArray(data.cards)) throw new Error("bad");
-      loadCards(data.cards);
-      renderPackFilter();
-    } catch (err) {
-      loadCards([]);
-      console.warn("カード一覧を読み込めませんでした", err);
+    // 前に読み込んだカード一覧があれば、まずそれをすぐ表示する
+    const cached = cacheGet(CACHE_CARDS);
+    if (Array.isArray(cached) && cached.length) {
+      cardsJson = JSON.stringify(cached);
+      applyCards(cached);
+      const ct = cacheGet(CACHE_TREND); if (Array.isArray(ct)) renderTrending(ct);
     }
-    if (cardInput.value.trim() && !picked) runSearch();
-    refresh();
-    loadTrending();
+    // 最新のカード一覧と注目カードを、同時に取りに行く
+    fetchCards(); loadTrending();
   }
   init();
 </script>
