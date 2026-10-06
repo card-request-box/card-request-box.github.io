@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-06b -->
+<!-- version 2026-10-06c -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -275,6 +275,13 @@
   .about-list b { color: var(--ink); }
   .claim-pre { margin: -8px 0 16px; padding: 9px 12px; border-radius: 12px; background: rgba(242,193,78,.14); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .82rem; }
   .claim-pre b { color: var(--gold); }
+  .rules-box summary { cursor: pointer; font-weight: 800; font-size: .95rem; }
+  .rules-box .rules { margin-top: 10px; }
+  .keypoints { font-size: .84rem; color: var(--muted); margin: 0 0 10px; }
+  .keypoints b { color: var(--ink); }
+  .getcode-open { display: block; width: 100%; font: inherit; font-weight: 800; font-size: .88rem; color: var(--ink); background: transparent; border: 0; text-align: left; padding: 0; cursor: pointer; }
+  .getcode-open::after { content: " ▼"; font-size: .7rem; color: var(--muted); }
+  .getcode-open[aria-expanded="true"]::after { content: " ▲"; }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) {
     .wheel-wrap svg.wheel { transition-duration: .01s; }
@@ -304,7 +311,7 @@
   <div class="loadbox" id="loadbox" hidden role="status"><span class="spin" aria-hidden="true"></span><span><span id="loadbox-text">読み込んでいます…</span><small id="loadbox-sub" hidden>はじめて開いたときは、10秒ほどかかることがあります。そのままお待ちください。</small></span></div>
   <div class="loginbar" id="loginbar">
     <div class="who" id="login-who"></div>
-    <div class="acts"><button type="button" id="login-out" hidden>ログアウト</button><button type="button" class="main" id="login-open">ログイン</button></div>
+    <div class="acts"><button type="button" id="login-out" hidden>保存を消す</button><button type="button" class="main" id="login-open">入力を保存</button></div>
   </div>
   <header>
     <h1><span class="mark" aria-hidden="true">★</span><span id="h1-text">配布ルーレット</span></h1>
@@ -353,26 +360,15 @@
       <button type="button" class="btn ghost" id="replay" hidden>もう一度回す</button>
     </section>
 
-    <section class="panel" aria-labelledby="rules-title">
-      <h2 id="rules-title">参加のしかた</h2>
-      <ol class="rules">
-        <li>下の表から<b>空いている枠</b>をタップ</li>
-        <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
-        <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
-        <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます。多く拡散してくださった方には、主催者から<b>3枠目の合言葉</b>をDMでお送りすることがあります</li>
-        <li id="rule-code">合言葉がほしい方は、1枠目に参加したあと、枠の上の<b>「投稿内容をコピー」</b>でコピーした文章をXに貼り付けて<b>引用ポスト</b>し、<b>「投稿済み」</b>を押してください（#ポケポケトレード #ポケポケ配布 入り）。合言葉は<b>その場で表示</b>されます。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
-        <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）。参加の取り消しはできますが、<b>取り消すとそのルーレットにはもう参加できません</b></li>
-        <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
-        <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
-        <li>入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの参加者には見えません。<b>当選した場合は、当選発表のポストでXのIDをお知らせします</b></li>
-      </ol>
-    </section>
 
     <section class="panel" aria-labelledby="grid-title">
       <h2 id="grid-title">枠をえらぶ <span id="left" style="font-weight:700;color:var(--muted);font-size:.85rem"></span></h2>
+      <p class="keypoints">空いている枠をタップして、4つ入力するだけで参加できます。ポケポケのIDは<b>カードを受け取るアカウントのID</b>を入れてください。</p>
       <p class="mine" id="mine" hidden></p>
       <div class="getcode" id="getcode" hidden>
-        <p id="getcode-text"></p>
+        <button type="button" class="getcode-open" id="getcode-open" aria-expanded="false">2枠目に参加したい方はこちら</button>
+        <div id="getcode-body" hidden>
+        <p id="getcode-text" style="margin-top:8px"></p>
         <p class="have" id="getcode-have" hidden></p>
         <div id="getcode-steps">
           <ol class="quote-rules" style="margin-bottom:10px">
@@ -384,12 +380,27 @@
           <pre class="dm-preview" id="getcode-textbox" hidden></pre>
         </div>
         <button type="button" class="btn primary" id="getcode-btn">投稿済み（合言葉をもらう）</button>
+        </div>
       </div>
       <div class="legend" aria-hidden="true"><span><i></i>空き</span><span><i class="l-taken"></i>うまっている</span><span><i class="l-mine"></i>あなたの枠</span></div>
       <div class="grid" id="grid" role="group" aria-label="枠の一覧"></div>
       <p class="hint" id="grid-hint"></p>
       <p class="hint" id="edit-row"><button type="button" class="linkbtn" id="open-edit">入力した内容を変更する</button>　<button type="button" class="linkbtn" id="open-cancel" style="color:var(--error)">参加を取り消す</button></p>
     </section>
+    <details class="panel rules-box" id="rules-box">
+      <summary>参加のしかた・ルール（タップで開く）</summary>
+      <ol class="rules">
+        <li>上の表から<b>空いている枠</b>をタップ</li>
+        <li><b>ポケポケのID・トレーナーネーム・Xの名前・XのID</b>を入力して参加</li>
+        <li>入力するポケポケのIDは、<b>カードを受け取るアカウントのID</b>にしてください。<b>参加したアカウントと受け取るアカウントが違う場合は配布できません</b></li>
+        <li>参加できるのは<b>1人1枠</b>。合言葉があれば<b>2枠目</b>にも参加できます。多く拡散してくださった方には、主催者から<b>3枠目の合言葉</b>をDMでお送りすることがあります</li>
+        <li id="rule-code">合言葉がほしい方は、1枠目に参加したあと、枠の上の<b>「2枠目に参加したい方はこちら」</b>を開き、<b>「投稿内容をコピー」</b>でコピーした文章をXに貼り付けて<b>引用ポスト</b>し、<b>「投稿済み」</b>を押してください（#ポケポケトレード #ポケポケ配布 入り）。合言葉は<b>その場で表示</b>されます。<b>鍵アカウントでの投稿は無効</b>です。投稿していない場合や、<b>抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります</b>（抽選後に消すのは大丈夫です）</li>
+        <li>一度決めた枠は<b>変更できません</b>（入力内容はあとから直せます）。参加の取り消しはできますが、<b>取り消すとそのルーレットにはもう参加できません</b></li>
+        <li>抽選時刻になると<b>「ルーレットを回す」ボタン</b>が出ます。自分で回して結果を見てください</li>
+        <li>当選した方は<b>配布期限までにDM</b>を送ってください</li>
+        <li>入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの参加者には見えません。<b>当選した場合は、当選発表のポストでXのIDをお知らせします</b></li>
+      </ol>
+    </details>
   </section>
 
   <!-- 管理者画面 -->
@@ -430,7 +441,7 @@
       <li><b>アプリのインストールやファイルのダウンロードもありません</b></li>
       <li>入力するのは<b>ポケポケのID・トレーナーネーム・Xの名前・XのIDの4つだけ</b>です（カードを送るのに必要なため）</li>
       <li>ポケポケのIDとXのIDは、<b>ほかの参加者には見えません</b>。主催者だけが見て、配布の連絡にだけ使います（当選した場合は、当選発表のポストでXのIDをお知らせします）</li>
-      <li>右上の「ログイン」は、入力した4つを<b>このスマホに覚えておくだけ</b>の機能です。どこかのアカウントにログインするわけではありません</li>
+      <li>上の「入力を保存」は、入力した4つを<b>このスマホに覚えておくだけ</b>の機能です。どこかのアカウントにログインするものではありません</li>
       <li>アドレスが <b>card-request-box.github.io</b> になっているか確認してください。ほかのアドレスで似た画面が出ても、このサイトではありません</li>
       <li>このサイトが、上の4つ以外（パスワードなど）を聞くことはありません。聞かれたら入力しないでください</li>
     </ul>
@@ -446,7 +457,7 @@
     <div id="entry-step1">
       <h2 id="entry-title"><span class="no" id="entry-no">1</span>番の枠に参加</h2>
       <p class="sub">入力内容は<b>配布の連絡にだけ</b>使います。ポケポケのIDとXのIDはほかの参加者には見えません（枠にはトレーナーネーム、当選したときは当選者の一覧にXの名前も出ます）。<b>当選した場合は、当選発表のポストでXのIDをお知らせします。</b></p>
-      <p class="prefill" id="prefill-note" hidden>ログイン中の内容が入っています。そのままでも、変更してもOKです。</p>
+      <p class="prefill" id="prefill-note" hidden>保存した内容が入っています。そのままでも、変更してもOKです。</p>
       <div class="field"><label for="f-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><p class="hint" style="margin:0 0 4px;color:var(--error);font-weight:700">※カードを受け取るアカウントのIDを入れてください。違うアカウントには配布できません</p><input id="f-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
       <div class="field"><label for="f-trainer">トレーナーネーム</label><input id="f-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
       <div class="field"><label for="f-xname">Xの名前</label><input id="f-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
@@ -536,15 +547,15 @@
 
 <!-- ログイン -->
 <div class="sheet" id="login-sheet" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
-  <h2 id="login-title">ログイン</h2>
-  <p class="sub">4つを入力しておくと、このスマホ（ブラウザ）ではどのルーレットでも参加するときに最初から入力された状態になります。入力内容はこのスマホの中にだけ保存されます。</p>
+  <h2 id="login-title">入力を保存</h2>
+  <p class="sub">4つを入力しておくと、このスマホ（ブラウザ）ではどのルーレットでも、参加するときに最初から入力された状態になります。<b>入力内容はこのスマホの中にだけ保存されます</b>（アカウントへのログインではありません）。Xアプリの中とSafariなど、別のブラウザで開いたときは、ここで同じ4つを保存すると「あなたの枠」が出ます。</p>
   <div class="field"><label for="l-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><input id="l-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
   <div class="field"><label for="l-trainer">トレーナーネーム</label><input id="l-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
   <div class="field"><label for="l-xname">Xの名前</label><input id="l-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
   <div class="field"><label for="l-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="l-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
-  <button type="button" class="btn primary" id="l-save">ログインする</button>
+  <button type="button" class="btn primary" id="l-save">保存する</button>
   <p class="status" id="login-status" role="status"></p>
-  <button type="button" class="btn ghost" id="l-logout" hidden>ログアウトする</button>
+  <button type="button" class="btn ghost" id="l-logout" hidden>保存した内容を消す</button>
   <button type="button" class="btn ghost" data-close>閉じる</button>
 </div>
 
@@ -588,7 +599,7 @@
   <div id="quote-step1">
     <h2 id="quote-title">投稿しましたか？</h2>
     <ol class="quote-rules">
-      <li>配布ポストのURL入りの投稿を、<b>ログイン中のXアカウント（<span id="quote-xid"></span>）</b>で投稿しましたか？合言葉はこのアカウント専用です</li>
+      <li>配布ポストのURL入りの投稿を、<b>保存してあるXアカウント（<span id="quote-xid"></span>）</b>で投稿しましたか？合言葉はこのアカウント専用です</li>
       <li><b>鍵アカウントでの投稿は確認できないため無効</b>です</li>
       <li class="danger">投稿していないのに「投稿しました」を押した場合や、抽選前に投稿を消した場合は、今後すべての抽選に参加できなくなります（あとで主催者が確認します）</li>
       <li>抽選が終わったあとなら、投稿を消しても大丈夫です</li>
@@ -1123,6 +1134,11 @@
     if (mine.length) {
       mineEl.innerHTML = ""; mineEl.append("あなたの枠：", txt(mk("b"), mine.map((n) => n + "番").join("・")));
       if (mine.length < 2 && !isClosed) mineEl.append("（合言葉があればもう1枠参加できます）");
+    } else if (!isClosed && !getProfile()) {
+      // 別のブラウザ（Xアプリの中とSafariなど）で参加した場合は、ここに出ないことがある
+      mineEl.hidden = false; mineEl.innerHTML = "";
+      const b = mk("button", "linkbtn", "参加したのに「あなたの枠」が出ないときはこちら"); b.type = "button"; b.addEventListener("click", openLogin);
+      mineEl.appendChild(b);
     }
     renderGetCode(mine, isClosed);
     txt($("grid-hint"), isClosed ? "受付は終了しました。ご参加ありがとうございました。" : full ? "満員になりました。抽選時刻になるとルーレットを回せます。" : "空き状況は数秒ごとに自動で更新されます。");
@@ -1297,6 +1313,8 @@
       if (!cur || cur.id !== rid) return;
       if (r.ok) {
         saveMine(cur.id, slot); saveInfo(cur.id, slot, p); cur.taken.push([slot, p.trainer]);
+        // まだ保存していなければ、入力した4つをこのスマホに保存しておく（次の参加や、合言葉・取り消しで使う）
+        if (!getProfile()) { setProfile(p); renderLoginBar(); }
         justJoined.push({ rid: cur.id, slot, trainer: p.trainer, at: Date.now() });
         // 合言葉を使わなかったときは、2枠目のためにとっておく
         const typed = $("f-code").value.trim();
@@ -1583,17 +1601,17 @@
     bar.hidden = !$("admin-view").hidden;
     const who = $("login-who"); who.innerHTML = "";
     if (p) {
-      who.append("ログイン中：", mk("b", "", p.trainer), mk("small", "", "@" + p.xId + "（参加するときに自動で入力されます）"));
+      who.append("入力を保存中：", mk("b", "", p.trainer), mk("small", "", "@" + p.xId + "（参加するときに自動で入力されます）"));
       txt($("login-open"), "変更"); $("login-open").classList.remove("main"); $("login-out").hidden = false;
     } else {
-      who.append("ログインしていません", mk("small", "", "ログインすると参加するときの入力がいりません"));
-      txt($("login-open"), "ログイン"); $("login-open").classList.add("main"); $("login-out").hidden = true;
+      who.append("入力を保存できます", mk("small", "", "保存しておくと、次から入力がいりません（このスマホの中だけに保存）"));
+      txt($("login-open"), "入力を保存"); $("login-open").classList.add("main"); $("login-out").hidden = true;
     }
   }
   function openLogin() {
     const p = getProfile() || { pokeId: "", trainer: "", xName: "", xId: "" };
     $("l-poke").value = p.pokeId; $("l-trainer").value = p.trainer; $("l-xname").value = p.xName; $("l-xid").value = p.xId;
-    txt($("l-save"), getProfile() ? "この内容に変更する" : "ログインする");
+    txt($("l-save"), getProfile() ? "この内容に変更する" : "保存する");
     $("l-logout").hidden = !getProfile();
     setStatus("login-status", "");
     openSheet("login-sheet");
@@ -1603,7 +1621,7 @@
     setProfile(null); lookedUp.clear(); myStatus = {}; lastMyStatus = 0;
     // 次に同じスマホを使う人に、前の人の枠や入力内容が出ないように消す
     try { [MY_KEY, INFO_KEY, RESULT_KEY].forEach((k) => localStorage.removeItem(k)); } catch (e) {}
-    if (cur) { shownFor = null; renderDetail(); } closeSheets(); renderLoginBar(); toast("ログアウトしました。"); }
+    if (cur) { shownFor = null; renderDetail(); } closeSheets(); renderLoginBar(); toast("保存した内容を消しました。"); }
   $("login-open").addEventListener("click", openLogin);
   $("login-out").addEventListener("click", logout);
   $("l-logout").addEventListener("click", logout);
@@ -1612,7 +1630,7 @@
     const err = checkPerson(p, "l-");
     if (err) return setStatus("login-status", err, true);
     setProfile(p); lookedUp.clear(); lastMyStatus = 0; closeSheets(); renderLoginBar();
-    toast("ログインしました。");
+    toast("保存しました。");
     if (cur) findMine(true);
   });
   // ログイン中なら、別のスマホで参加した枠も「自分の枠」として見つける（4つとも一致した枠だけ）
@@ -1985,22 +2003,29 @@
   const gotMem = {};
   function getGot(rid) { try { return (JSON.parse(localStorage.getItem(GOT_KEY) || "{}"))[rid] || gotMem[rid] || ""; } catch (e) { return gotMem[rid] || ""; } }
   function saveGot(rid, code) { gotMem[rid] = code; try { const v = JSON.parse(localStorage.getItem(GOT_KEY) || "{}"); v[rid] = code; localStorage.setItem(GOT_KEY, JSON.stringify(v)); } catch (e) {} }
+  let getcodeOpen = false, getcodeFor = null;
   function renderGetCode(mine, isClosed) {
     const box = $("getcode");
-    const show = !isClosed && mine.length < 2;
+    // 1枠参加している人にだけ出す（まだ参加していない人には関係ないので出さない）
+    const show = !isClosed && mine.length === 1;
     box.hidden = !show;
     if (!show) return;
+    if (getcodeFor !== cur.id) { getcodeFor = cur.id; getcodeOpen = false; }
+    const got = getGot(cur.id);
+    // 合言葉をもらったあとは、開いたままにする
+    const open = getcodeOpen || !!got;
+    $("getcode-open").setAttribute("aria-expanded", String(open)); $("getcode-body").hidden = !open;
     // 引用元のポストがまだ設定されていないとき
     $("getcode-btn").hidden = !cur.quote;
     if (!cur.quote) { $("getcode-have").hidden = true; $("getcode-steps").hidden = true; txt($("getcode-text"), "2枠目の合言葉の受け取りは、まだ始まっていません。準備ができると、ここにボタンが出ます。"); return; }
-    const got = getGot(cur.id);
-    txt($("getcode-text"), mine.length ? "配布ポストを引用ポストすると、2枠目に参加するための合言葉がもらえます。" : "1枠目に参加したあと、配布ポストを引用ポストすると2枠目の合言葉がもらえます。");
+    txt($("getcode-text"), "配布ポストを引用ポストすると、2枠目に参加するための合言葉がもらえます。");
     if ($("getcode-textbox").dataset.rid !== cur.id) { $("getcode-textbox").hidden = true; $("getcode-textbox").dataset.rid = cur.id; }
     $("getcode-have").hidden = !got;
     if (got) { const h = $("getcode-have"); h.innerHTML = ""; h.append("あなたの合言葉：", mk("code", "", got), "（空いている枠を選ぶと自動で入ります）"); }
     $("getcode-steps").hidden = !!got;
     txt($("getcode-btn"), got ? "合言葉をもう一度見る" : "投稿済み（合言葉をもらう）");
   }
+  $("getcode-open").addEventListener("click", () => { getcodeOpen = !getcodeOpen; if (cur) renderGetCode(mySlots(), closed()); });
   const quoteText = () => "#ポケポケトレード #ポケポケ配布\n" + cur.quote;
   $("getcode-copy").addEventListener("click", async () => {
     if (!cur || !cur.quote) return;
@@ -2015,7 +2040,7 @@
   $("getcode-btn").addEventListener("click", () => {
     if (!cur || !cur.quote) return;
     const prof = getProfile();
-    if (!prof) { toast("合言葉をもらうには、先にログインしてください。", true); openLogin(); return; }
+    if (!prof) { toast("合言葉をもらうには、先に「入力を保存」をしてください。", true); openLogin(); return; }
     if (!mySlots().length) { toast("先に1枠目に参加してください。", true); return; }
     txt($("quote-xid"), "@" + prof.xId);
     setStatus("quote-status", ""); $("quote-go").disabled = false;
@@ -2037,7 +2062,7 @@
         if (cur && cur.id === rid) renderDetail();
         return;
       }
-      setStatus("quote-status", { need_first: "先に1枠目に参加してください（ログイン中の4つと同じ内容で参加した枠が必要です）。", banned: "ルール違反のため、合言葉をお渡しできません。", cancelled: "このルーレットは参加を取り消したため、合言葉はもらえません。", limit: "参加できるのは2枠までです。", closed: "抽選時刻を過ぎたため、合言葉はもらえません。", no_quote: "このルーレットではボタンで合言葉を渡していません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "合言葉をもらえませんでした。", true);
+      setStatus("quote-status", { need_first: "先に1枠目に参加してください（保存してある4つと同じ内容で参加した枠が必要です）。", banned: "ルール違反のため、合言葉をお渡しできません。", cancelled: "このルーレットは参加を取り消したため、合言葉はもらえません。", limit: "参加できるのは2枠までです。", closed: "抽選時刻を過ぎたため、合言葉はもらえません。", no_quote: "このルーレットではボタンで合言葉を渡していません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "合言葉をもらえませんでした。", true);
     } catch (e) { setStatus("quote-status", "混み合っています。少し待ってからもう一度押してください。", true); }
     finally { $("quote-go").disabled = false; }
   });
@@ -2047,9 +2072,9 @@
   $("open-cancel").addEventListener("click", () => {
     if (!cur || closed()) return;
     const prof = getProfile();
-    if (!prof) { toast("取り消すには、先にログインしてください（参加したときと同じ4つを入れます）。", true); openLogin(); return; }
+    if (!prof) { toast("取り消すには、先に「入力を保存」をしてください（参加したときと同じ4つを入れます）。", true); openLogin(); return; }
     const mine = mySlots();
-    if (!mine.length) { toast("ログイン中の内容で参加している枠が見つかりません。", true); findMine(true); return; }
+    if (!mine.length) { toast("保存してある内容で参加している枠が見つかりません。", true); findMine(true); return; }
     txt($("cancel-who"), "「" + cur.title + "」の " + mine.map((n) => n + "番").join("・") + "（" + prof.trainer + " / @" + prof.xId + "）の参加を取り消します。");
     setStatus("cancel-status", ""); $("cancel-go").disabled = false;
     openSheet("cancel-sheet");
@@ -2070,7 +2095,7 @@
         toast(r.slots.map((n) => n + "番").join("・") + " の参加を取り消しました。");
         return;
       }
-      setStatus("cancel-status", { not_found: "ログイン中の内容で参加している枠が見つかりません。参加したときと同じ4つでログインしてください。", closed: "抽選時刻を過ぎたため、取り消せません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "取り消せませんでした。", true);
+      setStatus("cancel-status", { not_found: "保存してある内容で参加している枠が見つかりません。参加したときと同じ4つを保存し直してください。", closed: "抽選時刻を過ぎたため、取り消せません。", busy: "混み合っています。少し待ってからもう一度押してください。" }[r.error] || "取り消せませんでした。", true);
     } catch (e) { setStatus("cancel-status", "混み合っています。少し待ってからもう一度押してください。", true); }
     finally { $("cancel-go").disabled = false; }
   });
