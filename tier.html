@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-06a -->
+<!-- version 2026-10-06b -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>カードの現在のレート表</title>
@@ -18,6 +18,8 @@
 <meta name="twitter:title" content="★現在のレート表">
 <meta name="twitter:description" content="現在のレートを見て、配布してほしいカードを選べます。">
 <meta name="twitter:image" content="https://card-request-box.github.io/ogp-tier.png">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
@@ -315,6 +317,11 @@
   .tcard .rank { flex: none; width: 26px; text-align: center; font-weight: 800; font-size: .8rem; color: var(--muted); margin-top: 3px; }
   .tier-tools { flex-wrap: wrap; }
   .tier-tools input { flex: 1 1 100%; }
+  .loadbox { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border-radius: 14px; background: rgba(16,25,58,.94); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .9rem; font-weight: 700; position: relative; z-index: 2; }
+  .loadbox .spin { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 3px solid rgba(255,255,255,.25); border-top-color: #F2C14E; animation: lb-spin .8s linear infinite; }
+  .loadbox small { display: block; font-weight: 400; color: #C9D1EA; font-size: .78rem; margin-top: 2px; }
+  @keyframes lb-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .loadbox .spin { animation-duration: 2.4s; } }
 </style>
 </head>
 <body>
@@ -328,6 +335,7 @@
     <a href="roulette.html">配布ルーレット</a>
     <a aria-current="page" href="tier.html">現在レート</a>
   </nav>
+  <div class="loadbox" id="loadbox" hidden role="status"><span class="spin" aria-hidden="true"></span><span><span id="loadbox-text">読み込んでいます…</span><small id="loadbox-sub" hidden>はじめて開いたときは、10秒ほどかかることがあります。そのままお待ちください。</small></span></div>
   <header>
     <h1><span class="mark" aria-hidden="true">★</span>カードの現在のレート表</h1>
     <p class="lead" id="lead" style="white-space:pre-wrap">カードの強さをレート（数字）で表しています。数字が大きいほど強いカードです。配布してほしいカードを選ぶと、DMで送る文章を作れます。</p>
@@ -373,6 +381,14 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
+  // 読み込み中のお知らせ（3秒たっても終わらなければ「はじめは時間がかかります」も出す）
+  let loadboxTimer = null;
+  function setLoading(on, text) {
+    const b = document.getElementById("loadbox"), sub = document.getElementById("loadbox-sub");
+    if (!on) { b.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = null; return; }
+    if (text) document.getElementById("loadbox-text").textContent = text;
+    if (b.hidden) { b.hidden = false; sub.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = setTimeout(() => { sub.hidden = false; }, 3000); }
+  }
   const CONFIG = {
     GAS_URL: "https://script.google.com/macros/s/AKfycbxfcJFpA0QjPY07_Cw_bJiaeXmeElMYDphnG_cjHZF4X6tf_IAF3ItcBJySQWFuIu6H/exec",
     DM_ID: "1249919714022678528",
@@ -504,20 +520,27 @@
     if (d.updated) $("updated").textContent = "レートは強さの目安です（配布は無料）。随時見直しています（最終確認 " + new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(d.updated)) + "）";
     render(); renderBar();
   }
+  // 前に読み込んだ内容をこのスマホに残しておき、次に開いたときはすぐ表示する（そのあと最新に更新）
+  const CACHE_KEY = "cardRate:cache";
   async function load(quiet) {
     if (CONFIG.PREVIEW) { $("note").textContent = "見た目確認用のプレビューです（サンプルのカードを表示しています）。"; return apply(SAMPLE); }
-    if (!quiet) { $("empty").hidden = false; $("empty").textContent = "読み込み中…"; }
+    if (!quiet) {
+      let c = null; try { c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (e) {}
+      if (c && c.ok) apply(c); else { $("empty").hidden = true; setLoading(true, "レート表を読み込んでいます…"); }
+    }
     for (let i = 0; i < 3; i++) {
       const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8000);
       try {
         const res = await fetch(CONFIG.GAS_URL + "?action=tiers&t=" + Date.now(), { signal: ctl.signal });
         const d = await res.json();
         if (!d.ok) throw 0;
-        $("note").textContent = ""; return apply(d);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {}
+        $("note").textContent = ""; setLoading(false); return apply(d);
       } catch (e) { await new Promise((r) => setTimeout(r, 600)); }
       finally { clearTimeout(timer); }
     }
-    if (!quiet) $("empty").textContent = "混み合っています。少し待ってから再読み込みしてください。";
+    // まだ何も表示できていないときは、5秒後にもう一度読み込む
+    if (!quiet && $("loadbox").hidden === false) { setLoading(true, "つながりにくいため、読み込みをやり直しています…"); setTimeout(() => load(), 5000); }
   }
   $("dm-name").textContent = CONFIG.DM_NAME; $("dm-name2").textContent = CONFIG.DM_NAME;
   load();

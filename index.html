@@ -18,6 +18,8 @@
 <meta name="twitter:title" content="★カードリクエスト箱">
 <meta name="twitter:description" content="配布してほしいカードを匿名でリクエストできます。">
 <meta name="twitter:image" content="https://card-request-box.github.io/ogp.png">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
@@ -191,6 +193,11 @@
   .tabs a[aria-current="page"] { background: var(--gold); color: #2B1F03; box-shadow: 0 3px 0 var(--gold-deep); }
   .tabs a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
   .tabs a { font-size: .8rem; padding: 9px 6px; white-space: nowrap; flex: 1 1 auto; }
+  .loadbox { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border-radius: 14px; background: rgba(16,25,58,.94); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .9rem; font-weight: 700; position: relative; z-index: 2; }
+  .loadbox .spin { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 3px solid rgba(255,255,255,.25); border-top-color: #F2C14E; animation: lb-spin .8s linear infinite; }
+  .loadbox small { display: block; font-weight: 400; color: #C9D1EA; font-size: .78rem; margin-top: 2px; }
+  @keyframes lb-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .loadbox .spin { animation-duration: 2.4s; } }
 </style>
 </head>
 <body>
@@ -213,6 +220,7 @@
     <a href="roulette.html">配布ルーレット</a>
     <a href="tier.html">現在レート</a>
   </nav>
+  <div class="loadbox" id="loadbox" hidden role="status"><span class="spin" aria-hidden="true"></span><span><span id="loadbox-text">読み込んでいます…</span><small id="loadbox-sub" hidden>はじめて開いたときは、10秒ほどかかることがあります。そのままお待ちください。</small></span></div>
   <header>
     <h1><span class="mark" aria-hidden="true">★</span>カードリクエスト箱</h1>
     <p class="lead">配布してほしいカードを匿名でリクエストできます。名前もメールアドレスもいりません。</p>
@@ -288,6 +296,14 @@
 </main>
 
 <script>
+  // 読み込み中のお知らせ（3秒たっても終わらなければ「はじめは時間がかかります」も出す）
+  let loadboxTimer = null;
+  function setLoading(on, text) {
+    const b = document.getElementById("loadbox"), sub = document.getElementById("loadbox-sub");
+    if (!on) { b.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = null; return; }
+    if (text) document.getElementById("loadbox-text").textContent = text;
+    if (b.hidden) { b.hidden = false; sub.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = setTimeout(() => { sub.hidden = false; }, 3000); }
+  }
   // ===== 設定 =====
   const CONFIG = {
     // Google Apps Script の「ウェブアプリのURL」をここに貼り付けます
@@ -864,6 +880,7 @@
   }
   // カード一覧を画面に反映する（選んでいる途中のカードはそのまま保つ）
   function applyCards(rows) {
+    setLoading(false);
     loadCards(rows);
     if (picked) { const same = cardList.find((x) => x.name === picked.name); if (same) picked = same; }
     renderPackFilter();
@@ -881,7 +898,7 @@
     } catch (err) {
       console.warn("カード一覧を読み込めませんでした", err);
       // まだ何も表示できていないときは、5秒後にもう一度読み込む
-      if (!cardList.length) setTimeout(fetchCards, 5000);
+      if (!cardList.length) { setLoading(true, "つながりにくいため、読み込みをやり直しています…"); setTimeout(fetchCards, 5000); }
       return false;
     }
   }
@@ -904,6 +921,7 @@
       applyCards(cached);
       const ct = cacheGet(CACHE_TREND); if (Array.isArray(ct)) renderTrending(ct);
     }
+    else setLoading(true, "カード一覧を読み込んでいます…");
     // 最新のカード一覧と注目カードを、同時に取りに行く
     fetchCards(); loadTrending();
   }

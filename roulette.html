@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-04a -->
+<!-- version 2026-10-06b -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -18,6 +18,8 @@
 <meta name="twitter:title" content="★配布ルーレット">
 <meta name="twitter:description" content="好きな枠をえらんで参加しよう。抽選時刻に自分で回せます。">
 <meta name="twitter:image" content="https://card-request-box.github.io/ogp-roulette.png">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
@@ -279,6 +281,11 @@
     .sheet, .slot.flash { animation: none; }
   }
   .tabs a { font-size: .8rem; padding: 9px 6px; white-space: nowrap; flex: 1 1 auto; }
+  .loadbox { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border-radius: 14px; background: rgba(16,25,58,.94); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .9rem; font-weight: 700; position: relative; z-index: 2; }
+  .loadbox .spin { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 3px solid rgba(255,255,255,.25); border-top-color: #F2C14E; animation: lb-spin .8s linear infinite; }
+  .loadbox small { display: block; font-weight: 400; color: #C9D1EA; font-size: .78rem; margin-top: 2px; }
+  @keyframes lb-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .loadbox .spin { animation-duration: 2.4s; } }
 </style>
 </head>
 <body>
@@ -294,6 +301,7 @@
     <a aria-current="page" href="roulette.html">配布ルーレット</a>
     <a href="tier.html">現在レート</a>
   </nav>
+  <div class="loadbox" id="loadbox" hidden role="status"><span class="spin" aria-hidden="true"></span><span><span id="loadbox-text">読み込んでいます…</span><small id="loadbox-sub" hidden>はじめて開いたときは、10秒ほどかかることがあります。そのままお待ちください。</small></span></div>
   <div class="loginbar" id="loginbar">
     <div class="who" id="login-who"></div>
     <div class="acts"><button type="button" id="login-out" hidden>ログアウト</button><button type="button" class="main" id="login-open">ログイン</button></div>
@@ -647,6 +655,14 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
+  // 読み込み中のお知らせ（3秒たっても終わらなければ「はじめは時間がかかります」も出す）
+  let loadboxTimer = null;
+  function setLoading(on, text) {
+    const b = document.getElementById("loadbox"), sub = document.getElementById("loadbox-sub");
+    if (!on) { b.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = null; return; }
+    if (text) document.getElementById("loadbox-text").textContent = text;
+    if (b.hidden) { b.hidden = false; sub.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = setTimeout(() => { sub.hidden = false; }, 3000); }
+  }
   // ===== 設定 =====
   const CONFIG = {
     // リクエスト箱と同じ Apps Script の「ウェブアプリのURL」
@@ -935,8 +951,8 @@
     if (!list) {
       const c = cacheLoad("list", 30 * 60e3);
       if (c) { list = c.items; skew = c.skew || 0; renderList(); }
-      else { $("list-empty").hidden = false; txt($("list-empty"), "読み込み中…"); }
-    }
+      else { $("list-empty").hidden = true; setLoading(true, "ルーレットを読み込んでいます…"); }
+    } else setLoading(false);
     if (listBusy) return;
     listBusy = true;
     try {
@@ -945,10 +961,11 @@
       skew = r.now - Date.now();
       list = r.items;
       cacheSave("list", { items: r.items, skew });
+      setLoading(false);
       renderList();
       txt($("note"), "");
     } catch (e) {
-      if (!list) { txt($("list-empty"), "つながりにくいため、読み込みをやり直しています…"); setTimeout(() => { if (!curId && !$("list-view").hidden) showList(); }, 3000); }
+      if (!list) { setLoading(true, "つながりにくいため、読み込みをやり直しています…"); setTimeout(() => { if (!curId && !$("list-view").hidden) showList(); }, 3000); }
       return;
     } finally { listBusy = false; }
     // ログイン中なら、どのルーレットに参加しているかをまとめて調べる
@@ -1034,6 +1051,7 @@
       const c = cacheLoad("r:" + id, 30 * 60e3);
       if (c && c.r && c.r.id === id) { cur = c.r; skew = c.skew || 0; renderDetail(); txt($("note"), "最新の状態を確認しています…"); }
     }
+    if (cur) setLoading(false); else setLoading(true, "ルーレットを読み込んでいます…");
     await refreshDetail();
     window.scrollTo(0, 0);
   }
@@ -1044,8 +1062,9 @@
     const want = curId;
     try {
       const r = await apiGet({ action: "roulette", id: want });
-      if (!r.ok) { txt($("note"), "このルーレットは見つかりませんでした。"); return; }
+      if (!r.ok) { setLoading(false); txt($("note"), "このルーレットは見つかりませんでした。"); return; }
       if (curId !== r.id) return;
+      setLoading(false);
       // 参加した直後に古い空き状況が返ってきても、自分の枠が空きに戻らないようにする
       justJoined = justJoined.filter((j) => Date.now() - j.at < 20000);
       justJoined.filter((j) => j.rid === r.id && !r.taken.some((t) => t[0] === j.slot)).forEach((j) => r.taken.push([j.slot, j.trainer]));
@@ -1057,7 +1076,7 @@
     } catch (e) {
       // まだ何も表示できていないときは、3秒後にもう一度読み込む
       if (!cur && curId === want) {
-        txt($("count"), "読み込み中…"); txt($("note"), "つながりにくいため、読み込みをやり直しています…");
+        txt($("count"), "読み込み中…"); setLoading(true, "つながりにくいため、読み込みをやり直しています…");
         clearTimeout(retryTimer); retryTimer = setTimeout(refreshDetail, 3000);
       }
     } finally { detailBusy = false; }
@@ -1610,6 +1629,7 @@
 
   // ---- 管理者画面 ----
   function showAdmin() {
+    setLoading(false);
     $("about").hidden = true;
     $("list-view").hidden = true; $("detail-view").hidden = true; $("admin-view").hidden = false;
     txt($("h1-text"), "配布ルーレット 管理"); txt($("lead"), "ルーレットの作成・編集、合言葉の発行、当選者の確認ができます。");
