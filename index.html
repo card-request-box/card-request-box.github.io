@@ -190,7 +190,7 @@
   .tabs a:hover { color: #fff; }
   .tabs a[aria-current="page"] { background: var(--gold); color: #2B1F03; box-shadow: 0 3px 0 var(--gold-deep); }
   .tabs a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
-  .tabs a { font-size: .82rem; padding: 9px 4px; }
+  .tabs a { font-size: .8rem; padding: 9px 6px; white-space: nowrap; flex: 1 1 auto; }
 </style>
 </head>
 <body>
@@ -220,7 +220,7 @@
 
   <section class="trend" id="trend" hidden aria-labelledby="trend-title">
     <h2 id="trend-title"><span aria-hidden="true">★</span> 直近3日の注目カード</h2>
-    <p class="sub">この1週間でリクエストが多いカードです。タップするとそのカードを選べます。</p>
+    <p class="sub">この3日間でリクエストが多いカードです。タップするとそのカードを選べます。</p>
     <ol id="trend-list"></ol>
   </section>
 
@@ -305,8 +305,8 @@
     PREVIEW: false
   };
 
-  // レアリティ（スプレッドシートの番号：1 虹 / 2 黒 / 4 トレーナー / 5 ★1色違い / 6 ★2色違い　※3は使わない）
-  const RARITIES = ["虹", "黒", "トレーナー", "★1色違い", "★2色違い"];
+  // レアリティ（スプレッドシートの番号：1 虹 / 2 黒 / 3 金枠 / 4 トレーナー / 5 ★1色違い / 6 ★2色違い）
+  const RARITIES = ["虹", "黒", "金枠", "トレーナー", "★1色違い", "★2色違い"];
 
   // スプレッドシートを使わないとき用のサンプル：["カード名", "パック名", "レアリティ"]
   const SAMPLE_CARDS = [
@@ -365,6 +365,8 @@
     for (const row of rows) { const p = String(row[1] || "").trim(); if (p && packOrder.indexOf(p) < 0) packOrder.push(p); }
   }
   let packOrder = [];
+  // 「（レアリティ／パック）」の部分。名前とレアリティが同じとき・パックがないときは、その分を省く
+  const subLabel = (name, rarity, pack) => { const a = [rarity !== name ? rarity : "", pack || ""].filter(Boolean); return a.length ? "（" + a.join("／") + "）" : ""; };
   const raritiesOf = (c) => Array.from(new Set(c.versions.map((v) => v.rarity)));
   const packsOf = (c, r) => c.versions.filter((v) => v.rarity === r).map((v) => v.pack);
   const hasRarity = (c, r) => c.versions.some((v) => v.rarity === r);
@@ -410,7 +412,7 @@
       if (!selRarity) return { ok: false, label: "レアリティを選んでください" };
       const pv = currentVersion();
       if (!pv) return { ok: false, label: "パックを選んでください" };
-      return { ok: true, label: "★ " + picked.name + "（" + selRarity + (pv && pv.pack ? "／" + pv.pack : "") + "）をリクエスト" };
+      return { ok: true, label: "★ " + picked.name + subLabel(picked.name, selRarity, pv ? pv.pack : "") + "をリクエスト" };
     }
     if (!cardList.length && !CONFIG.ALLOW_FREE_TEXT) return { ok: false, label: "カード一覧を読み込み中…" };
     if (matches.length) return { ok: false, label: "候補からカードを選んでください" };
@@ -527,7 +529,7 @@
       const m = document.createElement("span");
       m.className = "meta";
       if (packFilter && !altMode) {
-        m.textContent = Array.from(new Set(versionsIn(c, selRarity, packFilter).map((v) => v.rarity))).join("・");
+        m.textContent = Array.from(new Set(versionsIn(c, selRarity, packFilter).map((v) => v.rarity))).filter((r) => r !== c.name).join("・");
       } else if (selRarity && !altMode) {
         m.textContent = packsOf(c, selRarity).filter(Boolean).join("・");
       } else {
@@ -596,8 +598,9 @@
     line("", "✓ " + picked.name, "name");
     const v = currentVersion();
     if (v) {
-      line("パック", v.pack || "（未登録）");
-      line("レアリティ", v.rarity);
+      // パックがないもの・名前とレアリティが同じもの（「金枠」など）は、その行を出さない
+      if (v.pack) line("パック", v.pack);
+      if (v.rarity !== picked.name) line("レアリティ", v.rarity);
     } else if (needsPack()) {
       line("パック", packsOf(picked, selRarity).join("／"));
       line("レアリティ", selRarity);
@@ -606,7 +609,7 @@
       // レアリティ未選択：パックごとにどのレアリティがあるかを表示
       const byPack = new Map();
       for (const x of picked.versions) {
-        const k = x.pack || "（未登録）";
+        const k = x.pack || "パックなし";
         if (!byPack.has(k)) byPack.set(k, []);
         if (byPack.get(k).indexOf(x.rarity) < 0) byPack.get(k).push(x.rarity);
       }
@@ -637,7 +640,7 @@
       li.setAttribute("aria-selected", on ? "true" : "false");
       li.tabIndex = 0;
       const n = document.createElement("span");
-      n.textContent = (on ? "✓ " : "") + (v.pack || "（パック未登録）");
+      n.textContent = (on ? "✓ " : "") + (v.pack || "パックなし");
       const m = document.createElement("span");
       m.className = "meta";
       m.textContent = v.rarity;
@@ -757,7 +760,7 @@
     } else {
       card = text; rarity = selRarity || ""; pack = "";
     }
-    const summary = card + (rarity ? "（" + rarity + (pack ? "／" + pack : "") + "）" : "");
+    const summary = card + (rarity ? subLabel(card, rarity, pack) : "");
 
     if (usedUp() && !CONFIG.PREVIEW) { showDone(false); return; }
     if (CONFIG.PREVIEW) { showDone(true, summary + "　※プレビューのため実際には送信していません"); return; }
@@ -805,7 +808,7 @@
       b.type = "button";
       const r = document.createElement("span"); r.className = "rank"; r.textContent = i + 1;
       const n = document.createElement("span"); n.className = "nm"; n.textContent = t.card;
-      const m = document.createElement("span"); m.className = "mt"; m.textContent = t.rarity + (t.pack ? "／" + t.pack : "");
+      const m = document.createElement("span"); m.className = "mt"; m.textContent = [t.rarity !== t.card ? t.rarity : "", t.pack].filter(Boolean).join("／");
       b.append(r, n, m);
       b.setAttribute("aria-label", (i + 1) + "位 " + t.card + " " + t.rarity + " " + t.pack + " を選ぶ");
       b.addEventListener("click", () => chooseTrending(t));

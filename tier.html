@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-03j -->
+<!-- version 2026-10-06a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>カードの現在のレート表</title>
@@ -300,7 +300,7 @@
   .pickbar .in { max-width: 528px; margin: 0 auto; display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 800; font-size: .9rem; }
   .pickbar .btn { width: auto; flex: 1; padding: 11px; }
   .pickbar .clear { flex: none; font: inherit; font-size: .8rem; font-weight: 800; color: #C9D1EA; background: transparent; border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
-  .tabs a { font-size: .82rem; padding: 9px 4px; }
+  .tabs a { font-size: .8rem; padding: 9px 6px; white-space: nowrap; flex: 1 1 auto; }
   .freenote { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--ok) 14%, var(--panel)); font-size: .82rem; }
   .pick-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .pick-row .body { flex: 1; min-width: 0; }
@@ -387,6 +387,7 @@
     ["ミュウツーex", "最強の遺伝子", "虹", "500", ""],
     ["ピカチュウex", "最強の遺伝子", "黒", "400", "速攻デッキの主役"],
     ["アイリス", "メガライジング", "トレーナー", "350", ""],
+    ["金枠", "", "金枠", "350", ""],
     ["デデンネex", "超克の光", "★2色違い", "300", "サブアタッカー向き"],
     ["リザードンex", "最強の遺伝子", "虹", "250", ""],
     ["ミライドンex", "ロケット団の野望", "黒", "200", ""]
@@ -394,6 +395,8 @@
   let dmHead = "配布してほしいカードを選びました";
   let items = [];          // [name, pack, rarity, tier, note]
   const picked = new Set(); // 選んだカード（name|pack|rarity）
+  // 「レアリティ／パック」の部分。名前とレアリティが同じとき・パックがないときは、その分を省く（「金枠」など）
+  const subOf = (c) => [c[2] !== c[0] ? c[2] : "", c[1] || ""].filter(Boolean).join("／");
   const keyOf = (c) => c[0] + "\u0001" + c[1] + "\u0001" + c[2];
   function toast(text, err) { const t = $("toast"); t.textContent = text; t.className = "toast" + (err ? " err" : ""); t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3200); }
 
@@ -422,7 +425,7 @@
         const k = keyOf(c);
         b.setAttribute("aria-pressed", String(picked.has(k)));
         const body = mk("span", "body");
-        body.append(mk("span", "nm", c[0]), mk("span", "sub2", c[2] + "／" + c[1]));
+        body.append(mk("span", "nm", c[0]), mk("span", "sub2", subOf(c)));
         if (c[4]) body.append(mk("span", "cm", c[4]));
         const rate = mk("span", "rate", c[3]);
         b.append(mk("span", "chk", "✓"), body, rate);
@@ -442,7 +445,7 @@
   }
   function dmText() {
     const lines = [dmHead];
-    pickedCards().forEach((c) => lines.push("・" + c[0] + "（" + c[2] + "／" + c[1] + "）"));
+    pickedCards().forEach((c) => lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "")));
     return lines.join("\n");
   }
   const pickedCards = () => items.filter((c) => picked.has(keyOf(c))).sort((a, b) => (num(b) || 0) - (num(a) || 0));
@@ -453,7 +456,7 @@
     if (!list.length) { closeDm(); return; }
     list.forEach((c) => {
       const row = mk("div", "pick-row"), body = mk("span", "body");
-      body.append(mk("span", "nm", c[0]), mk("span", "sub2", c[2] + "／" + c[1] + "　レート " + c[3]));
+      body.append(mk("span", "nm", c[0]), mk("span", "sub2", (subOf(c) ? subOf(c) + "　" : "") + "レート " + c[3]));
       const x = mk("button", "", "外す"); x.type = "button";
       x.addEventListener("click", () => { picked.delete(keyOf(c)); render(); renderBar(); renderPickList(); });
       row.append(body, x); box.appendChild(row);
