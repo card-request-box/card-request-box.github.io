@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-06c -->
+<!-- version 2026-10-07d -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>配布ルーレット</title>
@@ -282,6 +282,15 @@
   .getcode-open { display: block; width: 100%; font: inherit; font-weight: 800; font-size: .88rem; color: var(--ink); background: transparent; border: 0; text-align: left; padding: 0; cursor: pointer; }
   .getcode-open::after { content: " ▼"; font-size: .7rem; color: var(--muted); }
   .getcode-open[aria-expanded="true"]::after { content: " ▲"; }
+  .inapp { margin: -8px 0 16px; padding: 10px 14px; border-radius: 14px; background: rgba(242,193,78,.14); border: 1px solid rgba(242,193,78,.5); color: #fff; font-size: .8rem; }
+  .inapp p { margin: 0 0 8px; }
+  .inapp b { color: var(--gold); }
+  .inapp button { font: inherit; font-size: .8rem; font-weight: 800; color: #2B1F03; background: var(--gold); border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .keep-help { margin: -4px 0 12px; padding: 9px 12px; border-radius: 10px; background: var(--soft); font-size: .8rem; }
+  .keep-help summary { cursor: pointer; font-weight: 800; }
+  .keep-help ol { margin: 8px 0; padding-left: 1.3em; }
+  .keep-help li { margin: 3px 0; }
+  .keep-help p { margin: 6px 0 0; color: var(--muted); }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) {
     .wheel-wrap svg.wheel { transition-duration: .01s; }
@@ -312,6 +321,10 @@
   <div class="loginbar" id="loginbar">
     <div class="who" id="login-who"></div>
     <div class="acts"><button type="button" id="login-out" hidden>保存を消す</button><button type="button" class="main" id="login-open">入力を保存</button></div>
+  </div>
+  <div class="inapp" id="inapp" hidden>
+    <p><b>Xアプリの中で開いています。</b>このままだと、保存した入力が消えることがあります。iPhoneの方はSafari、Androidの方はChromeで開くのがおすすめです（画面のメニューから「ブラウザで開く」を選べます）。そこで「ホーム画面に追加」をしておくと、さらに消えにくくなります。</p>
+    <button type="button" id="inapp-copy">このページのURLをコピー</button>
   </div>
   <header>
     <h1><span class="mark" aria-hidden="true">★</span><span id="h1-text">配布ルーレット</span></h1>
@@ -549,6 +562,16 @@
 <div class="sheet" id="login-sheet" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
   <h2 id="login-title">入力を保存</h2>
   <p class="sub">4つを入力しておくと、このスマホ（ブラウザ）ではどのルーレットでも、参加するときに最初から入力された状態になります。<b>入力内容はこのスマホの中にだけ保存されます</b>（アカウントへのログインではありません）。Xアプリの中とSafariなど、別のブラウザで開いたときは、ここで同じ4つを保存すると「あなたの枠」が出ます。</p>
+  <details class="keep-help">
+    <summary>入力が毎回消えてしまう方へ</summary>
+    <ol>
+      <li><b>iPhoneの方：</b>Safariで開いて、共有ボタン →「ホーム画面に追加」</li>
+      <li><b>Androidの方：</b>Chromeで開いて、右上のメニュー →「ホーム画面に追加」</li>
+      <li>ホーム画面のアイコンから開いて、<b>最初に1回だけ</b>ここで入力を保存する</li>
+    </ol>
+    <p>次からは入力がいりません。Xのアプリの中で開いたままだと追加できないので、先にSafari（またはChrome）で開いてください。</p>
+    <p>保存した内容は、Xアプリの中で開いたときや、iPhoneのSafariで7日ほど開かなかったときなどに消えることがあります。消えても<b>参加した枠は残っています</b>。同じ4つを保存し直すと元どおり出ます。</p>
+  </details>
   <div class="field"><label for="l-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><input id="l-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
   <div class="field"><label for="l-trainer">トレーナーネーム</label><input id="l-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
   <div class="field"><label for="l-xname">Xの名前</label><input id="l-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
@@ -1596,9 +1619,16 @@
   let loginMem = null;
   function setProfile(p) { loginMem = p; try { if (p) localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); else localStorage.removeItem(PROFILE_KEY); } catch (e) {} }
   const lookedUp = new Set();
+  // Xアプリの中のブラウザで開いているか（保存が消えやすいので案内を出す）
+  const IN_APP = /Twitter/i.test(navigator.userAgent || "");
+  $("inapp-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(location.href); toast("URLをコピーしました。Safariなどのブラウザに貼り付けて開いてください。"); }
+    catch (e) { toast("コピーできませんでした。", true); }
+  });
   function renderLoginBar() {
     const bar = $("loginbar"), p = getProfile();
     bar.hidden = !$("admin-view").hidden;
+    $("inapp").hidden = !IN_APP || !$("admin-view").hidden;
     const who = $("login-who"); who.innerHTML = "";
     if (p) {
       who.append("入力を保存中：", mk("b", "", p.trainer), mk("small", "", "@" + p.xId + "（参加するときに自動で入力されます）"));
