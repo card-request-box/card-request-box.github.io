@@ -401,7 +401,7 @@
   };
   const $ = (id) => document.getElementById(id);
   const mk = (tag, cls, s) => { const e = document.createElement(tag); if (cls) e.className = cls; if (s != null) e.textContent = s; return e; };
-  const SAMPLE = { ok: true, updated: Date.now(), notice: "新弾の登場に合わせて、レートを見直しました。", dmHead: "配布してほしいカードを選びました", items: [
+  const SAMPLE = { ok: true, updated: Date.now(), notice: "新弾の登場に合わせて、価格を見直しました。", dmHead: "注文したいカードを選びました", items: [
     ["メガルカリオex", "メガライジング", "★2色違い", "500", "環境トップ。先攻でも後攻でも強い"],
     ["ミュウツーex", "最強の遺伝子", "虹", "500", ""],
     ["ピカチュウex", "最強の遺伝子", "黒", "400", "速攻デッキの主役"],
@@ -411,7 +411,7 @@
     ["リザードンex", "最強の遺伝子", "虹", "250", ""],
     ["ミライドンex", "ロケット団の野望", "黒", "200", ""]
   ] };
-  let dmHead = "配布してほしいカードを選びました";
+  let dmHead = "注文したいカードを選びました";
   let items = [];          // [name, pack, rarity, tier, note]
   const picked = new Set(); // 選んだカード（name|pack|rarity）
   // 「レアリティ／パック」の部分。名前とレアリティが同じとき・パックがないときは、その分を省く（「金枠」など）
@@ -430,8 +430,8 @@
     const shown = ranked.filter((c) => (!q || c[0].toLowerCase().indexOf(q) >= 0) && (!pack || c[1] === pack));
     if (asc) shown.reverse();
     $("empty").hidden = shown.length > 0;
-    if (!shown.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだレートが入力されていません。";
-    // レートの数字ごとにまとめて並べる
+    if (!shown.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだ価格が入力されていません。";
+    // 価格の数字ごとにまとめて並べる
     const groups = [];
     shown.forEach((c) => { let g = groups.find((x) => x.v === c[3]); if (!g) { g = { v: c[3], list: [] }; groups.push(g); } g.list.push(c); });
     groups.forEach((gr, gi) => {
