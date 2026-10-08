@@ -4,19 +4,19 @@
 <!-- version 2026-10-08d -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>カードの現在のレート表</title>
-<meta name="description" content="カードの強さをレート（数字）でまとめた表です。気になるカードを選んでDMで送れます。">
+<title>カードの現在の価格表</title>
+<meta name="description" content="カードの価格をまとめた表です。気になるカードを選んでDMで送れます。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://card-request-box.github.io/tier.html">
-<meta property="og:title" content="★現在のレート表">
-<meta property="og:description" content="現在のレートを見て、配布してほしいカードを選べます。">
+<meta property="og:title" content="★現在の価格表">
+<meta property="og:description" content="現在の価格を見て、注文したいカードを選べます。">
 <meta property="og:image" content="https://card-request-box.github.io/ogp-tier.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="★現在のレート表">
-<meta name="twitter:description" content="現在のレートを見て、配布してほしいカードを選べます。">
+<meta name="twitter:title" content="★現在の価格表">
+<meta name="twitter:description" content="現在の価格を見て、注文したいカードを選べます。">
 <meta name="twitter:image" content="https://card-request-box.github.io/ogp-tier.png">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
@@ -335,12 +335,12 @@
   <nav class="tabs" aria-label="ページの切り替え">
     <a href="./">カードリクエスト</a>
     <a href="roulette.html">配布ルーレット</a>
-    <a aria-current="page" href="tier.html">現在レート</a>
+    <a aria-current="page" href="tier.html">現在価格</a>
   </nav>
   <div class="loadbox" id="loadbox" hidden role="status"><span class="spin" aria-hidden="true"></span><span><span id="loadbox-text">読み込んでいます…</span><small id="loadbox-sub" hidden>はじめて開いたときは、10秒ほどかかることがあります。そのままお待ちください。</small></span></div>
   <header>
-    <h1><span class="mark" aria-hidden="true">★</span>カードの現在のレート表</h1>
-    <p class="lead" id="lead" style="white-space:pre-wrap">カードの強さをレート（数字）で表しています。数字が大きいほど強いカードです。配布してほしいカードを選ぶと、DMで送る文章を作れます。</p>
+    <h1><span class="mark" aria-hidden="true">★</span>カードの現在の価格表</h1>
+    <p class="lead" id="lead" style="white-space:pre-wrap">カードの価格を表しています。カードを選ぶと、DMで送る文章を作れます。</p>
   </header>
 
   <section class="panel">
@@ -348,7 +348,7 @@
     <div class="tier-tools">
       <input id="q" type="search" placeholder="カード名でさがす" autocomplete="off" aria-label="カード名でさがす">
       <select id="pack" aria-label="パックでしぼる"><option value="">すべてのパック</option></select>
-      <select id="sort" aria-label="並び順" style="flex:0 0 auto"><option value="desc">強い順</option><option value="asc">弱い順</option></select>
+      <select id="sort" aria-label="並び順" style="flex:0 0 auto"><option value="desc">高い順</option><option value="asc">低い順</option></select>
     </div>
     <p class="hint" id="updated" style="margin:0 0 10px"></p>
     <div id="tiers"></div>
@@ -520,7 +520,7 @@
     sel.innerHTML = ""; sel.appendChild(new Option("すべてのパック", ""));
     items.map((c) => c[1]).filter((p, i, a) => p && a.indexOf(p) === i).forEach((p) => sel.appendChild(new Option(p, p)));
     sel.value = cur; if (sel.value !== cur) sel.value = "";
-    { const u = $("updated"); u.textContent = "※レートは強さの目安です。配布のリクエストは"; const l = mk("a", "", "リクエスト箱"); l.href = "./"; u.append(l, "へ（無料です）"); }
+    { const u = $("updated"); u.textContent = "※カードの価格です。配布のリクエストは"; const l = mk("a", "", "リクエスト箱"); l.href = "./"; u.append(l, "へ（無料です）"); }
     render(); renderBar();
   }
   // 前に読み込んだ内容をこのスマホに残しておき、次に開いたときはすぐ表示する（そのあと最新に更新）
@@ -529,7 +529,7 @@
     if (CONFIG.PREVIEW) { $("note").textContent = "見た目確認用のプレビューです（サンプルのカードを表示しています）。"; return apply(SAMPLE); }
     if (!quiet) {
       let c = null; try { c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (e) {}
-      if (c && c.ok) apply(c); else { $("empty").hidden = true; setLoading(true, "レート表を読み込んでいます…"); }
+      if (c && c.ok) apply(c); else { $("empty").hidden = true; setLoading(true, "価格表を読み込んでいます…"); }
     }
     for (let i = 0; i < 3; i++) {
       const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8000);
@@ -547,7 +547,7 @@
   }
   $("dm-name").textContent = CONFIG.DM_NAME; $("dm-name2").textContent = CONFIG.DM_NAME;
   load();
-  // 開いたままでも、5分ごとに最新のレートに更新する
+  // 開いたままでも、5分ごとに最新の価格に更新する
   setInterval(() => { if (document.visibilityState === "visible" && $("dm-sheet").hidden && $("list-sheet").hidden) load(true); }, 5 * 60e3);
 </script>
 </body>
