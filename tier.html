@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-08b -->
+<!-- version 2026-10-08d -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>カードの現在のレート表</title>
@@ -520,7 +520,7 @@
     sel.innerHTML = ""; sel.appendChild(new Option("すべてのパック", ""));
     items.map((c) => c[1]).filter((p, i, a) => p && a.indexOf(p) === i).forEach((p) => sel.appendChild(new Option(p, p)));
     sel.value = cur; if (sel.value !== cur) sel.value = "";
-    if (d.updated) $("updated").textContent = "レートは強さの目安です（配布は無料）。随時見直しています（最終確認 " + new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(d.updated)) + "）";
+    { const u = $("updated"); u.textContent = "※レートは強さの目安です。配布のリクエストは"; const l = mk("a", "", "リクエスト箱"); l.href = "./"; u.append(l, "へ（無料です）"); }
     render(); renderBar();
   }
   // 前に読み込んだ内容をこのスマホに残しておき、次に開いたときはすぐ表示する（そのあと最新に更新）
