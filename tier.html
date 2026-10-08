@@ -437,7 +437,7 @@
     groups.forEach((gr, gi) => {
       const g = mk("div", "tier-group");
       const h = mk("div", "tier-head");
-      h.append(mk("span", "tier-badge t" + Math.min((asc ? groups.length - gi : gi + 1), 6), gr.v), mk("span", "tier-count", "￥ " + gr.v + "（" + gr.list.length + "枚）"));
+      h.append(mk("span", "tier-badge t" + Math.min((asc ? groups.length - gi : gi + 1), 6), gr.v), mk("span", "tier-count", "価格は " + gr.v + "（" + gr.list.length + "枚）"));
       g.appendChild(h);
       gr.list.forEach((c) => {
         const b = mk("button", "tcard"); b.type = "button";
@@ -448,7 +448,7 @@
         if (c[4]) body.append(mk("span", "cm", c[4]));
         const rate = mk("span", "rate", c[3]);
         b.append(mk("span", "chk", "✓"), body, rate);
-        b.setAttribute("aria-label", c[0] + " " + c[2] + " ￥" + c[3]);
+        b.setAttribute("aria-label", c[0] + " " + c[2] + " 価格は" + c[3]);
         b.addEventListener("click", () => {
           if (picked.has(k)) picked.delete(k); else { if (picked.size >= 20) return toast("一度にえらべるのは20枚までです。", true); picked.add(k); }
           b.setAttribute("aria-pressed", String(picked.has(k))); renderBar();
@@ -475,7 +475,7 @@
     if (!list.length) { closeDm(); return; }
     list.forEach((c) => {
       const row = mk("div", "pick-row"), body = mk("span", "body");
-      body.append(mk("span", "nm", c[0]), mk("span", "sub2", (subOf(c) ? subOf(c) + "　" : "") + "￥ " + c[3]));
+      body.append(mk("span", "nm", c[0]), mk("span", "sub2", (subOf(c) ? subOf(c) + "　" : "") + "価格は " + c[3]));
       const x = mk("button", "", "外す"); x.type = "button";
       x.addEventListener("click", () => { picked.delete(keyOf(c)); render(); renderBar(); renderPickList(); });
       row.append(body, x); box.appendChild(row);
