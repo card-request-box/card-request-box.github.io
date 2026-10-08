@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-06b -->
+<!-- version 2026-10-08b -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>カードの現在のレート表</title>
@@ -321,6 +321,8 @@
   .loadbox .spin { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 3px solid rgba(255,255,255,.25); border-top-color: #F2C14E; animation: lb-spin .8s linear infinite; }
   .loadbox small { display: block; font-weight: 400; color: #C9D1EA; font-size: .78rem; margin-top: 2px; }
   @keyframes lb-spin { to { transform: rotate(360deg); } }
+  /* 読み込み中は、お知らせ以外を出さない（まだ選べないものを押せそうに見せない） */
+  body.is-loading main > section.panel, body.is-loading #pickbar, body.is-loading #lead, body.is-loading #note { display: none !important; }
   @media (prefers-reduced-motion: reduce) { .loadbox .spin { animation-duration: 2.4s; } }
 </style>
 </head>
@@ -385,6 +387,7 @@
   let loadboxTimer = null;
   function setLoading(on, text) {
     const b = document.getElementById("loadbox"), sub = document.getElementById("loadbox-sub");
+    document.body.classList.toggle("is-loading", !!on);
     if (!on) { b.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = null; return; }
     if (text) document.getElementById("loadbox-text").textContent = text;
     if (b.hidden) { b.hidden = false; sub.hidden = true; clearTimeout(loadboxTimer); loadboxTimer = setTimeout(() => { sub.hidden = false; }, 3000); }
