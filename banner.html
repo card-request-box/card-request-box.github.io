@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ja"><head>
+<!-- version 2026-10-13c -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
@@ -14,135 +15,218 @@ h1{font-size:22px;margin:4px 0 12px}
 #cv{width:100%;height:auto;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.15);display:block;background:#eee}
 .box{background:#fff;border-radius:12px;padding:14px;margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 label{display:block;font-weight:700;font-size:14px;margin:10px 0 4px}
-label:first-child{margin-top:0}
-input[type=text],input[type=number]{width:100%;font-size:16px;padding:10px;border:1px solid #ccc;border-radius:8px}
+.box>label:first-child{margin-top:0}
+input[type=text],input[type=number]{width:100%;font-size:16px;padding:10px;border:1px solid #ccc;border-radius:8px;font-family:inherit}
 input[type=range]{width:100%}
-.file{display:block;text-align:center;background:#ff5f6d;color:#fff;font-weight:900;font-size:17px;padding:14px;border-radius:10px;cursor:pointer}
+.file{display:block;text-align:center;background:#ff5f6d;color:#fff;font-weight:900;font-size:17px;padding:14px;border-radius:10px;cursor:pointer;margin:0}
 .file input{display:none}
 .btn{display:block;width:100%;border:0;background:#2aa84a;color:#fff;font-weight:900;font-size:17px;padding:14px;border-radius:10px;margin-top:12px;cursor:pointer;font-family:inherit}
-.btn.sub{background:#888;font-size:14px;padding:10px}
+.btn.sub{background:#888;font-size:14px;padding:10px;margin-top:8px}
+.row{display:flex;gap:10px}.row>div{flex:1}
+.row .btn{margin-top:8px}
 .note{font-size:13px;color:#666;line-height:1.6;margin:8px 0 0}
+#from{font-size:13px;color:#2a7a3a;background:#eaf7ec;border-radius:8px;padding:8px 10px;margin:0 0 10px;display:none}
 #result{display:none;margin-top:14px}
 #result img{width:100%;border-radius:10px;border:3px solid #2aa84a}
-.row{display:flex;gap:10px}.row>div{flex:1}
 </style>
 </head><body>
 <div class="wrap">
 <h1>配布バナー作成</h1>
+<p id="from"></p>
 <canvas id="cv" width="1200" height="675"></canvas>
 
 <div class="box">
   <label class="file">カード画像を選ぶ<input type="file" id="file" accept="image/*"></label>
+  <p class="note">選んだカードの色に合わせて、背景の色も自動で変わります。</p>
   <div id="adj" style="display:none">
+    <div class="row">
+      <div><button class="btn sub" id="recolor" type="button">別の色にする</button></div>
+      <div><button class="btn sub" id="defcolor" type="button">いつもの色に戻す</button></div>
+    </div>
     <label>大きさ</label><input type="range" id="zoom" min="100" max="200" value="100">
     <div class="row">
       <div><label>左右の位置</label><input type="range" id="px" min="-100" max="100" value="0"></div>
       <div><label>上下の位置</label><input type="range" id="py" min="-100" max="100" value="0"></div>
     </div>
-    <button class="btn sub" id="reset">位置を元に戻す</button>
+    <button class="btn sub" id="reset" type="button">位置を元に戻す</button>
   </div>
 </div>
 
 <div class="box">
-  <label>カード名</label><input type="text" id="name" value="モノマネむすめ">
+  <label>カード名</label><input type="text" id="name" value="カード名">
   <div class="row">
     <div><label>当選人数</label><input type="number" id="num" value="1" min="1" max="999"></div>
-    <div><label>抽選日時</label><input type="text" id="date" value="10/13(火) 22:00"></div>
+    <div><label>抽選日時</label><input type="text" id="date" value=""></div>
   </div>
 </div>
 
-<button class="btn" id="save">画像を保存する</button>
+<button class="btn" id="save" type="button">画像を保存する</button>
 <p class="note">保存できないときは、下に出る画像を長押しして「写真に保存」を選んでください。</p>
 <div id="result"><img id="out" alt="できあがった画像"></div>
 </div>
 
 <script>
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
 const F='"Noto Sans JP","Noto Sans CJK JP",sans-serif';
 const FR={x:686,y:67,w:388,h:540,r:14};
-const base=new Image();base.src='img/banner-base.png?v=1';
 let card=null;
-const $=id=>document.getElementById(id);
 
+// ---- 色 ----
+const DEF={bg:['#ff5f6d','#ff9a3c','#ffd54a','#7ed957','#3cc8b4'],dark:'#c8262f',deep:'#8a1520',box:['#2aa84a','#1f8f9a'],date:'#e0303c'};
+let pal=DEF,hues=null,shift=0;
+const hsl=(h,s,l)=>`hsl(${((h%360)+360)%360},${s}%,${l}%)`;
+const hmix=(a,b)=>{let d=((b-a+540)%360)-180;return a+d/2;};
+
+function pickHues(im){
+  const c=document.createElement('canvas'),W=48,H=Math.round(48*im.height/im.width);c.width=W;c.height=H;
+  const g=c.getContext('2d');g.drawImage(im,0,0,W,H);
+  const d=g.getImageData(0,0,W,H).data,bins=new Array(24).fill(0);let n=0;
+  const ix=Math.round(W*.1),iy=Math.round(H*.1);
+  for(let y=iy;y<H-iy;y++)for(let x=ix;x<W-ix;x++){
+    const i=(y*W+x)*4,r=d[i]/255,gg=d[i+1]/255,b=d[i+2]/255;
+    const mx=Math.max(r,gg,b),mn=Math.min(r,gg,b),s=mx-mn;if(s<.25||mx<.25)continue;
+    let h;if(mx===r)h=((gg-b)/s)%6;else if(mx===gg)h=(b-r)/s+2;else h=(r-gg)/s+4;h=(h*60+360)%360;
+    bins[Math.floor(h/15)]+=s;n++;
+  }
+  if(n<30)return null;
+  const sm=bins.map((v,i)=>v+.5*(bins[(i+23)%24]+bins[(i+1)%24]));
+  const order=sm.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]);
+  const out=[];
+  for(const [v,i] of order){const h=i*15+7.5;if(v<=0)break;if(out.every(o=>Math.min(Math.abs(o-h),360-Math.abs(o-h))>=40))out.push(h);if(out.length===3)break;}
+  while(out.length<3)out.push(out[0]+(out.length===1?40:-40));
+  return out;
+}
+// 黄色〜緑は明るく見えるので、文字用の色は少し暗くする
+const k=h=>{h=((h%360)+360)%360;return h>=35&&h<=190?14:0;};
+function makePal(hs){
+  const [a,b,c]=hs;
+  return{bg:[hsl(a,92,64),hsl(hmix(a,b),92,62),hsl(b,90,63),hsl(hmix(b,c),75,58),hsl(c,70,52)],
+    dark:hsl(a,78,40-k(a)),deep:hsl(a,75,27-k(a)/2),box:[hsl(c,65,40-k(c)),hsl(c+20,65,35-k(c))],date:hsl(a,78,45-k(a))};
+}
+function applyColor(){
+  if(!hues){pal=DEF;return;}
+  const k=shift%3,hs=[hues[k],hues[(k+1)%3],hues[(k+2)%3]];pal=makePal(hs);
+}
+
+// ---- 描画 ----
 function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
-function fit(text,size,max){ctx.font=`900 ${size}px ${F}`;while(ctx.measureText(text).width>max&&size>16){size-=2;ctx.font=`900 ${size}px ${F}`;}return size;}
+function fit(text,size,max,w){w=w||900;ctx.font=`${w} ${size}px ${F}`;while(ctx.measureText(text).width>max&&size>16){size-=2;ctx.font=`${w} ${size}px ${F}`;}return size;}
+function star(x,y,s){ctx.save();ctx.fillStyle='#fff';ctx.shadowColor='#fff8c0';ctx.shadowBlur=s*.6;ctx.translate(x,y);ctx.beginPath();
+  for(let i=0;i<4;i++){ctx.rotate(Math.PI/2);ctx.quadraticCurveTo(s*.08,-s*.08,0,-s/2);ctx.quadraticCurveTo(-s*.08,-s*.08,0,0);}
+  ctx.fill();ctx.restore();}
 
 function draw(){
-  ctx.clearRect(0,0,1200,675);
-  if(base.complete&&base.naturalWidth)ctx.drawImage(base,0,0,1200,675);
+  ctx.save();ctx.clearRect(0,0,1200,675);
+  // 背景
+  const L=ctx.createLinearGradient(0,0,1200*.78,675*1.38);
+  [0,.35,.6,.85,1].forEach((p,i)=>L.addColorStop(p,pal.bg[i]));
+  ctx.fillStyle=L;ctx.fillRect(0,0,1200,675);
+  const R=ctx.createRadialGradient(900,337,0,900,337,430);R.addColorStop(0,'rgba(255,245,200,.6)');R.addColorStop(1,'rgba(255,245,200,0)');
+  ctx.fillStyle=R;ctx.fillRect(0,0,1200,675);
+  ctx.fillStyle='rgba(255,255,255,.18)';
+  for(let a=0;a<360;a+=15){const t1=(a-90)*Math.PI/180,t2=(a-84)*Math.PI/180;ctx.beginPath();ctx.moveTo(880,337);ctx.lineTo(880+2000*Math.cos(t1),337+2000*Math.sin(t1));ctx.lineTo(880+2000*Math.cos(t2),337+2000*Math.sin(t2));ctx.closePath();ctx.fill();}
+  [[620,62,40],[1135,112,34],[1150,557,48],[652,612,30],[532,260,26]].forEach(s=>star(...s));
 
-  // カード枠
+  // 金の枠
+  ctx.save();ctx.shadowColor='rgba(80,40,0,.45)';ctx.shadowBlur=14;ctx.shadowOffsetY=6;
+  const G=ctx.createLinearGradient(670,51,1090,623);['#fff6c8','#e0a526','#fff3b0','#b9790f','#ffe38a'].forEach((c,i)=>G.addColorStop(i/4,c));
+  rr(675,56,410,562,21);ctx.lineWidth=10;ctx.strokeStyle=G;ctx.stroke();ctx.restore();
+
+  // カード
   ctx.save();rr(FR.x,FR.y,FR.w,FR.h,FR.r);
   if(card){
-    ctx.clip();
-    const z=$('zoom').value/100;
-    const s=Math.max(FR.w/card.width,FR.h/card.height)*z;
-    const w=card.width*s,h=card.height*s;
-    const mx=(w-FR.w)/2,my=(h-FR.h)/2;
-    const x=FR.x-mx+mx*($('px').value/100);
-    const y=FR.y-my+my*($('py').value/100);
-    ctx.drawImage(card,x,y,w,h);
+    ctx.fillStyle='#fff';ctx.fill();ctx.clip();
+    const z=$('zoom').value/100,s=Math.max(FR.w/card.width,FR.h/card.height)*z;
+    const w=card.width*s,h=card.height*s,mx=(w-FR.w)/2,my=(h-FR.h)/2;
+    ctx.drawImage(card,FR.x-mx+mx*($('px').value/100),FR.y-my+my*($('py').value/100),w,h);
   }else{
     ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill();
-    ctx.setLineDash([14,10]);ctx.lineWidth=4;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.stroke();
-    ctx.setLineDash([]);ctx.fillStyle='#fff';ctx.font=`900 28px ${F}`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.setLineDash([14,10]);ctx.lineWidth=4;ctx.strokeStyle='rgba(255,255,255,.95)';ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#fff';ctx.font=`900 28px ${F}`;ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
     ['ここに','カード画像が','入ります'].forEach((t,i)=>ctx.fillText(t,FR.x+FR.w/2,FR.y+FR.h/2+(i-1)*42));
   }
   ctx.restore();
 
+  ctx.textBaseline='middle';
+  // 参加無料
+  ctx.font=`900 30px ${F}`;const tw0=ctx.measureText('参加無料').width;
+  ctx.fillStyle=pal.dark;rr(44,44,tw0+44,54,27);ctx.fill();
+  ctx.fillStyle='#fff';rr(44,40,tw0+44,54,27);ctx.fill();
+  ctx.fillStyle=pal.date;ctx.textAlign='left';ctx.fillText('参加無料',66,68);
+
+  // 見出し
+  ctx.font=`900 96px ${F}`;ctx.lineJoin='round';
+  [['カード配布',166],['イベント!!',267]].forEach(([t,y])=>{
+    ctx.lineWidth=10;ctx.strokeStyle=pal.deep;ctx.fillStyle=pal.deep;ctx.strokeText(t,44,y+8);ctx.fillText(t,44,y+8);
+    ctx.strokeStyle=pal.dark;ctx.strokeText(t,44,y);ctx.fillStyle='#fff27a';ctx.fillText(t,44,y);
+  });
+
   // カード名
   const name=$('name').value.trim()||'カード名';
-  const ns=fit(name,50,360);
-  const tw=ctx.measureText(name).width;
-  const bw=tw+64,bx=44,by=343,bh=88;
-  ctx.save();
-  ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowOffsetY=6;
-  rr(bx,by,bw,bh,14);const g=ctx.createLinearGradient(bx,0,bx+bw,0);g.addColorStop(0,'#2aa84a');g.addColorStop(1,'#1f8f9a');
-  ctx.fillStyle='#fff';ctx.fill();ctx.shadowColor='transparent';
-  rr(bx+4,by+4,bw-8,bh-8,11);ctx.fillStyle=g;ctx.fill();
-  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`900 ${ns}px ${F}`;
-  ctx.fillText(name,bx+bw/2,by+bh/2+2);
-  ctx.restore();
+  const ns=fit(name,50,360),tw=ctx.measureText(name).width,bx=44,by=343,bh=88,bw=tw+64;
+  ctx.fillStyle='rgba(0,0,0,.25)';rr(bx,by+6,bw,bh,14);ctx.fill();
+  ctx.fillStyle='#fff';rr(bx,by,bw,bh,14);ctx.fill();
+  const g=ctx.createLinearGradient(bx,0,bx+bw,0);g.addColorStop(0,pal.box[0]);g.addColorStop(1,pal.box[1]);
+  ctx.fillStyle=g;rr(bx+4,by+4,bw-8,bh-8,11);ctx.fill();
+  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font=`900 ${ns}px ${F}`;ctx.fillText(name,bx+bw/2,by+bh/2+2);
+
+  // 参加方法
+  ctx.textAlign='left';ctx.font=`900 30px ${F}`;ctx.fillStyle=pal.deep;ctx.fillText('プロフのリンクから参加できます',44,495);
+  ctx.fillStyle='#fff';ctx.fillText('プロフのリンクから参加できます',44,492);
+
+  // 抽選日時の帯
+  ctx.fillStyle='rgba(0,0,0,.2)';rr(-60,522,700,115,57);ctx.fill();
+  ctx.fillStyle='#fff';rr(-60,516,700,115,57);ctx.fill();
+  ctx.fillStyle='#555';ctx.font=`900 24px ${F}`;ctx.fillText('抽選日時',44,550);
+  const dt=$('date').value;ctx.fillStyle=pal.date;fit(dt,44,560);ctx.fillText(dt,44,594);
 
   // 当選人数バッジ
   const n=String($('num').value||'1');
   ctx.save();ctx.translate(570,400);ctx.rotate(-10*Math.PI/180);
   ctx.shadowColor='rgba(0,0,0,.3)';ctx.shadowBlur=16;ctx.shadowOffsetY=8;
-  ctx.beginPath();ctx.arc(0,0,100,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
-  ctx.shadowColor='transparent';
+  ctx.beginPath();ctx.arc(0,0,100,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.shadowColor='transparent';
   const rg=ctx.createRadialGradient(-30,-35,5,0,0,94);rg.addColorStop(0,'#fff3a0');rg.addColorStop(.55,'#ffc400');rg.addColorStop(1,'#e08a00');
   ctx.beginPath();ctx.arc(0,0,94,0,Math.PI*2);ctx.fillStyle=rg;ctx.fill();
-  ctx.fillStyle='#b3200f';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#b3200f';ctx.textAlign='center';
   ctx.font=`900 28px ${F}`;ctx.fillText('抽選で',0,-50);
-  const s2=fit(n,70,150);ctx.fillText(n,0,2);
+  fit(n,70,150);ctx.fillText(n,0,2);
   ctx.font=`900 30px ${F}`;ctx.fillText('名様',0,54);
   ctx.restore();
-
-  // 抽選日時
-  ctx.save();ctx.fillStyle='#e0303c';ctx.textAlign='left';ctx.textBaseline='middle';
-  fit($('date').value,44,560);ctx.fillText($('date').value,44,592);ctx.restore();
+  ctx.restore();
 }
+
+// ---- 管理画面から来たとき ----
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('name'))$('name').value=q.get('name');
+  if(q.get('num'))$('num').value=q.get('num');
+  if(q.get('date'))$('date').value=q.get('date');
+  if(q.get('name')||q.get('date')){$('from').textContent='管理画面のルーレットから、カード名・当選人数・抽選日時を入れました。';$('from').style.display='block';}
+  if(!$('date').value)$('date').value='10/13(火) 22:00';
+})();
 
 $('file').addEventListener('change',e=>{
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{const im=new Image();im.onload=()=>{card=im;$('adj').style.display='block';resetPos();};im.src=r.result;};
+  r.onload=()=>{const im=new Image();im.onload=()=>{card=im;hues=pickHues(im);shift=0;applyColor();$('adj').style.display='block';resetPos();};im.src=r.result;};
   r.readAsDataURL(f);
 });
 function resetPos(){$('zoom').value=100;$('px').value=0;$('py').value=0;draw();}
 $('reset').addEventListener('click',resetPos);
+$('recolor').addEventListener('click',()=>{if(!hues&&card)hues=pickHues(card);if(!hues)return;shift++;applyColor();draw();});
+$('defcolor').addEventListener('click',()=>{pal=DEF;draw();});
 ['zoom','px','py','name','num','date'].forEach(id=>$(id).addEventListener('input',draw));
 
 $('save').addEventListener('click',()=>{
-  draw();
-  const url=cv.toDataURL('image/png');
+  draw();const url=cv.toDataURL('image/png');
   $('out').src=url;$('result').style.display='block';
   const a=document.createElement('a');a.href=url;a.download='配布バナー.png';document.body.appendChild(a);a.click();a.remove();
 });
 
-base.onload=draw;
-(document.fonts?document.fonts.load(`900 50px "Noto Sans JP"`):Promise.resolve()).then(draw,draw);
 draw();
+(document.fonts?document.fonts.load(`900 50px "Noto Sans JP"`):Promise.resolve()).then(draw,draw);
+if(document.fonts)document.fonts.ready.then(draw);
 </script>
 </body></html>
