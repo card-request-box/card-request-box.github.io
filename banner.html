@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja"><head>
-<!-- version 2026-10-13c -->
+<!-- version 2026-10-13d -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
@@ -24,6 +24,8 @@ input[type=range]{width:100%}
 .btn.sub{background:#888;font-size:14px;padding:10px;margin-top:8px}
 .row{display:flex;gap:10px}.row>div{flex:1}
 .row .btn{margin-top:8px}
+.btn.sty{background:#ddd;color:#555;font-size:15px;padding:10px;margin-top:0}
+.btn.sty.on{background:#ff5f6d;color:#fff}
 .note{font-size:13px;color:#666;line-height:1.6;margin:8px 0 0}
 #from{font-size:13px;color:#2a7a3a;background:#eaf7ec;border-radius:8px;padding:8px 10px;margin:0 0 10px;display:none}
 #result{display:none;margin-top:14px}
@@ -36,6 +38,11 @@ input[type=range]{width:100%}
 <canvas id="cv" width="1200" height="675"></canvas>
 
 <div class="box">
+  <label>デザイン</label>
+  <div class="row" style="margin-bottom:12px">
+    <div><button class="btn sty on" data-s="impact" type="button">インパクト</button></div>
+    <div><button class="btn sty" data-s="simple" type="button">シンプル</button></div>
+  </div>
   <label class="file">カード画像を選ぶ<input type="file" id="file" accept="image/*"></label>
   <p class="note">選んだカードの色に合わせて、背景の色も自動で変わります。</p>
   <div id="adj" style="display:none">
@@ -116,7 +123,7 @@ function star(x,y,s){ctx.save();ctx.fillStyle='#fff';ctx.shadowColor='#fff8c0';c
   for(let i=0;i<4;i++){ctx.rotate(Math.PI/2);ctx.quadraticCurveTo(s*.08,-s*.08,0,-s/2);ctx.quadraticCurveTo(-s*.08,-s*.08,0,0);}
   ctx.fill();ctx.restore();}
 
-function draw(){
+function drawSimple(){
   ctx.save();ctx.clearRect(0,0,1200,675);
   // 背景
   const L=ctx.createLinearGradient(0,0,1200*.78,675*1.38);
@@ -197,6 +204,126 @@ function draw(){
   ctx.restore();
 }
 
+
+// ---- インパクト ----
+let STYLE='impact';
+function draw(){STYLE==='simple'?drawSimple():drawImpact();}
+function rnd(seed){return()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};}
+function burst(cx,cy,r1,r2,n){ctx.beginPath();for(let i=0;i<n*2;i++){const a=i*Math.PI/n-Math.PI/2,r=i%2?r2:r1;ctx.lineTo(cx+r*Math.cos(a),cy+r*Math.sin(a));}ctx.closePath();}
+function outlined(t,x,y,size,fillStyle,inner,outer,shadow){
+  ctx.font=`900 ${size}px ${F}`;ctx.lineJoin='round';
+  if(shadow){ctx.lineWidth=outer*2;ctx.strokeStyle=shadow;ctx.strokeText(t,x+4,y+10);}
+  ctx.lineWidth=outer*2;ctx.strokeStyle=pal.deep;ctx.strokeText(t,x,y);
+  ctx.lineWidth=inner*2;ctx.strokeStyle='#fff';ctx.strokeText(t,x,y);
+  ctx.fillStyle=fillStyle;ctx.fillText(t,x,y);
+}
+function drawImpact(){
+  ctx.save();ctx.clearRect(0,0,1200,675);
+  const CX=870,CY=330;
+  // 背景：中心が明るく、外が濃い
+  const B=ctx.createRadialGradient(CX,CY,40,CX,CY,950);
+  B.addColorStop(0,'#fffbe6');B.addColorStop(.18,pal.bg[2]);B.addColorStop(.45,pal.bg[0]);B.addColorStop(1,pal.deep);
+  ctx.fillStyle=B;ctx.fillRect(0,0,1200,675);
+  // 集中線
+  const r=rnd(7);
+  for(let a=0;a<360;a+=7.5){const w=1.2+r()*2.6,t1=(a)*Math.PI/180,t2=(a+w)*Math.PI/180;
+    ctx.fillStyle=`rgba(255,255,255,${.10+r()*.16})`;ctx.beginPath();ctx.moveTo(CX,CY);
+    ctx.lineTo(CX+2200*Math.cos(t1),CY+2200*Math.sin(t1));ctx.lineTo(CX+2200*Math.cos(t2),CY+2200*Math.sin(t2));ctx.closePath();ctx.fill();}
+  // 左側を少し暗くして文字を立たせる
+  const V=ctx.createLinearGradient(0,0,640,0);V.addColorStop(0,'rgba(0,0,0,.28)');V.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=V;ctx.fillRect(0,0,640,675);
+  // 後光
+  const H=ctx.createRadialGradient(CX,CY,60,CX,CY,400);H.addColorStop(0,'rgba(255,255,230,.95)');H.addColorStop(.5,'rgba(255,240,160,.45)');H.addColorStop(1,'rgba(255,240,160,0)');
+  ctx.fillStyle=H;ctx.fillRect(400,0,800,675);
+  // 紙吹雪
+  const cols=[pal.bg[0],pal.bg[2],pal.bg[4],'#fff','#ffd84a'];
+  for(let i=0;i<46;i++){const x=r()*1200,y=r()*675;if(x<620&&y>120&&y<660)continue;
+    ctx.save();ctx.translate(x,y);ctx.rotate(r()*Math.PI);ctx.fillStyle=cols[i%5];ctx.globalAlpha=.9;
+    if(i%3===0){ctx.beginPath();ctx.arc(0,0,4+r()*4,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-7,-3.5,10+r()*8,7);ctx.restore();}
+
+  // カード（少し傾けて大きく）
+  const CW=412,CH=574;
+  ctx.save();ctx.translate(CX,CY+8);ctx.rotate(4*Math.PI/180);
+  ctx.shadowColor='rgba(255,255,200,.9)';ctx.shadowBlur=40;
+  rr(-CW/2-16,-CH/2-16,CW+32,CH+32,26);ctx.fillStyle='#fff';ctx.fill();
+  ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=24;ctx.shadowOffsetY=12;
+  const G=ctx.createLinearGradient(-CW/2,-CH/2,CW/2,CH/2);['#fff6c8','#e0a526','#fff3b0','#b9790f','#ffe38a'].forEach((c,i)=>G.addColorStop(i/4,c));
+  rr(-CW/2-11,-CH/2-11,CW+22,CH+22,22);ctx.fillStyle=G;ctx.fill();
+  ctx.shadowColor='transparent';
+  rr(-CW/2,-CH/2,CW,CH,14);
+  if(card){
+    ctx.fillStyle='#fff';ctx.fill();ctx.save();ctx.clip();
+    const z=$('zoom').value/100,s=Math.max(CW/card.width,CH/card.height)*z;
+    const w=card.width*s,h=card.height*s,mx=(w-CW)/2,my=(h-CH)/2;
+    ctx.drawImage(card,-CW/2-mx+mx*($('px').value/100),-CH/2-my+my*($('py').value/100),w,h);
+    // 光沢
+    const sh=ctx.createLinearGradient(-CW/2,-CH/2,CW/2,CH/2);sh.addColorStop(0,'rgba(255,255,255,0)');sh.addColorStop(.42,'rgba(255,255,255,0)');sh.addColorStop(.5,'rgba(255,255,255,.28)');sh.addColorStop(.58,'rgba(255,255,255,0)');
+    ctx.fillStyle=sh;ctx.fillRect(-CW/2,-CH/2,CW,CH);ctx.restore();
+  }else{
+    ctx.fillStyle=pal.bg[1];ctx.fill();ctx.setLineDash([14,10]);ctx.lineWidth=4;ctx.strokeStyle='#fff';ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#fff';ctx.font=`900 30px ${F}`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ['ここに','カード画像が','入ります'].forEach((t,i)=>ctx.fillText(t,0,(i-1)*44));
+  }
+  ctx.restore();
+  [[640,70,54],[1150,70,40],[1160,600,62],[612,610,36],[1110,330,30],[700,250,28]].forEach(s=>star(...s));
+
+  ctx.textBaseline='middle';ctx.textAlign='left';
+  // 参加無料（リボン）
+  ctx.save();ctx.translate(40,58);ctx.rotate(-4*Math.PI/180);
+  ctx.font=`900 34px ${F}`;const fw=ctx.measureText('参加無料').width+50;
+  ctx.fillStyle=pal.deep;rr(4,6,fw,58,10);ctx.fill();
+  const rb=ctx.createLinearGradient(0,0,0,58);rb.addColorStop(0,'#ff4b5c');rb.addColorStop(1,'#d01f35');
+  ctx.fillStyle=rb;rr(0,0,fw,58,10);ctx.fill();ctx.lineWidth=4;ctx.strokeStyle='#fff';ctx.stroke();
+  ctx.fillStyle='#fff';ctx.fillText('参加無料',25,31);ctx.restore();
+
+  // 見出し（斜め・金色・二重ふち）
+  ctx.save();ctx.transform(1,0,-.12,1,0,0);
+  const hg=ctx.createLinearGradient(0,120,0,320);hg.addColorStop(0,'#ffffff');hg.addColorStop(.3,'#fff27a');hg.addColorStop(.62,'#ffc21a');hg.addColorStop(1,'#ff8a00');
+  outlined('カード配布',72,178,112,hg,8,16,'rgba(0,0,0,.35)');
+  outlined('イベント!!',72,296,112,hg,8,16,'rgba(0,0,0,.35)');
+  ctx.restore();
+
+  // カード名
+  const name=$('name').value.trim()||'カード名';
+  const ns=fit(name,54,470),tw=ctx.measureText(name).width;
+  const bx=36,by=370,bh=86,bw=Math.min(tw+70,560);
+  ctx.save();ctx.transform(1,0,-.12,1,0,0);
+  ctx.fillStyle='rgba(0,0,0,.35)';rr(bx+50,by+8,bw,bh,12);ctx.fill();
+  const ng=ctx.createLinearGradient(0,by,0,by+bh);ng.addColorStop(0,pal.box[0]);ng.addColorStop(1,pal.box[1]);
+  ctx.fillStyle='#fff';rr(bx+44,by,bw,bh,12);ctx.fill();
+  ctx.fillStyle=ng;rr(bx+50,by+6,bw-12,bh-12,9);ctx.fill();
+  ctx.restore();
+  ctx.font=`900 ${ns}px ${F}`;ctx.textAlign='center';ctx.lineJoin='round';
+  ctx.lineWidth=8;ctx.strokeStyle='rgba(0,0,0,.35)';ctx.strokeText(name,bx+bw/2+2,by+bh/2+2);
+  ctx.fillStyle='#fff';ctx.fillText(name,bx+bw/2-4,by+bh/2+2);
+
+  // 参加方法
+  ctx.textAlign='left';ctx.font=`900 28px ${F}`;ctx.lineWidth=8;ctx.strokeStyle=pal.deep;
+  ctx.strokeText('プロフのリンクから参加できます',44,496);ctx.fillStyle='#fff';ctx.fillText('プロフのリンクから参加できます',44,496);
+
+  // 抽選日時（帯）
+  ctx.save();ctx.transform(1,0,-.12,1,0,0);
+  ctx.fillStyle='rgba(0,0,0,.3)';rr(-40,542,720,96,14);ctx.fill();
+  ctx.fillStyle='#fff';rr(-40,534,712,96,14);ctx.fill();
+  ctx.fillStyle=pal.deep;rr(-40,540,706,84,10);ctx.fill();
+  ctx.restore();
+  ctx.fillStyle='#fff';ctx.font=`900 26px ${F}`;ctx.fillText('抽選',44,582);
+  const dt=$('date').value;fit(dt,52,470);ctx.fillStyle='#ffe34d';ctx.fillText(dt,112,584);
+
+  // 当選人数（ギザギザのバッジ）
+  const n=String($('num').value||'1');
+  ctx.save();ctx.translate(1062,118);ctx.rotate(12*Math.PI/180);
+  ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=18;ctx.shadowOffsetY=8;
+  burst(0,0,112,92,18);ctx.fillStyle='#fff';ctx.fill();ctx.shadowColor='transparent';
+  const bg2=ctx.createRadialGradient(-25,-30,5,0,0,100);bg2.addColorStop(0,'#ff6b6b');bg2.addColorStop(1,'#c8102e');
+  burst(0,0,102,84,18);ctx.fillStyle=bg2;ctx.fill();
+  ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font=`900 26px ${F}`;ctx.fillText('抽選で',0,-44);
+  const s3=fit(n+'名',64,150);ctx.lineWidth=6;ctx.strokeStyle='#7a0018';ctx.strokeText(n+'名',0,10);ctx.fillStyle='#ffe34d';ctx.fillText(n+'名',0,10);
+  ctx.fillStyle='#fff';ctx.font=`900 22px ${F}`;ctx.fillText('にプレゼント',0,56);
+  ctx.restore();
+  ctx.restore();
+}
+
 // ---- 管理画面から来たとき ----
 (function(){
   const q=new URLSearchParams(location.search);
@@ -217,6 +344,7 @@ function resetPos(){$('zoom').value=100;$('px').value=0;$('py').value=0;draw();}
 $('reset').addEventListener('click',resetPos);
 $('recolor').addEventListener('click',()=>{if(!hues&&card)hues=pickHues(card);if(!hues)return;shift++;applyColor();draw();});
 $('defcolor').addEventListener('click',()=>{pal=DEF;draw();});
+document.querySelectorAll('.sty').forEach(b=>b.addEventListener('click',()=>{STYLE=b.dataset.s;document.querySelectorAll('.sty').forEach(x=>x.classList.toggle('on',x===b));draw();}));
 ['zoom','px','py','name','num','date'].forEach(id=>$(id).addEventListener('input',draw));
 
 $('save').addEventListener('click',()=>{
