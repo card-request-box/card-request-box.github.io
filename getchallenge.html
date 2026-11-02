@@ -125,8 +125,10 @@
   .marks button.g[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: #2B1F03; }
   .marks button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 
-  .prevrow { padding: 8px 10px; border-radius: 12px; background: var(--want-soft); margin-bottom: 8px; }
-  .prevname { margin: 0 0 6px; font-weight: 800; font-size: .86rem; color: var(--ink); }
+  .marks.one { grid-template-columns: 1fr; }
+  .card .from { font-size: .68rem; font-weight: 700; color: var(--muted); }
+  .card:disabled { cursor: default; opacity: .6; }
+  .marks button:disabled { opacity: .5; cursor: default; }
   .prev { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .keybox { border: 2px solid var(--gold); border-radius: 14px; padding: 12px; margin: 4px 0 4px; }
   .keybox h3 { margin-top: 0; }
@@ -261,13 +263,13 @@
       <h2><span class="step">1</span>パック</h2>
       <div class="field"><label for="pack" class="sub" style="margin:0 0 4px">5枚が入っていたパック</label><select id="pack"></select></div>
 
-      <h2 style="margin-top:14px"><span class="step">2</span>チャレンジ結果の5枚</h2>
-      <p class="sub">結果画面と同じ並びです。四角をタップしてカードを入れ、<b>欲しい</b>と<b>GET</b>に印をつけてください。</p>
+      <h2 style="margin-top:14px"><span class="step">2</span>シャッフル前の5枚</h2>
+      <p class="sub">シャッフルする<b>前</b>の画面と同じ並びです。四角をタップしてカードを入れ、欲しいカードに<b>♥欲しい</b>の印をつけてください。</p>
       <div class="board" id="board"></div>
 
-      <h2 style="margin-top:16px"><span class="step">3</span>シャッフル前の場所</h2>
-      <p class="sub">欲しいカードが、シャッフルする<b>前</b>にどこにあったかを選んでください。「シャッフル前→後」の統計に使います。シャッフル前の画面をスクショしておくと確実です。</p>
-      <div id="prev"></div>
+      <h2 style="margin-top:16px"><span class="step">3</span>シャッフル後（チャレンジ結果）</h2>
+      <p class="sub">結果画面と同じ並びです。それぞれの場所に<b>どのカードが来たか</b>を選び、GETした場所に<b>GET</b>の印をつけてください。</p>
+      <div class="board" id="board2"></div>
 
       <div class="summary" id="rec-summary"></div>
       <button type="button" class="btn primary" id="save" disabled>記録する</button>
@@ -320,6 +322,15 @@
   <button type="button" class="btn ghost" data-close>閉じる</button>
 </div>
 
+<!-- シャッフル後の場所に来たカードを選ぶ -->
+<div class="sheet" id="after-sheet" role="dialog" aria-modal="true" aria-labelledby="after-title" hidden>
+  <h2 id="after-title">この場所に来たカード</h2>
+  <p class="sub">シャッフル前の5枚から選んでください。</p>
+  <ul class="clist" id="after-list"></ul>
+  <button type="button" class="btn ghost" id="after-clear">この場所を空にする</button>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
 <!-- ログイン（配布ルーレットと共通） -->
 <div class="sheet" id="login-sheet" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
   <h2 id="login-title">入力を保存</h2>
@@ -342,7 +353,7 @@
   // ============ 設定 ============
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
-    GAS_URL: "",
+    GAS_URL: "https://script.google.com/macros/s/AKfycby6w1ndTc9Fow0xrfqc5xJy7ejFLPyAeTicZSTBfGW5E0CqqGbszntfXzQBF3pizHK7/exec",
     STATS_CACHE_MIN: 10   // 全員の統計をスマホに覚えておく時間（分）
   };
   const PROFILE_KEY = "cardRoulette:profile";      // 配布ルーレットと共通のログイン
@@ -402,7 +413,7 @@
   function setStatus(id, t, err) { const s = $(id); s.className = "status" + (err ? " error" : ""); s.textContent = t || ""; }
   function rarEl(r) { const x = RAR[r]; return mk("span", "rar" + (x && x.c ? " " + x.c : ""), x ? x.s : ""); }
   function openSheet(id) { closeSheets(); $(id).hidden = false; $("sheet-bg").hidden = false; document.body.style.overflow = "hidden"; }
-  function closeSheets() { ["pick-sheet", "login-sheet"].forEach((i) => { $(i).hidden = true; }); $("sheet-bg").hidden = true; document.body.style.overflow = ""; }
+  function closeSheets() { ["pick-sheet", "after-sheet", "login-sheet"].forEach((i) => { $(i).hidden = true; }); $("sheet-bg").hidden = true; document.body.style.overflow = ""; }
   $("sheet-bg").addEventListener("click", closeSheets);
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeSheets));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheets(); });
@@ -468,7 +479,7 @@
 
   // ============ 記録する ============
   let draft = null;
-  function newDraft(pack) { return { pack: pack, cards: [null, null, null, null, null], want: [], get: -1, prev: {} }; }
+  function newDraft(pack) { return { pack: pack, cards: [null, null, null, null, null], want: [], after: [-1, -1, -1, -1, -1], get: -1 }; }
   function fillPackSelect(sel, withAll) {
     sel.innerHTML = "";
     if (withAll) sel.appendChild(new Option("すべてのパック", ""));
@@ -481,60 +492,96 @@
   $("pack").addEventListener("change", () => {
     const keep = draft.cards.some(Boolean);
     draft.pack = $("pack").value; ls.set(LAST_PACK_KEY, draft.pack);
-    if (keep) { draft.cards = [null, null, null, null, null]; draft.want = []; draft.get = -1; toast("パックを変えたので、5枚を空にしました。"); }
+    if (keep) { draft = newDraft(draft.pack); toast("パックを変えたので、5枚を空にしました。"); }
     renderBoard();
   });
 
+  // ---- ② シャッフル前の5枚 ----
   function renderBoard() {
     const b = $("board"); b.innerHTML = "";
     draft.cards.forEach((c, i) => {
       const pos = mk("div", "pos");
-      const btn = mk("button", "card" + (c ? " filled" : "") + (draft.get === i ? " is-get" : "") + (draft.want.indexOf(i) >= 0 ? " is-want" : ""));
-      btn.type = "button"; btn.setAttribute("aria-label", (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：カードを入れる"));
+      const btn = mk("button", "card" + (c ? " filled" : "") + (draft.want.indexOf(i) >= 0 ? " is-want" : ""));
+      btn.type = "button"; btn.setAttribute("aria-label", "シャッフル前 " + (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：カードを入れる"));
       btn.append(mk("span", "no", String(i + 1)));
-      if (draft.get === i) btn.append(mk("span", "tag", "GET"));
       if (draft.want.indexOf(i) >= 0) btn.append(mk("span", "wtag", "♥"));
       if (c) { btn.append(mk("span", "nm", c.name), rarEl(c.r)); } else { btn.append(mk("span", "ph", "＋ カード")); }
       btn.addEventListener("click", () => openPicker(i));
-      const marks = mk("div", "marks");
+      const marks = mk("div", "marks one");
       const w = mk("button", "w", "♥欲しい"); w.type = "button"; w.setAttribute("aria-pressed", draft.want.indexOf(i) >= 0 ? "true" : "false");
       w.addEventListener("click", () => { const k = draft.want.indexOf(i); if (k >= 0) draft.want.splice(k, 1); else draft.want.push(i); draft.want.sort(); renderBoard(); });
-      const g = mk("button", "g", "GET"); g.type = "button"; g.setAttribute("aria-pressed", draft.get === i ? "true" : "false");
-      g.addEventListener("click", () => { draft.get = draft.get === i ? -1 : i; renderBoard(); });
-      marks.append(w, g); pos.append(btn, marks); b.append(pos);
+      marks.append(w); pos.append(btn, marks); b.append(pos);
     });
-    const pv = $("prev"); pv.innerHTML = "";
-    if (!draft.want.length) pv.append(mk("p", "note", "先に、欲しかったカードに「♥ 欲しい」の印をつけてください。"));
-    draft.want.forEach((w) => {
-      const c = draft.cards[w];
-      const row = mk("div", "prevrow");
-      row.append(mk("p", "prevname", "♥ " + (c ? c.name : (w + 1) + "番目のカード") + " はシャッフル前どこ？"));
-      const btns = mk("div", "prev");
-      [0, 1, 2, 3, 4, -1].forEach((i) => {
-        const x = mk("button", "", i < 0 ? "わからない" : (i + 1) + " " + POS_LABEL[i]); x.type = "button";
-        x.setAttribute("aria-pressed", (draft.prev[w] === undefined ? -2 : draft.prev[w]) === i ? "true" : "false");
-        x.addEventListener("click", () => { draft.prev[w] = i; renderBoard(); });
-        btns.append(x);
-      });
-      row.append(btns); pv.append(row);
+    renderBoard2();
+  }
+  // ---- ③ シャッフル後（それぞれの場所に来たカード） ----
+  function renderBoard2() {
+    const b = $("board2"); b.innerHTML = "";
+    const ready = draft.cards.every(Boolean);
+    draft.after.forEach((pi, i) => {
+      const c = pi >= 0 ? draft.cards[pi] : null;
+      const isWant = pi >= 0 && draft.want.indexOf(pi) >= 0;
+      const pos = mk("div", "pos");
+      const btn = mk("button", "card" + (c ? " filled" : "") + (draft.get === i ? " is-get" : "") + (isWant ? " is-want" : ""));
+      btn.type = "button"; btn.disabled = !ready;
+      btn.setAttribute("aria-label", "シャッフル後 " + (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：来たカードを選ぶ"));
+      btn.append(mk("span", "no", String(i + 1)));
+      if (draft.get === i) btn.append(mk("span", "tag", "GET"));
+      if (isWant) btn.append(mk("span", "wtag", "♥"));
+      if (c) { btn.append(mk("span", "nm", c.name), mk("span", "from", "前は " + (pi + 1) + POS_LABEL[pi])); }
+      else btn.append(mk("span", "ph", ready ? "＋ 来たカード" : "先に②を入れる"));
+      btn.addEventListener("click", () => openAfter(i));
+      const marks = mk("div", "marks one");
+      const g = mk("button", "g", "GET"); g.type = "button"; g.setAttribute("aria-pressed", draft.get === i ? "true" : "false"); g.disabled = !ready;
+      g.addEventListener("click", () => { draft.get = draft.get === i ? -1 : i; renderBoard2(); });
+      marks.append(g); pos.append(btn, marks); b.append(pos);
     });
     renderSummary();
   }
+  let afterIdx = 0;
+  function openAfter(i) {
+    afterIdx = i;
+    $("after-title").textContent = "シャッフル後 " + (i + 1) + "番目（" + POS_LABEL[i] + "）に来たカード";
+    const ul = $("after-list"); ul.innerHTML = "";
+    draft.cards.forEach((c, pi) => {
+      const used = draft.after.indexOf(pi);
+      const li = mk("li"), bt = mk("button"); bt.type = "button";
+      bt.append(mk("span", "num", "前" + (pi + 1) + POS_LABEL[pi]), mk("span", "nm", (draft.want.indexOf(pi) >= 0 ? "♥ " : "") + c.name), mk("span", "num", used >= 0 && used !== i ? "（後" + (used + 1) + "に入力済み）" : ""));
+      bt.addEventListener("click", () => setAfter(pi));
+      li.append(bt); ul.append(li);
+    });
+    $("after-clear").hidden = draft.after[i] < 0;
+    openSheet("after-sheet");
+  }
+  function setAfter(pi) {
+    const old = draft.after.indexOf(pi);
+    if (old >= 0 && old !== afterIdx) draft.after[old] = -1;   // 同じカードは1か所だけ
+    draft.after[afterIdx] = pi;
+    // 4か所決まったら、残りの1か所は自動で入れる
+    const empty = draft.after.map((v, i) => v < 0 ? i : -1).filter((i) => i >= 0);
+    if (empty.length === 1) { const rest = [0, 1, 2, 3, 4].find((x) => draft.after.indexOf(x) < 0); draft.after[empty[0]] = rest; }
+    closeSheets(); renderBoard2();
+    const next = draft.after.findIndex((v) => v < 0);
+    if (next >= 0) setTimeout(() => openAfter(next), 120);
+  }
+  $("after-clear").addEventListener("click", () => { draft.after[afterIdx] = -1; closeSheets(); renderBoard2(); });
+
   function draftProblem() {
     const empty = draft.cards.filter((c) => !c).length;
-    if (empty) return "あと" + empty + "か所、カードを入れてください。";
-    if (!draft.want.length) return "欲しかったカードに「♥ 欲しい」の印をつけてください。";
-    if (draft.get < 0) return "GETした場所に「GET」の印をつけてください。";
-    if (draft.want.some((w) => draft.prev[w] === undefined)) return "シャッフル前の場所を選んでください（わからなければ「わからない」）。";
+    if (empty) return "②シャッフル前：あと" + empty + "か所、カードを入れてください。";
+    if (!draft.want.length) return "②シャッフル前：欲しかったカードに「♥欲しい」の印をつけてください。";
+    const ae = draft.after.filter((v) => v < 0).length;
+    if (ae) return "③シャッフル後：あと" + ae + "か所、来たカードを選んでください。";
+    if (draft.get < 0) return "③シャッフル後：GETした場所に「GET」の印をつけてください。";
     return "";
   }
   function renderSummary() {
     const s = $("rec-summary"); s.innerHTML = "";
     const prob = draftProblem();
     if (prob) { s.textContent = prob; $("save").disabled = true; return; }
-    const hit = draft.want.indexOf(draft.get) >= 0;
-    const wantTxt = draft.want.map((i) => draft.cards[i].name + "（" + (i + 1) + " " + POS_LABEL[i] + "）").join("、");
-    s.append("欲しかったカード：", mk("b", "", wantTxt), mk("br"), "GET：", mk("b", "", draft.cards[draft.get].name + "（" + (draft.get + 1) + " " + POS_LABEL[draft.get] + "）"), mk("br"), "結果：", mk("b", "", hit ? "当たり！" : "はずれ"));
+    const got = draft.after[draft.get], hit = draft.want.indexOf(got) >= 0;
+    draft.want.forEach((w) => { const d = draft.after.indexOf(w); s.append("♥ ", mk("b", "", draft.cards[w].name), "：前 " + (w + 1) + POS_LABEL[w] + " → 後 ", mk("b", "", (d + 1) + POS_LABEL[d]), mk("br")); });
+    s.append("GET：", mk("b", "", draft.cards[got].name + "（後 " + (draft.get + 1) + POS_LABEL[draft.get] + "）"), mk("br"), "結果：", mk("b", "", hit ? "当たり！" : "はずれ"));
     $("save").disabled = false;
   }
   $("clear").addEventListener("click", () => { draft = newDraft($("pack").value); renderBoard(); setStatus("rec-status", ""); });
@@ -584,12 +631,13 @@
     if (!n) { $("free-name").focus(); return; }
     setCard({ no: 0, name: n.slice(0, 30), r: $("free-rar").value });
   });
-  $("pick-clear").addEventListener("click", () => { draft.cards[pickIdx] = null; draft.want = draft.want.filter((i) => i !== pickIdx); if (draft.get === pickIdx) draft.get = -1; closeSheets(); renderBoard(); });
+  $("pick-clear").addEventListener("click", () => { draft.cards[pickIdx] = null; draft.want = draft.want.filter((i) => i !== pickIdx); draft.after = draft.after.map((v) => v === pickIdx ? -1 : v); closeSheets(); renderBoard(); });
   function setCard(c) {
     draft.cards[pickIdx] = c; closeSheets(); renderBoard();
     // 次の空いている場所へ自動で進む
     const next = draft.cards.findIndex((x) => !x);
     if (next >= 0) setTimeout(() => openPicker(next), 120);
+    else if (!draft.want.length) setTimeout(() => toast("欲しかったカードに「♥欲しい」をつけてください"), 150);
   }
 
   // ---- 保存 ----
@@ -600,8 +648,8 @@
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       at: Date.now(), pack: draft.pack, packName: p ? p.name : "",
       cards: draft.cards.map((c) => ({ no: c.no, name: c.name, r: c.r })),
-      want: draft.want.slice(), get: draft.get, prev: draft.want.map((w) => draft.prev[w] >= 0 ? draft.prev[w] : -1),
-      hit: draft.want.indexOf(draft.get) >= 0, uid: o.uid, synced: false
+      want: draft.want.slice(), after: draft.after.slice(), get: draft.get,
+      hit: draft.want.indexOf(draft.after[draft.get]) >= 0, uid: o.uid, synced: false
     };
     const list = loadRecords().slice(); list.unshift(rec); saveRecords(list);
     toast(rec.hit ? "記録しました。当たり！" : "記録しました。");
@@ -629,7 +677,7 @@
     } catch (e) { /* 通信できないときは、次に開いたときに送ります */ }
     finally { pushing = false; renderFoot(); }
   }
-  function packForServer(r) { return { id: r.id, at: r.at, pack: r.pack, cards: r.cards, want: r.want, get: r.get, prev: r.prev, deleted: !!r.deleted, moveFrom: r.moveFrom || "" }; }
+  function packForServer(r) { return { id: r.id, at: r.at, pack: r.pack, cards: r.cards, want: r.want, get: r.get, after: r.after, deleted: !!r.deleted, moveFrom: r.moveFrom || "" }; }
   // ログイン中なら、別のスマホでつけた自分の記録も取り込む（1日1回まで。記録画面を開くたびには読みに行かない）
   async function syncMine(force) {
     if (!CONFIG.GAS_URL || !getProfile()) return;
@@ -640,7 +688,7 @@
       const r = await api({ action: "gc_mine", uid: o.uid, key: o.key }, 25000);
       if (!r || !r.ok) return;
       const have = new Map(loadRecords().map((x) => [x.id, x]));
-      (r.records || []).forEach((x) => { if (!have.has(x.id)) have.set(x.id, Object.assign({}, x, { hit: x.want.indexOf(x.get) >= 0, packName: (packByCode(x.pack) || {}).name || "", uid: o.uid, synced: true })); });
+      (r.records || []).forEach((x) => { if (!have.has(x.id)) have.set(x.id, Object.assign({}, x, { hit: Array.isArray(x.after) && x.want.indexOf(x.after[x.get]) >= 0, packName: (packByCode(x.pack) || {}).name || "", uid: o.uid, synced: true })); });
       const list = Array.from(have.values()).sort((a, b) => b.at - a.at);
       saveRecords(list); ls.set(SYNC_KEY, Date.now());
       if (!$("view-hist").hidden) renderHist();
@@ -660,15 +708,17 @@
       const head = mk("div", "head");
       const left = mk("span"); left.append(mk("b", "", r.packName || (packByCode(r.pack) || {}).name || "パック不明"), " ・ " + fmtDate(r.at));
       head.append(left, mk("span", "pill " + (r.hit ? "hit" : "miss"), r.hit ? "当たり" : "はずれ"));
-      const mini = mk("div", "mini");
-      r.cards.forEach((c, i) => {
-        const d = mk("div", (r.get === i ? "g" : "") + (r.want.indexOf(i) >= 0 ? " w" : ""));
-        const lb = (i + 1) + (r.get === i ? " GET" : "") + (r.want.indexOf(i) >= 0 ? " ♥" : "");
+      const mini = mk("div", "mini"), A = Array.isArray(r.after) ? r.after : null;
+      [0, 1, 2, 3, 4].forEach((i) => {
+        const pi = A ? A[i] : i, c = r.cards[pi];
+        const w = r.want.indexOf(pi) >= 0;
+        const d = mk("div", (r.get === i ? "g" : "") + (w ? " w" : ""));
+        const lb = "後" + (i + 1) + (A ? "←前" + (pi + 1) : "") + (r.get === i ? " GET" : "") + (w ? " ♥" : "");
         d.append(mk("span", "lb", lb), mk("span", "nm", c ? c.name : "-"), rarEl(c ? c.r : ""));
         mini.append(d);
       });
       const foot = mk("div", "foot");
-      const info = r.want.map((w, k) => { const p = (r.prev || [])[k]; return p >= 0 ? "♥" + (w + 1) + "は前 " + (p + 1) + POS_LABEL[p] : ""; }).filter(Boolean).join("・");
+      const info = A ? r.want.map((w) => "♥" + r.cards[w].name + " 前" + (w + 1) + POS_LABEL[w] + "→後" + (A.indexOf(w) + 1) + POS_LABEL[A.indexOf(w)]).join("・") : "";
       const del = mk("button", "delbtn", "消す"); del.type = "button";
       del.addEventListener("click", () => {
         if (!del.classList.contains("sure")) { del.classList.add("sure"); del.textContent = "本当に消す"; setTimeout(() => { del.classList.remove("sure"); del.textContent = "消す"; }, 4000); return; }
@@ -692,15 +742,22 @@
 
   // 記録の一覧から統計を作る（全員の分はサーバーで同じ形に集計して返す）
   function aggregate(list, packCode) {
+    const z = () => [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0, 0]);
     const S = { n: 0, hit: 0, expect: 0, getN: [0, 0, 0, 0, 0], getHit: [0, 0, 0, 0, 0], wantAt: [0, 0, 0, 0, 0], wantN: 0,
-      prevTo: [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0, 0]), prevN: 0, rar: {}, packs: {} };
+      moveAll: z(), moveWant: z(), rar: {}, packs: {} };
     list.forEach((r) => {
       if (r.deleted || (packCode && r.pack !== packCode)) return;
-      S.n++; const hit = r.want.indexOf(r.get) >= 0; if (hit) S.hit++;
+      const A = r.after;
+      if (!Array.isArray(A) || A.length !== 5 || A.some((v) => !(v >= 0 && v < 5))) return;   // 古い形の記録は数えない
+      const got = A[r.get], hit = r.want.indexOf(got) >= 0;
+      S.n++; if (hit) S.hit++;
       S.expect += r.want.length / 5;
-      if (r.get >= 0) { S.getN[r.get]++; if (hit) S.getHit[r.get]++; }
-      r.want.forEach((w) => { S.wantAt[w]++; S.wantN++; const g = RAR_GROUP[(r.cards[w] || {}).r] || "?"; S.rar[g] = S.rar[g] || [0, 0]; S.rar[g][0]++; if (r.get === w) S.rar[g][1]++; });
-      r.want.forEach((w, k) => { const p = (r.prev || [])[k]; if (p >= 0 && p < 5) { S.prevTo[p][w]++; S.prevN++; } });
+      S.getN[r.get]++; if (hit) S.getHit[r.get]++;
+      for (let p = 0; p < 5; p++) S.moveAll[p][A.indexOf(p)]++;
+      r.want.forEach((w) => {
+        const d = A.indexOf(w); S.wantAt[d]++; S.wantN++; S.moveWant[w][d]++;
+        const g = RAR_GROUP[(r.cards[w] || {}).r] || "?"; S.rar[g] = S.rar[g] || [0, 0]; S.rar[g][0]++; if (got === w) S.rar[g][1]++;
+      });
       S.packs[r.pack] = S.packs[r.pack] || [0, 0]; S.packs[r.pack][0]++; if (hit) S.packs[r.pack][1]++;
     });
     return S;
@@ -739,7 +796,7 @@
     });
     return box;
   }
-  let statPrev = 2; // シャッフル前の場所（はじめは右上）
+  let statPrev = 2, statScope = "all"; // シャッフル前の場所（はじめは右上）・数えるカード
   function allStatsCached(packCode) { const c = (ls.get(STATS_KEY, null) || {})[packCode || "_"]; return c ? c.data : null; }
   function drawStats(S, mine) {
     const body = $("st-body"); body.innerHTML = "";
@@ -749,30 +806,38 @@
     k.append(kp(String(S.n), "記録した回数"), kp(pct(S.hit, S.n) + "%", "当たった割合"), kp(pct(S.expect, S.n) + "%", "運だけの目安"));
     body.append(k, mk("p", "note", "「運だけの目安」は、欲しいカードの枚数÷5 の平均です。当たった割合がこれより高ければ、運より良い結果です。"));
 
-    // ---- いちばん大事な統計：シャッフル前の場所 → 行った場所 ----
+    // ---- いちばん大事な統計：シャッフル前の場所 → シャッフル後の場所 ----
+    const M = statScope === "all" ? S.moveAll : S.moveWant;
     const box = mk("div", "keybox");
-    box.append(mk("h3", "", "シャッフル前の場所 → シャッフル後に行った場所"));
-    box.append(mk("p", "sub", "シャッフル前に欲しいカードがあった場所を選んでください。"));
+    box.append(mk("h3", "", "シャッフル前の場所 → シャッフル後の場所"));
+    const sc = mk("div", "chips");
+    [["all", "5枚全部の動き"], ["want", "欲しいカードだけ"]].forEach(([v, l]) => {
+      const b = mk("button", "", l); b.type = "button"; b.setAttribute("aria-pressed", statScope === v ? "true" : "false");
+      b.addEventListener("click", () => { statScope = v; drawStats(S, mine); }); sc.append(b);
+    });
+    box.append(sc, mk("p", "sub", "シャッフル前にあった場所を選ぶと、シャッフル後にどこへ行ったかの割合が出ます。"));
     const ch = mk("div", "chips");
     [0, 1, 2, 3, 4].forEach((i) => {
-      const cnt = S.prevTo[i].reduce((a, b) => a + b, 0);
-      const b = mk("button", "", (i + 1) + " " + POS_LABEL[i] + "（" + cnt + "）"); b.type = "button"; b.setAttribute("aria-pressed", statPrev === i ? "true" : "false");
+      const cnt = M[i].reduce((a, b) => a + b, 0);
+      const b = mk("button", "", "前 " + (i + 1) + POS_LABEL[i] + "（" + cnt + "）"); b.type = "button"; b.setAttribute("aria-pressed", statPrev === i ? "true" : "false");
       b.addEventListener("click", () => { statPrev = i; drawStats(S, mine); });
       ch.append(b);
     });
     box.append(ch);
-    const row = S.prevTo[statPrev], sum = row.reduce((a, b) => a + b, 0);
+    const row = M[statPrev], sum = row.reduce((a, b) => a + b, 0);
     if (!sum) {
       box.append(mk("p", "empty", "シャッフル前が「" + (statPrev + 1) + " " + POS_LABEL[statPrev] + "」の記録はまだありません。"));
     } else {
       const A = mine && CONFIG.GAS_URL ? allStatsCached($("st-pack").value) : null;
-      const arow = A && A.prevTo ? A.prevTo[statPrev] : null, asum = arow ? arow.reduce((a, b) => a + b, 0) : 0;
-      box.append(heat(row.map((v) => pct(v, sum)), row, "%", (i) => row[i] + "回", asum ? (i) => "全員 " + pct(arow[i], asum) + "%" : null));
+      const AM = A ? (statScope === "all" ? A.moveAll : A.moveWant) : null;
+      const arow = AM ? AM[statPrev] : null, asum = arow ? arow.reduce((a, b) => a + b, 0) : 0;
+      box.append(heat(row.map((v) => pct(v, sum)), row, "%", (i) => "後 " + row[i] + "回", asum ? (i) => "全員 " + pct(arow[i], asum) + "%" : null));
       const best = row.indexOf(Math.max.apply(null, row));
       const adv = mk("p", "advice");
-      adv.append("シャッフル前が", mk("b", "", (statPrev + 1) + " " + POS_LABEL[statPrev]), "のとき、いちばん多く行った場所は ", mk("b", "", (best + 1) + " " + POS_LABEL[best] + "（" + pct(row[best], sum) + "%）"), "。" + sum + "回分の記録です。");
+      adv.append("シャッフル前が", mk("b", "", (statPrev + 1) + " " + POS_LABEL[statPrev]), "のカードは、シャッフル後 ", mk("b", "", (best + 1) + " " + POS_LABEL[best] + "（" + pct(row[best], sum) + "%）"), " に行くことがいちばん多いです（" + sum + "回分）。欲しいカードがその場所にあったら、ここを選ぶのが目安です。");
       box.append(adv);
-      if (mine && asum) box.append(mk("p", "note", "下の小さい数字は、記録している全員の割合です。自分だけ大きくちがう場所があれば、アカウントごとの偏りかもしれません（回数が少ないうちは偶然の差も大きく出ます）。"));
+      box.append(mk("p", "note", "上の数字は「シャッフル後の場所」です。偏りがなければ、どこも20%前後になります。"));
+      if (mine && asum) box.append(mk("p", "note", "小さい数字は、記録している全員の割合です。自分だけ大きくちがう場所があれば、アカウントごとの偏りかもしれません（回数が少ないうちは偶然の差も大きく出ます）。"));
     }
     body.append(box);
     drawStats.tried = drawStats.tried || {};
@@ -791,19 +856,19 @@
     body.append(heat(wr, S.wantAt, "%", (i) => S.wantAt[i] + "回"));
     body.append(mk("p", "note", "偏りがなければ、どの場所も20%前後になります。"));
 
-    if (S.prevN) {
-      body.append(mk("h3", "", "シャッフル前→後の全体の表"));
+    {
+      body.append(mk("h3", "", "シャッフル前→後の全体の表（" + (statScope === "all" ? "5枚全部" : "欲しいカードだけ") + "）"));
       const wrap = mk("div", "tbl-wrap"), t = mk("table", "mx"), hr = mk("tr");
       hr.append(mk("th", "", "前＼後"));
       POS_LABEL.forEach((l, i) => hr.append(mk("th", "", (i + 1) + l)));
       t.append(hr);
-      S.prevTo.forEach((row, i) => {
+      M.forEach((row, i) => {
         const tr = mk("tr"); tr.append(mk("th", "", (i + 1) + POS_LABEL[i]));
         const sum = row.reduce((a, b) => a + b, 0);
         row.forEach((v) => tr.append(mk("td", "", sum ? pct(v, sum) + "%" : "-")));
         t.append(tr);
       });
-      wrap.append(t); body.append(wrap, mk("p", "note", "行ごとに合計100%。シャッフル前の場所を記録した " + S.prevN + "回分です。"));
+      wrap.append(t); body.append(wrap, mk("p", "note", "行ごとに合計100%です。"));
     }
 
     const rk = RAR_GROUPS.filter((g) => S.rar[g]);
