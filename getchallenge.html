@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ゲットチャレンジ記録</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="ポケポケのゲットチャレンジで、5枚の並び・欲しかったカード・GETした場所を記録して、どこを選ぶと当たりやすいかを統計で見られます。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://card-request-box.github.io/getchallenge.html">
+<meta property="og:title" content="★ゲットチャレンジ記録">
+<meta property="og:description" content="ゲットチャレンジの結果を記録して、どこを選ぶと当たりやすいかをみんなの記録から調べられます。">
+<meta property="og:image" content="https://card-request-box.github.io/ogp.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  /* レイアウト：リクエスト箱と同じ夜空の背景に、白いパネルを縦に重ねる。5枚は結果画面と同じ「上3・下2」 */
+  :root {
+    --sky-top: #0E1633; --sky-bottom: #25346A; --star: #FFF4C8;
+    --gold: #F2C14E; --gold-deep: #C9962A;
+    --panel: #FBFAF5; --ink: #18213D; --muted: #5C6781; --line: #DADDE5; --soft: #EEF0F6;
+    --ok: #2E8B57; --error: #B3261E; --want: #D2436B; --want-soft: #FBE4EA; --get-soft: #FFF3D1;
+    --dia: #6E7FA8; --shiny: #C04FA0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: #151F42; --ink: #EEF1FA; --muted: #A3ADC6; --line: #2F3B66; --soft: #1D2850;
+      --ok: #6FD39A; --error: #FF8A80; --want: #FF7FA3; --want-soft: #3A2346; --get-soft: #3A3420;
+      --dia: #9DADD6; --shiny: #F08CD4; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: #151F42; --ink: #EEF1FA; --muted: #A3ADC6; --line: #2F3B66; --soft: #1D2850;
+    --ok: #6FD39A; --error: #FF8A80; --want: #FF7FA3; --want-soft: #3A2346; --get-soft: #3A3420;
+    --dia: #9DADD6; --shiny: #F08CD4; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background: var(--sky-bottom); }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Meiryo", sans-serif;
+    line-height: 1.7; overflow-x: hidden;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  }
+  .sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .8;
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 78% 12%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 40% 30%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 44%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 6% 62%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 64% 70%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1px 1px at 30% 86%, #FFF4C8 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 92% 90%, #FFF4C8 50%, transparent 51%); }
+  main { position: relative; z-index: 1; max-width: 560px; margin: 0 auto;
+    padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header { color: #fff; margin-bottom: 14px; }
+  h1 { font-size: 1.6rem; font-weight: 800; line-height: 1.3; margin: 0 0 6px; text-wrap: balance; }
+  h1 .mark { color: var(--gold); margin-right: 6px; }
+  .lead { color: #C9D1EA; font-size: .9rem; margin: 0; }
+
+  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; margin: 0 0 18px; background: rgba(16,25,58,.95); border: 1px solid rgba(242,193,78,.35); border-radius: 22px; }
+  .tabs a { min-width: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 7px 2px; border-radius: 18px; color: #C9D1EA; font-weight: 800; font-size: .74rem; text-decoration: none; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
+  .tabs a:hover { color: #fff; }
+  .tabs a[aria-current="page"] { background: var(--gold); color: #2B1F03; box-shadow: 0 3px 0 var(--gold-deep); }
+  .tabs a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+  .loginbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 14px; padding: 10px 14px; border-radius: 14px; background: rgba(16,25,58,.92); border: 1px solid rgba(242,193,78,.35); color: #fff; font-size: .85rem; }
+  .loginbar .who { min-width: 0; line-height: 1.4; }
+  .loginbar .who b { color: var(--gold); word-break: break-all; }
+  .loginbar .who small { display: block; color: #C9D1EA; font-size: .75rem; }
+  .loginbar button { flex-shrink: 0; font: inherit; font-weight: 800; font-size: .8rem; border-radius: 999px; padding: 6px 12px; cursor: pointer; border: 1px solid rgba(242,193,78,.6); background: transparent; color: #fff; }
+  .loginbar button.main { background: var(--gold); color: #2B1F03; border-color: var(--gold); }
+  .loginbar button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 14px; }
+  .seg button { font: inherit; font-weight: 800; font-size: .92rem; padding: 10px 6px; border-radius: 12px; border: 1px solid rgba(242,193,78,.45); background: rgba(16,25,58,.7); color: #DDE3F5; cursor: pointer; }
+  .seg button[aria-selected="true"] { background: var(--panel); color: var(--ink); border-color: var(--gold); box-shadow: 0 0 0 3px rgba(242,193,78,.35); }
+  .seg button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+  .panel { background: var(--panel); border-radius: 18px; padding: 16px; box-shadow: 0 0 0 4px rgba(242,193,78,.35); margin-bottom: 16px; }
+  .panel h2 { font-size: 1.02rem; font-weight: 800; margin: 0 0 4px; }
+  .panel h3 { font-size: .92rem; font-weight: 800; margin: 18px 0 6px; }
+  .sub { margin: 0 0 10px; font-size: .82rem; color: var(--muted); }
+  .step { display: inline-flex; align-items: center; justify-content: center; width: 1.6em; height: 1.6em; border-radius: 50%; background: var(--gold); color: #2B1F03; font-size: .8rem; font-weight: 800; margin-right: 6px; vertical-align: 1px; }
+
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-weight: 700; font-size: .85rem; margin-bottom: 3px; }
+  .field .ex { font-weight: 400; color: var(--muted); font-size: .78rem; }
+  .field input, .field select { width: 100%; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--gold); }
+  .field input[aria-invalid="true"] { border-color: var(--error); }
+  .at { position: relative; }
+  .at span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 700; }
+  .at input { padding-left: 28px; }
+
+  /* 5か所（上3・下2） */
+  .board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 6px 0 4px; }
+  .board > .pos { grid-column: span 2; min-width: 0; }
+  .board > .pos:nth-child(4) { grid-column: 2 / span 2; }
+  .board > .pos:nth-child(5) { grid-column: 4 / span 2; }
+  .pos { display: flex; flex-direction: column; gap: 4px; }
+  .card { position: relative; min-height: 96px; border-radius: 10px; border: 2px dashed var(--line); background: var(--soft); color: var(--ink); font: inherit; padding: 18px 6px 6px; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
+  .card.filled { border-style: solid; background: var(--panel); }
+  .card.is-get { border-color: var(--gold); background: var(--get-soft); box-shadow: 0 0 0 2px var(--gold) inset; }
+  .card.is-want { border-color: var(--want); }
+  .card:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .card .no { position: absolute; left: 0; top: 0; background: #48506A; color: #fff; font-size: .72rem; font-weight: 800; padding: 0 8px; border-radius: 8px 0 8px 0; }
+  .card .nm { font-weight: 800; font-size: .82rem; line-height: 1.3; word-break: break-all; }
+  .card .ph { color: var(--muted); font-size: .78rem; font-weight: 700; }
+  .card .tag { position: absolute; right: 4px; top: 2px; font-size: .66rem; font-weight: 800; color: #2B1F03; background: var(--gold); border-radius: 999px; padding: 0 6px; }
+  .card .wtag { position: absolute; right: 4px; top: 2px; color: var(--want); font-size: .8rem; font-weight: 800; }
+  .card.is-get.is-want .wtag { right: 40px; }
+  .rar { font-size: .7rem; font-weight: 800; letter-spacing: .02em; color: var(--dia); white-space: nowrap; }
+  .rar.st, .rar.cr { color: var(--gold-deep); }
+  .rar.sh { color: var(--shiny); }
+  .marks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .marks button { font: inherit; font-size: .7rem; font-weight: 800; padding: 5px 0; white-space: nowrap; min-width: 0; overflow: hidden; border-radius: 8px; border: 1.5px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; }
+  .marks button.w[aria-pressed="true"] { background: var(--want-soft); border-color: var(--want); color: var(--want); }
+  .marks button.g[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: #2B1F03; }
+  .marks button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+  .prevrow { padding: 8px 10px; border-radius: 12px; background: var(--want-soft); margin-bottom: 8px; }
+  .prevname { margin: 0 0 6px; font-weight: 800; font-size: .86rem; color: var(--ink); }
+  .prev { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .keybox { border: 2px solid var(--gold); border-radius: 14px; padding: 12px; margin: 4px 0 4px; }
+  .keybox h3 { margin-top: 0; }
+  .advice { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--get-soft); font-size: .86rem; }
+  .advice b { font-weight: 800; }
+  .heat .cmp { position: relative; display: block; font-size: .66rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .prev button { font: inherit; font-weight: 800; font-size: .85rem; min-width: 2.6em; padding: 6px 10px; border-radius: 999px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  .prev button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .prev button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+  .summary { margin: 12px 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--soft); font-size: .86rem; line-height: 1.6; }
+  .summary b { font-weight: 800; }
+  .btn { display: block; width: 100%; font: inherit; font-weight: 800; font-size: 1rem; border: 0; border-radius: 14px; padding: 13px; cursor: pointer; text-align: center; }
+  .btn.primary { background: var(--gold); color: #2B1F03; box-shadow: 0 5px 0 var(--gold-deep); }
+  .btn.primary:disabled { background: var(--soft); color: var(--muted); box-shadow: none; cursor: default; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 2px solid var(--line); margin-top: 10px; }
+  .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .linkbtn { background: none; border: 0; padding: 0; font: inherit; font-size: .82rem; font-weight: 700; color: var(--gold-deep); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .status { min-height: 1.4em; margin: 8px 0 0; font-size: .86rem; text-align: center; }
+  .status.error { color: var(--error); font-weight: 700; }
+
+  /* 履歴 */
+  .hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .hist li { border: 2px solid var(--line); border-radius: 14px; padding: 10px; }
+  .hist .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .hist .head b { color: var(--ink); }
+  .pill { display: inline-block; font-size: .75rem; font-weight: 800; padding: 1px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill.hit { background: var(--gold); color: #2B1F03; }
+  .pill.miss { background: var(--soft); color: var(--muted); }
+  .pill.wait { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+  .mini { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .mini > div { grid-column: span 2; min-width: 0; border-radius: 8px; border: 1.5px solid var(--line); padding: 3px 4px; font-size: .72rem; line-height: 1.3; text-align: center; position: relative; }
+  .mini > div:nth-child(4) { grid-column: 2 / span 2; }
+  .mini > div:nth-child(5) { grid-column: 4 / span 2; }
+  .mini > div.g { border-color: var(--gold); background: var(--get-soft); }
+  .mini > div.w { box-shadow: 0 0 0 2px var(--want) inset; }
+  .mini .nm { display: block; font-weight: 800; word-break: break-all; }
+  .mini .lb { display: block; font-size: .64rem; font-weight: 800; color: var(--muted); }
+  .hist .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: .78rem; color: var(--muted); gap: 8px; }
+  .delbtn { font: inherit; font-size: .76rem; font-weight: 700; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+  .delbtn.sure { color: #fff; background: var(--error); border-color: var(--error); }
+  .empty { text-align: center; color: var(--muted); font-size: .88rem; padding: 18px 8px; }
+
+  /* 統計 */
+  .who-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 10px; }
+  .who-seg button { font: inherit; font-weight: 800; padding: 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  .who-seg button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
+  .warn { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--want-soft); color: var(--ink); font-size: .82rem; border: 1px solid var(--want); }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 6px; }
+  .kpi { background: var(--soft); border-radius: 12px; padding: 8px 6px; text-align: center; min-width: 0; }
+  .kpi .v { display: block; font-size: 1.3rem; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .kpi .l { display: block; font-size: .7rem; color: var(--muted); font-weight: 700; }
+  .heat { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .heat > div { grid-column: span 2; min-width: 0; border-radius: 10px; padding: 8px 4px; text-align: center; border: 1.5px solid var(--line); background: var(--panel); position: relative; overflow: hidden; }
+  .heat > div:nth-child(4) { grid-column: 2 / span 2; }
+  .heat > div:nth-child(5) { grid-column: 4 / span 2; }
+  .heat .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--gold); opacity: .35; }
+  .heat .best { border-color: var(--gold-deep); border-width: 2.5px; }
+  .heat .v { position: relative; display: block; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .heat .l { position: relative; display: block; font-size: .7rem; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .heat .p { position: relative; display: block; font-size: .66rem; font-weight: 800; color: var(--muted); }
+  .note { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
+  .tbl-wrap { overflow-x: auto; }
+  table.mx { border-collapse: collapse; font-size: .8rem; width: 100%; font-variant-numeric: tabular-nums; }
+  table.mx th, table.mx td { border: 1px solid var(--line); padding: 4px 6px; text-align: center; }
+  table.mx th { background: var(--soft); font-weight: 800; }
+  .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .bars li { display: grid; grid-template-columns: 7.5em 1fr 4.6em; gap: 8px; align-items: center; font-size: .8rem; }
+  .bars .lb { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bars .bar { height: 12px; border-radius: 6px; background: var(--soft); overflow: hidden; }
+  .bars .bar i { display: block; height: 100%; background: var(--gold); border-radius: 6px; }
+  .bars .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 700; }
+
+  /* シート */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(8,12,30,.55); z-index: 10; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; max-height: 88vh; overflow-y: auto;
+    background: var(--panel); border-radius: 20px 20px 0 0; box-shadow: 0 -6px 30px rgba(0,0,0,.35);
+    padding-block: 18px calc(18px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    max-width: 560px; margin: 0 auto; animation: up .18s ease-out; }
+  @keyframes up { from { transform: translateY(16px); opacity: .6; } to { transform: none; opacity: 1; } }
+  .sheet h2 { margin: 0 0 4px; font-size: 1.1rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+  .chips button { font: inherit; font-size: .78rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .clist { list-style: none; margin: 0; padding: 0; border: 2px solid var(--line); border-radius: 12px; max-height: 46vh; overflow-y: auto; }
+  .clist li + li { border-top: 1px solid var(--line); }
+  .clist button { width: 100%; display: grid; grid-template-columns: 3.2em 1fr auto; gap: 8px; align-items: center; text-align: left; font: inherit; font-size: .9rem; background: none; border: 0; color: var(--ink); padding: 9px 12px; cursor: pointer; }
+  .clist button:hover, .clist button:focus-visible { background: var(--soft); outline: none; }
+  .clist .num { color: var(--muted); font-size: .76rem; font-variant-numeric: tabular-nums; }
+  .clist .nm { font-weight: 700; min-width: 0; word-break: break-all; }
+  .freerow { display: flex; gap: 6px; margin-top: 10px; }
+  .freerow input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .freerow select, .freerow button { font: inherit; font-size: .85rem; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 8px; }
+  .freerow button { font-weight: 800; background: var(--gold); border-color: var(--gold); color: #2B1F03; cursor: pointer; }
+  details.help { font-size: .82rem; margin: 0 0 10px; }
+  details.help summary { cursor: pointer; font-weight: 700; color: var(--gold-deep); }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; max-width: calc(100% - 32px);
+    background: var(--ink); color: var(--panel); font-weight: 800; font-size: .9rem; padding: 10px 18px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+  .toast.err { background: var(--error); color: #fff; }
+  .foot-note { color: #C9D1EA; font-size: .76rem; text-align: center; margin-top: 8px; }
+  @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+  @media (max-width: 380px) { .card { min-height: 88px; } .card .nm { font-size: .76rem; } .tabs a { font-size: .66rem; } .marks button { font-size: .64rem; } }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+<main>
+  <nav class="tabs" aria-label="ページの切り替え">
+    <a href="./">カードリクエスト</a>
+    <a href="roulette.html">配布ルーレット</a>
+    <a href="tier.html">現在価格</a>
+    <a aria-current="page" href="getchallenge.html">ゲットチャレンジ</a>
+  </nav>
+  <div class="loginbar" id="loginbar">
+    <div class="who" id="login-who"></div>
+    <button type="button" class="main" id="login-open">入力を保存</button>
+  </div>
+  <header>
+    <h1><span class="mark" aria-hidden="true">★</span>ゲットチャレンジ記録</h1>
+    <p class="lead">チャレンジ結果の5枚と、欲しかったカード・GETした場所を記録します。みんなの記録から、どこを選ぶと当たりやすいかも見られます。</p>
+  </header>
+
+  <div class="seg" role="tablist" aria-label="表示の切り替え">
+    <button type="button" role="tab" id="tab-rec" aria-selected="true" aria-controls="view-rec">記録する</button>
+    <button type="button" role="tab" id="tab-hist" aria-selected="false" aria-controls="view-hist">履歴</button>
+    <button type="button" role="tab" id="tab-stat" aria-selected="false" aria-controls="view-stat">統計</button>
+  </div>
+
+  <!-- 記録する -->
+  <section id="view-rec" role="tabpanel" aria-labelledby="tab-rec">
+    <div class="panel">
+      <h2><span class="step">1</span>パック</h2>
+      <div class="field"><label for="pack" class="sub" style="margin:0 0 4px">5枚が入っていたパック</label><select id="pack"></select></div>
+
+      <h2 style="margin-top:14px"><span class="step">2</span>チャレンジ結果の5枚</h2>
+      <p class="sub">結果画面と同じ並びです。四角をタップしてカードを入れ、<b>欲しい</b>と<b>GET</b>に印をつけてください。</p>
+      <div class="board" id="board"></div>
+
+      <h2 style="margin-top:16px"><span class="step">3</span>シャッフル前の場所</h2>
+      <p class="sub">欲しいカードが、シャッフルする<b>前</b>にどこにあったかを選んでください。「シャッフル前→後」の統計に使います。シャッフル前の画面をスクショしておくと確実です。</p>
+      <div id="prev"></div>
+
+      <div class="summary" id="rec-summary"></div>
+      <button type="button" class="btn primary" id="save" disabled>記録する</button>
+      <p class="status" id="rec-status" role="status"></p>
+      <p style="text-align:center;margin:4px 0 0"><button type="button" class="linkbtn" id="clear">入力をやり直す</button></p>
+    </div>
+  </section>
+
+  <!-- 履歴 -->
+  <section id="view-hist" role="tabpanel" aria-labelledby="tab-hist" hidden>
+    <div class="panel">
+      <h2>これまでの記録</h2>
+      <p class="sub" id="hist-sub"></p>
+      <ul class="hist" id="hist"></ul>
+      <p style="text-align:center;margin:10px 0 0" id="more-wrap" hidden><button type="button" class="linkbtn" id="more">もっと見る</button></p>
+    </div>
+  </section>
+
+  <!-- 統計 -->
+  <section id="view-stat" role="tabpanel" aria-labelledby="tab-stat" hidden>
+    <div class="panel">
+      <h2>統計</h2>
+      <div class="who-seg">
+        <button type="button" id="st-me" aria-pressed="true">自分の記録</button>
+        <button type="button" id="st-all" aria-pressed="false">記録している全員</button>
+      </div>
+      <p class="warn" id="st-warn" hidden>全員の統計には、偽の記録を投稿している方がいる可能性があるため、正確な統計にならない場合があります。参考としてご覧ください。</p>
+      <div class="field" style="margin-bottom:12px"><label for="st-pack" class="sub" style="margin:0 0 4px">パックでしぼる</label><select id="st-pack"></select></div>
+      <div id="st-body"></div>
+      <p class="status" id="st-status" role="status"></p>
+    </div>
+  </section>
+  <p class="foot-note" id="foot-note"></p>
+</main>
+
+<div class="sheet-bg" id="sheet-bg" hidden></div>
+
+<!-- カードを選ぶ -->
+<div class="sheet" id="pick-sheet" role="dialog" aria-modal="true" aria-labelledby="pick-title" hidden>
+  <h2 id="pick-title">カードを選ぶ</h2>
+  <p class="sub" id="pick-sub"></p>
+  <div class="field" style="margin-bottom:8px"><input id="pick-q" type="search" placeholder="名前で検索（ひらがなでもOK）" autocomplete="off" aria-label="カード名で検索"></div>
+  <div class="chips" id="pick-rar"></div>
+  <ul class="clist" id="pick-list"></ul>
+  <details class="help" style="margin-top:10px">
+    <summary>一覧にないカード（新しいパックなど）</summary>
+    <div class="freerow"><input id="free-name" placeholder="カード名" maxlength="30" autocomplete="off" aria-label="カード名"><select id="free-rar" aria-label="レア度"></select><button type="button" id="free-add">入れる</button></div>
+  </details>
+  <button type="button" class="btn ghost" id="pick-clear">この場所を空にする</button>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<!-- ログイン（配布ルーレットと共通） -->
+<div class="sheet" id="login-sheet" role="dialog" aria-modal="true" aria-labelledby="login-title" hidden>
+  <h2 id="login-title">入力を保存</h2>
+  <p class="sub">配布ルーレットと同じ4つです。保存しておくと、ゲットチャレンジの記録があなたの記録としてまとまり、別のスマホからも見られます。<b>入力内容はこのスマホの中に保存されます。</b></p>
+  <div class="field"><label for="l-poke">ポケポケのID <span class="ex">（フレンドID・数字）</span></label><input id="l-poke" inputmode="numeric" autocomplete="off" placeholder="例：1234-5678-9012-3456" maxlength="30"></div>
+  <div class="field"><label for="l-trainer">トレーナーネーム</label><input id="l-trainer" autocomplete="off" maxlength="20" placeholder="ゲーム内の名前"></div>
+  <div class="field"><label for="l-xname">Xの名前</label><input id="l-xname" autocomplete="off" maxlength="50" placeholder="表示されている名前"></div>
+  <div class="field"><label for="l-xid">XのID <span class="ex">（@のあと）</span></label><div class="at"><span aria-hidden="true">@</span><input id="l-xid" autocomplete="off" maxlength="16" placeholder="example_id" autocapitalize="off" spellcheck="false"></div></div>
+  <button type="button" class="btn primary" id="l-save">保存する</button>
+  <p class="status" id="login-status" role="status"></p>
+  <button type="button" class="btn ghost" data-close>閉じる</button>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="getchallenge-cards.js"></script>
+<script>
+(function () {
+  "use strict";
+  // ============ 設定 ============
+  const CONFIG = {
+    // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
+    GAS_URL: "",
+    STATS_CACHE_MIN: 10   // 全員の統計をスマホに覚えておく時間（分）
+  };
+  const PROFILE_KEY = "cardRoulette:profile";      // 配布ルーレットと共通のログイン
+  const REC_KEY = "getChallenge:records";          // 自分の記録（このスマホ）
+  const LAST_PACK_KEY = "getChallenge:lastPack";
+  const DEV_KEY = "getChallenge:device";
+  const STATS_KEY = "getChallenge:statsAll";
+  const SYNC_KEY = "getChallenge:lastSync";
+
+  const $ = (id) => document.getElementById(id);
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const POS_LABEL = ["左上", "中上", "右上", "左下", "右下"];
+  const RAR = {
+    d1: { s: "◆", c: "" }, d2: { s: "◆◆", c: "" }, d3: { s: "◆◆◆", c: "" }, d4: { s: "◆◆◆◆", c: "" },
+    s1: { s: "☆", c: "st" }, s2: { s: "☆☆", c: "st" }, s3: { s: "☆☆☆", c: "st" },
+    sh1: { s: "色違い☆", c: "sh" }, sh2: { s: "色違い☆☆", c: "sh" }, cr: { s: "王冠", c: "cr" }
+  };
+  const RAR_ORDER = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr"];
+  const RAR_GROUP = { d1: "◆1〜2", d2: "◆1〜2", d3: "◆3", d4: "◆4", s1: "☆1", s2: "☆2", s3: "☆3以上", sh1: "色違い", sh2: "色違い", cr: "☆3以上" };
+  const RAR_GROUPS = ["◆1〜2", "◆3", "◆4", "☆1", "☆2", "☆3以上", "色違い"];
+  const PACKS = (window.GC_PACKS || []);
+  const OTHER = { code: "X", name: "そのほかのパック（一覧にない）", cards: [] };
+  const packByCode = (c) => PACKS.find((p) => p.code === c) || (c === "X" ? OTHER : null);
+
+  // ============ 保存（このスマホ） ============
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+  };
+  let memRecords = null;
+  function loadRecords() { if (memRecords) return memRecords; const v = ls.get(REC_KEY, []); memRecords = Array.isArray(v) ? v : []; return memRecords; }
+  function saveRecords(list) { memRecords = list; ls.set(REC_KEY, list); }
+  function deviceId() {
+    let d = ls.get(DEV_KEY, null);
+    if (!d) { d = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^\w-]/g, ""); ls.set(DEV_KEY, d); }
+    return d;
+  }
+  function getProfile() { try { const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); return p && p.pokeId ? p : null; } catch (e) { return loginMem; } }
+  let loginMem = null;
+  function setProfile(p) { loginMem = p; try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) {} }
+  // 記録の持ち主（ログインしていればポケポケID、していなければこのスマホ）
+  function owner() { const p = getProfile(); return p ? { uid: "p:" + p.pokeId, key: p.trainer + "|" + p.xId } : { uid: "d:" + deviceId(), key: deviceId() }; }
+
+  // ============ 通信 ============
+  async function api(body, timeoutMs) {
+    if (!CONFIG.GAS_URL) throw new Error("no_server");
+    const ctl = window.AbortController ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), timeoutMs || 20000) : null;
+    try {
+      const res = await fetch(CONFIG.GAS_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined });
+      return await res.json();
+    } finally { if (t) clearTimeout(t); }
+  }
+
+  // ============ 表示ユーティリティ ============
+  function toast(text, err) { const t = $("toast"); t.textContent = text; t.className = "toast" + (err ? " err" : ""); t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3200); }
+  function setStatus(id, t, err) { const s = $(id); s.className = "status" + (err ? " error" : ""); s.textContent = t || ""; }
+  function rarEl(r) { const x = RAR[r]; return mk("span", "rar" + (x && x.c ? " " + x.c : ""), x ? x.s : ""); }
+  function openSheet(id) { closeSheets(); $(id).hidden = false; $("sheet-bg").hidden = false; document.body.style.overflow = "hidden"; }
+  function closeSheets() { ["pick-sheet", "login-sheet"].forEach((i) => { $(i).hidden = true; }); $("sheet-bg").hidden = true; document.body.style.overflow = ""; }
+  $("sheet-bg").addEventListener("click", closeSheets);
+  document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeSheets));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheets(); });
+  const fmtDate = (ms) => { const d = new Date(ms); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const pct = (a, b) => b ? Math.round(a / b * 1000) / 10 : 0;
+  // ひらがな→カタカナ（検索用）
+  const kata = (s) => String(s || "").normalize("NFKC").replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60)).toLowerCase();
+
+  // ============ タブ ============
+  const VIEWS = ["rec", "hist", "stat"];
+  function showView(v) {
+    VIEWS.forEach((x) => { $("view-" + x).hidden = x !== v; $("tab-" + x).setAttribute("aria-selected", x === v ? "true" : "false"); });
+    if (v === "hist") renderHist();
+    if (v === "stat") renderStats();
+  }
+  VIEWS.forEach((x) => $("tab-" + x).addEventListener("click", () => showView(x)));
+
+  // ============ ログインバー ============
+  function renderLoginBar() {
+    const who = $("login-who"), p = getProfile(); who.innerHTML = "";
+    if (p) {
+      who.append("ログイン中：", mk("b", "", p.trainer), mk("small", "", "配布ルーレットと共通。記録はあなたの記録としてまとまります"));
+      $("login-open").textContent = "変更"; $("login-open").classList.remove("main");
+    } else {
+      who.append("ログインしなくても記録できます", mk("small", "", "配布ルーレットと同じ「入力を保存」をすると、別のスマホでも記録が見られます"));
+      $("login-open").textContent = "入力を保存"; $("login-open").classList.add("main");
+    }
+  }
+  function val(id) { return String($(id).value || ""); }
+  function readPerson() {
+    return {
+      pokeId: val("l-poke").normalize("NFKC").replace(/\D/g, ""),
+      trainer: val("l-trainer").normalize("NFKC").trim(),
+      xName: val("l-xname").trim(),
+      xId: val("l-xid").normalize("NFKC").trim().replace(/^@/, "")
+    };
+  }
+  function checkPerson(p) {
+    const bad = { "l-poke": p.pokeId.length < 8 || p.pokeId.length > 20, "l-trainer": !p.trainer, "l-xname": !p.xName, "l-xid": !/^[A-Za-z0-9_]{1,15}$/.test(p.xId) };
+    Object.keys(bad).forEach((k) => $(k).setAttribute("aria-invalid", bad[k] ? "true" : "false"));
+    if (bad["l-poke"]) return "ポケポケのIDを数字で入れてください。";
+    if (bad["l-trainer"]) return "トレーナーネームを入れてください。";
+    if (bad["l-xname"]) return "Xの名前を入れてください。";
+    if (bad["l-xid"]) return "XのIDは英数字と _ で入れてください（@はいりません）。";
+    return "";
+  }
+  $("login-open").addEventListener("click", () => {
+    const p = getProfile() || { pokeId: "", trainer: "", xName: "", xId: "" };
+    $("l-poke").value = p.pokeId; $("l-trainer").value = p.trainer; $("l-xname").value = p.xName; $("l-xid").value = p.xId;
+    $("l-save").textContent = getProfile() ? "この内容に変更する" : "保存する";
+    setStatus("login-status", ""); openSheet("login-sheet");
+  });
+  $("l-save").addEventListener("click", () => {
+    const p = readPerson(), err = checkPerson(p);
+    if (err) return setStatus("login-status", err, true);
+    const before = owner().uid;
+    setProfile(p); closeSheets(); renderLoginBar(); toast("保存しました。");
+    // ログイン前にこのスマホでつけた記録も、あなたの記録としてまとめる
+    // （送信済みの記録は「送信待ち」に戻して、新しい持ち主へまとめ直してもらう）
+    if (before !== owner().uid && before.indexOf("d:") === 0) { const list = loadRecords().map((r) => r.synced && !r.deleted ? Object.assign({}, r, { synced: false, moveFrom: before }) : r); saveRecords(list); }
+    ls.set(SYNC_KEY, 0); syncMine();
+  });
+
+  // ============ 記録する ============
+  let draft = null;
+  function newDraft(pack) { return { pack: pack, cards: [null, null, null, null, null], want: [], get: -1, prev: {} }; }
+  function fillPackSelect(sel, withAll) {
+    sel.innerHTML = "";
+    if (withAll) sel.appendChild(new Option("すべてのパック", ""));
+    PACKS.forEach((p) => sel.appendChild(new Option(p.name, p.code)));
+    sel.appendChild(new Option(OTHER.name, OTHER.code));
+  }
+  fillPackSelect($("pack"), false);
+  $("pack").value = packByCode(ls.get(LAST_PACK_KEY, "")) ? ls.get(LAST_PACK_KEY, "") : (PACKS[0] ? PACKS[0].code : "X");
+  draft = newDraft($("pack").value);
+  $("pack").addEventListener("change", () => {
+    const keep = draft.cards.some(Boolean);
+    draft.pack = $("pack").value; ls.set(LAST_PACK_KEY, draft.pack);
+    if (keep) { draft.cards = [null, null, null, null, null]; draft.want = []; draft.get = -1; toast("パックを変えたので、5枚を空にしました。"); }
+    renderBoard();
+  });
+
+  function renderBoard() {
+    const b = $("board"); b.innerHTML = "";
+    draft.cards.forEach((c, i) => {
+      const pos = mk("div", "pos");
+      const btn = mk("button", "card" + (c ? " filled" : "") + (draft.get === i ? " is-get" : "") + (draft.want.indexOf(i) >= 0 ? " is-want" : ""));
+      btn.type = "button"; btn.setAttribute("aria-label", (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：カードを入れる"));
+      btn.append(mk("span", "no", String(i + 1)));
+      if (draft.get === i) btn.append(mk("span", "tag", "GET"));
+      if (draft.want.indexOf(i) >= 0) btn.append(mk("span", "wtag", "♥"));
+      if (c) { btn.append(mk("span", "nm", c.name), rarEl(c.r)); } else { btn.append(mk("span", "ph", "＋ カード")); }
+      btn.addEventListener("click", () => openPicker(i));
+      const marks = mk("div", "marks");
+      const w = mk("button", "w", "♥欲しい"); w.type = "button"; w.setAttribute("aria-pressed", draft.want.indexOf(i) >= 0 ? "true" : "false");
+      w.addEventListener("click", () => { const k = draft.want.indexOf(i); if (k >= 0) draft.want.splice(k, 1); else draft.want.push(i); draft.want.sort(); renderBoard(); });
+      const g = mk("button", "g", "GET"); g.type = "button"; g.setAttribute("aria-pressed", draft.get === i ? "true" : "false");
+      g.addEventListener("click", () => { draft.get = draft.get === i ? -1 : i; renderBoard(); });
+      marks.append(w, g); pos.append(btn, marks); b.append(pos);
+    });
+    const pv = $("prev"); pv.innerHTML = "";
+    if (!draft.want.length) pv.append(mk("p", "note", "先に、欲しかったカードに「♥ 欲しい」の印をつけてください。"));
+    draft.want.forEach((w) => {
+      const c = draft.cards[w];
+      const row = mk("div", "prevrow");
+      row.append(mk("p", "prevname", "♥ " + (c ? c.name : (w + 1) + "番目のカード") + " はシャッフル前どこ？"));
+      const btns = mk("div", "prev");
+      [0, 1, 2, 3, 4, -1].forEach((i) => {
+        const x = mk("button", "", i < 0 ? "わからない" : (i + 1) + " " + POS_LABEL[i]); x.type = "button";
+        x.setAttribute("aria-pressed", (draft.prev[w] === undefined ? -2 : draft.prev[w]) === i ? "true" : "false");
+        x.addEventListener("click", () => { draft.prev[w] = i; renderBoard(); });
+        btns.append(x);
+      });
+      row.append(btns); pv.append(row);
+    });
+    renderSummary();
+  }
+  function draftProblem() {
+    const empty = draft.cards.filter((c) => !c).length;
+    if (empty) return "あと" + empty + "か所、カードを入れてください。";
+    if (!draft.want.length) return "欲しかったカードに「♥ 欲しい」の印をつけてください。";
+    if (draft.get < 0) return "GETした場所に「GET」の印をつけてください。";
+    if (draft.want.some((w) => draft.prev[w] === undefined)) return "シャッフル前の場所を選んでください（わからなければ「わからない」）。";
+    return "";
+  }
+  function renderSummary() {
+    const s = $("rec-summary"); s.innerHTML = "";
+    const prob = draftProblem();
+    if (prob) { s.textContent = prob; $("save").disabled = true; return; }
+    const hit = draft.want.indexOf(draft.get) >= 0;
+    const wantTxt = draft.want.map((i) => draft.cards[i].name + "（" + (i + 1) + " " + POS_LABEL[i] + "）").join("、");
+    s.append("欲しかったカード：", mk("b", "", wantTxt), mk("br"), "GET：", mk("b", "", draft.cards[draft.get].name + "（" + (draft.get + 1) + " " + POS_LABEL[draft.get] + "）"), mk("br"), "結果：", mk("b", "", hit ? "当たり！" : "はずれ"));
+    $("save").disabled = false;
+  }
+  $("clear").addEventListener("click", () => { draft = newDraft($("pack").value); renderBoard(); setStatus("rec-status", ""); });
+
+  // ---- カードを選ぶ ----
+  let pickIdx = 0, pickRar = "";
+  function openPicker(i) {
+    pickIdx = i; pickRar = "";
+    const p = packByCode(draft.pack);
+    $("pick-title").textContent = (i + 1) + "番目（" + POS_LABEL[i] + "）のカード";
+    $("pick-sub").textContent = p ? p.name : "";
+    $("pick-q").value = "";
+    $("free-name").value = "";
+    const fr = $("free-rar"); fr.innerHTML = ""; RAR_ORDER.forEach((r) => fr.appendChild(new Option(RAR[r].s, r)));
+    $("pick-clear").hidden = !draft.cards[i];
+    const det = document.querySelector("#pick-sheet details"); det.open = !(p && p.cards.length);
+    renderRarChips(); renderPickList();
+    openSheet("pick-sheet");
+    setTimeout(() => { if (p && p.cards.length && window.matchMedia("(pointer:fine)").matches) $("pick-q").focus(); }, 60);
+  }
+  function renderRarChips() {
+    const p = packByCode(draft.pack), have = new Set((p ? p.cards : []).map((c) => c[2]));
+    const box = $("pick-rar"); box.innerHTML = "";
+    if (!have.size) return;
+    [""].concat(RAR_ORDER.filter((r) => have.has(r))).forEach((r) => {
+      const b = mk("button", "", r ? RAR[r].s : "すべて"); b.type = "button"; b.setAttribute("aria-pressed", pickRar === r ? "true" : "false");
+      b.addEventListener("click", () => { pickRar = r; renderRarChips(); renderPickList(); });
+      box.append(b);
+    });
+  }
+  function renderPickList() {
+    const p = packByCode(draft.pack), ul = $("pick-list"); ul.innerHTML = "";
+    const q = kata($("pick-q").value.trim());
+    const rows = (p ? p.cards : []).filter((c) => (!pickRar || c[2] === pickRar) && (!q || kata(c[1]).indexOf(q) >= 0 || String(c[0]) === q));
+    ul.hidden = !(p && p.cards.length);
+    if (!rows.length && p && p.cards.length) { const li = mk("li", "empty", "見つかりませんでした。"); ul.append(li); return; }
+    rows.forEach((c) => {
+      const li = mk("li"), b = mk("button"); b.type = "button";
+      b.append(mk("span", "num", "No." + c[0]), mk("span", "nm", c[1]), rarEl(c[2]));
+      b.addEventListener("click", () => setCard({ no: c[0], name: c[1], r: c[2] }));
+      li.append(b); ul.append(li);
+    });
+  }
+  $("pick-q").addEventListener("input", renderPickList);
+  $("free-add").addEventListener("click", () => {
+    const n = $("free-name").value.normalize("NFKC").trim();
+    if (!n) { $("free-name").focus(); return; }
+    setCard({ no: 0, name: n.slice(0, 30), r: $("free-rar").value });
+  });
+  $("pick-clear").addEventListener("click", () => { draft.cards[pickIdx] = null; draft.want = draft.want.filter((i) => i !== pickIdx); if (draft.get === pickIdx) draft.get = -1; closeSheets(); renderBoard(); });
+  function setCard(c) {
+    draft.cards[pickIdx] = c; closeSheets(); renderBoard();
+    // 次の空いている場所へ自動で進む
+    const next = draft.cards.findIndex((x) => !x);
+    if (next >= 0) setTimeout(() => openPicker(next), 120);
+  }
+
+  // ---- 保存 ----
+  $("save").addEventListener("click", () => {
+    if (draftProblem()) return;
+    const p = packByCode(draft.pack), o = owner();
+    const rec = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      at: Date.now(), pack: draft.pack, packName: p ? p.name : "",
+      cards: draft.cards.map((c) => ({ no: c.no, name: c.name, r: c.r })),
+      want: draft.want.slice(), get: draft.get, prev: draft.want.map((w) => draft.prev[w] >= 0 ? draft.prev[w] : -1),
+      hit: draft.want.indexOf(draft.get) >= 0, uid: o.uid, synced: false
+    };
+    const list = loadRecords().slice(); list.unshift(rec); saveRecords(list);
+    toast(rec.hit ? "記録しました。当たり！" : "記録しました。");
+    draft = newDraft(draft.pack); renderBoard(); setStatus("rec-status", "");
+    statsCacheDirty = true;
+    pushPending();
+  });
+
+  // ============ 送信と取り込み ============
+  let pushing = false, pushError = "";
+  async function pushPending() {
+    if (!CONFIG.GAS_URL || pushing) return;
+    const o = owner(); const pend = loadRecords().filter((r) => !r.synced || r.deleted && !r.delSynced);
+    if (!pend.length) return;
+    pushing = true;
+    try {
+      const r = await api({ action: "gc_push", uid: o.uid, key: o.key, records: pend.map(packForServer) }, 25000);
+      if (r && r.ok) {
+        const done = new Set(r.saved || []);
+        saveRecords(loadRecords().map((x) => done.has(x.id) ? Object.assign({}, x, { synced: true, delSynced: !!x.deleted }) : x).filter((x) => !(x.deleted && x.delSynced)));
+        ls.set(STATS_KEY, null); pushError = "";
+      } else if (r && r.error === "bad_key") {
+        pushError = "保存した「入力を保存」の内容が、前に記録したときとちがうため送れませんでした。前と同じトレーナーネーム・XのIDにすると送れます（記録はこのスマホに残っています）。";
+      }
+    } catch (e) { /* 通信できないときは、次に開いたときに送ります */ }
+    finally { pushing = false; renderFoot(); }
+  }
+  function packForServer(r) { return { id: r.id, at: r.at, pack: r.pack, cards: r.cards, want: r.want, get: r.get, prev: r.prev, deleted: !!r.deleted, moveFrom: r.moveFrom || "" }; }
+  // ログイン中なら、別のスマホでつけた自分の記録も取り込む（1日1回まで。記録画面を開くたびには読みに行かない）
+  async function syncMine(force) {
+    if (!CONFIG.GAS_URL || !getProfile()) return;
+    const last = ls.get(SYNC_KEY, 0);
+    if (!force && Date.now() - last < 24 * 3600 * 1000) return;
+    const o = owner();
+    try {
+      const r = await api({ action: "gc_mine", uid: o.uid, key: o.key }, 25000);
+      if (!r || !r.ok) return;
+      const have = new Map(loadRecords().map((x) => [x.id, x]));
+      (r.records || []).forEach((x) => { if (!have.has(x.id)) have.set(x.id, Object.assign({}, x, { hit: x.want.indexOf(x.get) >= 0, packName: (packByCode(x.pack) || {}).name || "", uid: o.uid, synced: true })); });
+      const list = Array.from(have.values()).sort((a, b) => b.at - a.at);
+      saveRecords(list); ls.set(SYNC_KEY, Date.now());
+      if (!$("view-hist").hidden) renderHist();
+      if (!$("view-stat").hidden && statWho === "me") renderStats();
+    } catch (e) {}
+  }
+
+  // ============ 履歴 ============
+  let histShow = 30;
+  function renderHist() {
+    const list = loadRecords().filter((r) => !r.deleted), ul = $("hist"); ul.innerHTML = "";
+    const hits = list.filter((r) => r.hit).length;
+    $("hist-sub").textContent = list.length ? list.length + "回の記録（当たり " + hits + "回）" : "";
+    if (!list.length) { ul.append(mk("li", "empty", "まだ記録がありません。「記録する」から最初の1回を入れてみてください。")); $("more-wrap").hidden = true; return; }
+    list.slice(0, histShow).forEach((r) => {
+      const li = mk("li");
+      const head = mk("div", "head");
+      const left = mk("span"); left.append(mk("b", "", r.packName || (packByCode(r.pack) || {}).name || "パック不明"), " ・ " + fmtDate(r.at));
+      head.append(left, mk("span", "pill " + (r.hit ? "hit" : "miss"), r.hit ? "当たり" : "はずれ"));
+      const mini = mk("div", "mini");
+      r.cards.forEach((c, i) => {
+        const d = mk("div", (r.get === i ? "g" : "") + (r.want.indexOf(i) >= 0 ? " w" : ""));
+        const lb = (i + 1) + (r.get === i ? " GET" : "") + (r.want.indexOf(i) >= 0 ? " ♥" : "");
+        d.append(mk("span", "lb", lb), mk("span", "nm", c ? c.name : "-"), rarEl(c ? c.r : ""));
+        mini.append(d);
+      });
+      const foot = mk("div", "foot");
+      const info = r.want.map((w, k) => { const p = (r.prev || [])[k]; return p >= 0 ? "♥" + (w + 1) + "は前 " + (p + 1) + POS_LABEL[p] : ""; }).filter(Boolean).join("・");
+      const del = mk("button", "delbtn", "消す"); del.type = "button";
+      del.addEventListener("click", () => {
+        if (!del.classList.contains("sure")) { del.classList.add("sure"); del.textContent = "本当に消す"; setTimeout(() => { del.classList.remove("sure"); del.textContent = "消す"; }, 4000); return; }
+        const L = loadRecords().map((x) => x.id === r.id ? Object.assign({}, x, { deleted: true, synced: !x.synced ? true : false, delSynced: !x.synced }) : x).filter((x) => !(x.deleted && x.delSynced));
+        saveRecords(L); statsCacheDirty = true; renderHist(); toast("記録を消しました。"); pushPending();
+      });
+      const stat = mk("span", "", (info ? info + "　" : "") + (CONFIG.GAS_URL ? (r.synced ? "" : "送信待ち") : ""));
+      foot.append(stat, del);
+      li.append(head, mini, foot); ul.append(li);
+    });
+    $("more-wrap").hidden = list.length <= histShow;
+  }
+  $("more").addEventListener("click", () => { histShow += 30; renderHist(); });
+
+  // ============ 統計 ============
+  let statWho = "me", statsCacheDirty = false;
+  fillPackSelect($("st-pack"), true);
+  $("st-me").addEventListener("click", () => { statWho = "me"; renderStats(); });
+  $("st-all").addEventListener("click", () => { statWho = "all"; renderStats(); });
+  $("st-pack").addEventListener("change", renderStats);
+
+  // 記録の一覧から統計を作る（全員の分はサーバーで同じ形に集計して返す）
+  function aggregate(list, packCode) {
+    const S = { n: 0, hit: 0, expect: 0, getN: [0, 0, 0, 0, 0], getHit: [0, 0, 0, 0, 0], wantAt: [0, 0, 0, 0, 0], wantN: 0,
+      prevTo: [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0, 0]), prevN: 0, rar: {}, packs: {} };
+    list.forEach((r) => {
+      if (r.deleted || (packCode && r.pack !== packCode)) return;
+      S.n++; const hit = r.want.indexOf(r.get) >= 0; if (hit) S.hit++;
+      S.expect += r.want.length / 5;
+      if (r.get >= 0) { S.getN[r.get]++; if (hit) S.getHit[r.get]++; }
+      r.want.forEach((w) => { S.wantAt[w]++; S.wantN++; const g = RAR_GROUP[(r.cards[w] || {}).r] || "?"; S.rar[g] = S.rar[g] || [0, 0]; S.rar[g][0]++; if (r.get === w) S.rar[g][1]++; });
+      r.want.forEach((w, k) => { const p = (r.prev || [])[k]; if (p >= 0 && p < 5) { S.prevTo[p][w]++; S.prevN++; } });
+      S.packs[r.pack] = S.packs[r.pack] || [0, 0]; S.packs[r.pack][0]++; if (hit) S.packs[r.pack][1]++;
+    });
+    return S;
+  }
+  async function loadAllStats(packCode) {
+    const cache = ls.get(STATS_KEY, null) || {};
+    const k = packCode || "_";
+    const c = cache[k];
+    if (c && Date.now() - c.at < CONFIG.STATS_CACHE_MIN * 60000) return c.data;
+    const r = await api({ action: "gc_stats", pack: packCode || "" }, 25000);
+    if (!r || !r.ok) throw new Error("bad");
+    cache[k] = { at: Date.now(), data: r.stats }; ls.set(STATS_KEY, cache);
+    return r.stats;
+  }
+  async function renderStats() {
+    $("st-me").setAttribute("aria-pressed", statWho === "me" ? "true" : "false");
+    $("st-all").setAttribute("aria-pressed", statWho === "all" ? "true" : "false");
+    $("st-warn").hidden = statWho !== "all";
+    const body = $("st-body"), packCode = $("st-pack").value; setStatus("st-status", "");
+    if (statWho === "me") { drawStats(aggregate(loadRecords(), packCode), true); return; }
+    if (!CONFIG.GAS_URL) { body.innerHTML = ""; body.append(mk("p", "empty", "全員の統計は準備中です。もうしばらくお待ちください。")); return; }
+    const cache = (ls.get(STATS_KEY, null) || {})[packCode || "_"];
+    if (cache) drawStats(cache.data, false); else { body.innerHTML = ""; body.append(mk("p", "empty", "読み込んでいます…")); }
+    try { const s = await loadAllStats(packCode); if (statWho === "all" && $("st-pack").value === packCode) drawStats(s, false); }
+    catch (e) { if (!cache) { body.innerHTML = ""; body.append(mk("p", "empty", "読み込めませんでした。時間をおいて開き直してください。")); } }
+  }
+  function heat(values, counts, unit, labelFn, cmpFn) {
+    const box = mk("div", "heat"), max = Math.max.apply(null, values.concat([0.0001]));
+    const best = values.indexOf(max);
+    values.forEach((v, i) => {
+      const d = mk("div", counts[i] && i === best && max > 0 ? "best" : "");
+      const f = mk("span", "fill"); f.style.height = (max ? v / max * 100 : 0) + "%";
+      d.append(f, mk("span", "p", (i + 1) + " " + POS_LABEL[i]), mk("span", "v", counts[i] ? v + unit : "-"), mk("span", "l", labelFn(i)));
+      const c = cmpFn ? cmpFn(i) : ""; if (c) d.append(mk("span", "cmp", c));
+      box.append(d);
+    });
+    return box;
+  }
+  let statPrev = 2; // シャッフル前の場所（はじめは右上）
+  function allStatsCached(packCode) { const c = (ls.get(STATS_KEY, null) || {})[packCode || "_"]; return c ? c.data : null; }
+  function drawStats(S, mine) {
+    const body = $("st-body"); body.innerHTML = "";
+    if (!S || !S.n) { body.append(mk("p", "empty", mine ? "まだ記録がありません。記録すると、ここに統計が出ます。" : "まだ記録が集まっていません。")); return; }
+    const k = mk("div", "kpis");
+    const kp = (v, l) => { const d = mk("div", "kpi"); d.append(mk("span", "v", v), mk("span", "l", l)); return d; };
+    k.append(kp(String(S.n), "記録した回数"), kp(pct(S.hit, S.n) + "%", "当たった割合"), kp(pct(S.expect, S.n) + "%", "運だけの目安"));
+    body.append(k, mk("p", "note", "「運だけの目安」は、欲しいカードの枚数÷5 の平均です。当たった割合がこれより高ければ、運より良い結果です。"));
+
+    // ---- いちばん大事な統計：シャッフル前の場所 → 行った場所 ----
+    const box = mk("div", "keybox");
+    box.append(mk("h3", "", "シャッフル前の場所 → シャッフル後に行った場所"));
+    box.append(mk("p", "sub", "シャッフル前に欲しいカードがあった場所を選んでください。"));
+    const ch = mk("div", "chips");
+    [0, 1, 2, 3, 4].forEach((i) => {
+      const cnt = S.prevTo[i].reduce((a, b) => a + b, 0);
+      const b = mk("button", "", (i + 1) + " " + POS_LABEL[i] + "（" + cnt + "）"); b.type = "button"; b.setAttribute("aria-pressed", statPrev === i ? "true" : "false");
+      b.addEventListener("click", () => { statPrev = i; drawStats(S, mine); });
+      ch.append(b);
+    });
+    box.append(ch);
+    const row = S.prevTo[statPrev], sum = row.reduce((a, b) => a + b, 0);
+    if (!sum) {
+      box.append(mk("p", "empty", "シャッフル前が「" + (statPrev + 1) + " " + POS_LABEL[statPrev] + "」の記録はまだありません。"));
+    } else {
+      const A = mine && CONFIG.GAS_URL ? allStatsCached($("st-pack").value) : null;
+      const arow = A && A.prevTo ? A.prevTo[statPrev] : null, asum = arow ? arow.reduce((a, b) => a + b, 0) : 0;
+      box.append(heat(row.map((v) => pct(v, sum)), row, "%", (i) => row[i] + "回", asum ? (i) => "全員 " + pct(arow[i], asum) + "%" : null));
+      const best = row.indexOf(Math.max.apply(null, row));
+      const adv = mk("p", "advice");
+      adv.append("シャッフル前が", mk("b", "", (statPrev + 1) + " " + POS_LABEL[statPrev]), "のとき、いちばん多く行った場所は ", mk("b", "", (best + 1) + " " + POS_LABEL[best] + "（" + pct(row[best], sum) + "%）"), "。" + sum + "回分の記録です。");
+      box.append(adv);
+      if (mine && asum) box.append(mk("p", "note", "下の小さい数字は、記録している全員の割合です。自分だけ大きくちがう場所があれば、アカウントごとの偏りかもしれません（回数が少ないうちは偶然の差も大きく出ます）。"));
+    }
+    body.append(box);
+    drawStats.tried = drawStats.tried || {};
+    if (mine && CONFIG.GAS_URL && !allStatsCached($("st-pack").value) && !drawStats.fetching && !drawStats.tried[$("st-pack").value]) {
+      drawStats.fetching = true; drawStats.tried[$("st-pack").value] = true;
+      loadAllStats($("st-pack").value).then(() => { if (statWho === "me" && !$("view-stat").hidden) renderStats(); }).catch(() => {}).finally(() => { drawStats.fetching = false; });
+    }
+
+    body.append(mk("h3", "", "選んだ場所ごとの当たりやすさ"));
+    const rate = S.getN.map((n, i) => n ? pct(S.getHit[i], n) : 0);
+    body.append(heat(rate, S.getN, "%", (i) => S.getN[i] + "回中 " + S.getHit[i] + "回"));
+    body.append(mk("p", "note", "枠が太い場所が、いちばん当たっている場所です。"));
+
+    body.append(mk("h3", "", "欲しいカードが行った場所"));
+    const wr = S.wantAt.map((n) => pct(n, S.wantN));
+    body.append(heat(wr, S.wantAt, "%", (i) => S.wantAt[i] + "回"));
+    body.append(mk("p", "note", "偏りがなければ、どの場所も20%前後になります。"));
+
+    if (S.prevN) {
+      body.append(mk("h3", "", "シャッフル前→後の全体の表"));
+      const wrap = mk("div", "tbl-wrap"), t = mk("table", "mx"), hr = mk("tr");
+      hr.append(mk("th", "", "前＼後"));
+      POS_LABEL.forEach((l, i) => hr.append(mk("th", "", (i + 1) + l)));
+      t.append(hr);
+      S.prevTo.forEach((row, i) => {
+        const tr = mk("tr"); tr.append(mk("th", "", (i + 1) + POS_LABEL[i]));
+        const sum = row.reduce((a, b) => a + b, 0);
+        row.forEach((v) => tr.append(mk("td", "", sum ? pct(v, sum) + "%" : "-")));
+        t.append(tr);
+      });
+      wrap.append(t); body.append(wrap, mk("p", "note", "行ごとに合計100%。シャッフル前の場所を記録した " + S.prevN + "回分です。"));
+    }
+
+    const rk = RAR_GROUPS.filter((g) => S.rar[g]);
+    if (rk.length) {
+      body.append(mk("h3", "", "欲しかったカードのレア度ごとの当たり"));
+      const ul = mk("ul", "bars");
+      rk.forEach((g) => { const a = S.rar[g], li = mk("li"), bar = mk("span", "bar"), i = mk("i"); i.style.width = pct(a[1], a[0]) + "%"; bar.append(i); li.append(mk("span", "lb", g), bar, mk("span", "n", pct(a[1], a[0]) + "%")); ul.append(li); });
+      body.append(ul);
+    }
+    if (!$("st-pack").value) {
+      const pk = Object.keys(S.packs).sort((a, b) => S.packs[b][0] - S.packs[a][0]).slice(0, 8);
+      if (pk.length > 1) {
+        body.append(mk("h3", "", "パックごとの当たり"));
+        const ul = mk("ul", "bars");
+        pk.forEach((c) => { const a = S.packs[c], li = mk("li"), bar = mk("span", "bar"), i = mk("i"); i.style.width = pct(a[1], a[0]) + "%"; bar.append(i); li.append(mk("span", "lb", (packByCode(c) || { name: c }).name), bar, mk("span", "n", a[1] + "/" + a[0])); ul.append(li); });
+        body.append(ul);
+      }
+    }
+    if (S.n < 30) body.append(mk("p", "note", "※ まだ " + S.n + "回分なので、偶然の差が大きく出ます。目安として、場所ごとに100回以上あると偏りが見えやすくなります。"));
+    if (!mine && S.updated) body.append(mk("p", "note", "全員の統計：" + fmtDate(S.updated) + " 時点（" + (S.users || 0) + "人の記録）"));
+  }
+
+  function renderFoot() {
+    const pend = loadRecords().filter((r) => !r.synced && !r.deleted).length;
+    $("foot-note").textContent = pushError ? pushError : CONFIG.GAS_URL ? (pend ?"送信待ちの記録が " + pend + "件あります（通信できたときに自動で送ります）" : "") : "記録はこのスマホの中に保存されます。";
+  }
+
+  // ============ 起動 ============
+  renderLoginBar(); renderBoard(); renderFoot();
+  pushPending(); syncMine();
+  window.addEventListener("online", pushPending);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pushPending(); });
+})();
+</script>
+</body>
+</html>
