@@ -10,8 +10,14 @@
 <meta property="og:url" content="https://card-request-box.github.io/getchallenge.html">
 <meta property="og:title" content="★ゲットチャレンジ記録">
 <meta property="og:description" content="ゲットチャレンジの結果を記録して、どこを選ぶと当たりやすいかをみんなの記録から調べられます。">
-<meta property="og:image" content="https://card-request-box.github.io/ogp.png">
+<meta property="og:image" content="https://card-request-box.github.io/ogp-getchallenge.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="★ゲットチャレンジ記録">
+<meta name="twitter:description" content="シャッフル後、どこに行きやすい？みんなの記録で統計がわかります。">
+<meta name="twitter:image" content="https://card-request-box.github.io/ogp-getchallenge.png">
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -176,6 +182,19 @@
   .who-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 10px; }
   .who-seg button { font: inherit; font-weight: 800; padding: 8px; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
   .who-seg button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--panel); }
+  .pick5 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 0 0 6px; }
+  .pick5 button { grid-column: span 2; min-width: 0; font: inherit; border-radius: 10px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); padding: 5px 2px; cursor: pointer; line-height: 1.3; }
+  .pick5 button:nth-child(4) { grid-column: 2 / span 2; }
+  .pick5 button:nth-child(5) { grid-column: 4 / span 2; }
+  .pick5 button .p { display: block; font-size: .78rem; font-weight: 800; }
+  .pick5 button .l { display: block; font-size: .66rem; color: var(--muted); font-weight: 700; }
+  .pick5 button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .pick5 button[aria-pressed="true"] .l { color: var(--panel); opacity: .8; }
+  .pick5 button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+  .flow-label { margin: 8px 0 4px; font-size: .78rem; font-weight: 800; color: var(--muted); }
+  table.mx td.top { font-weight: 800; }
+  table.mx td { color: var(--ink); }
+  .sample-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 12px; border: 2px dashed var(--gold-deep); background: var(--get-soft); color: var(--ink); font-size: .82rem; font-weight: 700; }
   .warn { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--want-soft); color: var(--ink); font-size: .82rem; border: 1px solid var(--want); }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 6px; }
   .kpi { background: var(--soft); border-radius: 12px; padding: 8px 6px; text-align: center; min-width: 0; }
@@ -798,9 +817,26 @@
   }
   let statPrev = 2, statScope = "all"; // シャッフル前の場所（はじめは右上）・数えるカード
   function allStatsCached(packCode) { const c = (ls.get(STATS_KEY, null) || {})[packCode || "_"]; return c ? c.data : null; }
-  function drawStats(S, mine) {
+  // まだ記録がないときに見せる「見本」（毎回同じ中身になるよう、決まった順で作る）
+  function sampleStats() {
+    let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const list = [];
+    for (let n = 0; n < 60; n++) {
+      const after = [0, 1, 2, 3, 4];
+      for (let i = 4; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [after[i], after[j]] = [after[j], after[i]]; }
+      const w = Math.floor(rnd() * 5), get = Math.floor(rnd() * 5);
+      list.push({ pack: "C1", cards: [{ r: "d1" }, { r: "d2" }, { r: "d4" }, { r: "d1" }, { r: "s1" }], want: [w], after, get });
+    }
+    return aggregate(list, "");
+  }
+  function drawStats(S, mine, isSample) {
     const body = $("st-body"); body.innerHTML = "";
-    if (!S || !S.n) { body.append(mk("p", "empty", mine ? "まだ記録がありません。記録すると、ここに統計が出ます。" : "まだ記録が集まっていません。")); return; }
+    if (!S || !S.n) {
+      if (!mine) { body.append(mk("p", "empty", "まだ記録が集まっていません。")); return; }
+      drawStats(sampleStats(), true, true);
+      return;
+    }
+    if (isSample) body.append(mk("p", "sample-note", "まだ記録がないので、見本（例）を表示しています。記録すると、あなたの統計に変わります。"));
     const k = mk("div", "kpis");
     const kp = (v, l) => { const d = mk("div", "kpi"); d.append(mk("span", "v", v), mk("span", "l", l)); return d; };
     k.append(kp(String(S.n), "記録した回数"), kp(pct(S.hit, S.n) + "%", "当たった割合"), kp(pct(S.expect, S.n) + "%", "運だけの目安"));
@@ -813,22 +849,24 @@
     const sc = mk("div", "chips");
     [["all", "5枚全部の動き"], ["want", "欲しいカードだけ"]].forEach(([v, l]) => {
       const b = mk("button", "", l); b.type = "button"; b.setAttribute("aria-pressed", statScope === v ? "true" : "false");
-      b.addEventListener("click", () => { statScope = v; drawStats(S, mine); }); sc.append(b);
+      b.addEventListener("click", () => { statScope = v; drawStats(S, mine, isSample); }); sc.append(b);
     });
-    box.append(sc, mk("p", "sub", "シャッフル前にあった場所を選ぶと、シャッフル後にどこへ行ったかの割合が出ます。"));
-    const ch = mk("div", "chips");
+    box.append(sc);
+    box.append(mk("p", "flow-label", "シャッフル前（タップで切りかえ）"));
+    const ch = mk("div", "pick5");
     [0, 1, 2, 3, 4].forEach((i) => {
       const cnt = M[i].reduce((a, b) => a + b, 0);
-      const b = mk("button", "", "前 " + (i + 1) + POS_LABEL[i] + "（" + cnt + "）"); b.type = "button"; b.setAttribute("aria-pressed", statPrev === i ? "true" : "false");
-      b.addEventListener("click", () => { statPrev = i; drawStats(S, mine); });
+      const b = mk("button", ""); b.type = "button"; b.setAttribute("aria-pressed", statPrev === i ? "true" : "false");
+      b.append(mk("span", "p", (i + 1) + " " + POS_LABEL[i]), mk("span", "l", cnt + "回"));
+      b.addEventListener("click", () => { statPrev = i; drawStats(S, mine, isSample); });
       ch.append(b);
     });
-    box.append(ch);
+    box.append(ch, mk("p", "flow-label", "↓ シャッフル後に行った場所"));
     const row = M[statPrev], sum = row.reduce((a, b) => a + b, 0);
     if (!sum) {
       box.append(mk("p", "empty", "シャッフル前が「" + (statPrev + 1) + " " + POS_LABEL[statPrev] + "」の記録はまだありません。"));
     } else {
-      const A = mine && CONFIG.GAS_URL ? allStatsCached($("st-pack").value) : null;
+      const A = mine && !isSample && CONFIG.GAS_URL ? allStatsCached($("st-pack").value) : null;
       const AM = A ? (statScope === "all" ? A.moveAll : A.moveWant) : null;
       const arow = AM ? AM[statPrev] : null, asum = arow ? arow.reduce((a, b) => a + b, 0) : 0;
       box.append(heat(row.map((v) => pct(v, sum)), row, "%", (i) => "後 " + row[i] + "回", asum ? (i) => "全員 " + pct(arow[i], asum) + "%" : null));
@@ -841,7 +879,7 @@
     }
     body.append(box);
     drawStats.tried = drawStats.tried || {};
-    if (mine && CONFIG.GAS_URL && !allStatsCached($("st-pack").value) && !drawStats.fetching && !drawStats.tried[$("st-pack").value]) {
+    if (!isSample && mine && CONFIG.GAS_URL && !allStatsCached($("st-pack").value) && !drawStats.fetching && !drawStats.tried[$("st-pack").value]) {
       drawStats.fetching = true; drawStats.tried[$("st-pack").value] = true;
       loadAllStats($("st-pack").value).then(() => { if (statWho === "me" && !$("view-stat").hidden) renderStats(); }).catch(() => {}).finally(() => { drawStats.fetching = false; });
     }
@@ -864,8 +902,12 @@
       t.append(hr);
       M.forEach((row, i) => {
         const tr = mk("tr"); tr.append(mk("th", "", (i + 1) + POS_LABEL[i]));
-        const sum = row.reduce((a, b) => a + b, 0);
-        row.forEach((v) => tr.append(mk("td", "", sum ? pct(v, sum) + "%" : "-")));
+        const sum = row.reduce((a, b) => a + b, 0), mx = Math.max.apply(null, row);
+        row.forEach((v) => {
+          const td = mk("td", sum && v === mx && v > 0 ? "top" : "", sum ? pct(v, sum) + "%" : "-");
+          if (sum) td.style.background = "rgba(242,193,78," + (v / sum * 1.6).toFixed(2) + ")";
+          tr.append(td);
+        });
         t.append(tr);
       });
       wrap.append(t); body.append(wrap, mk("p", "note", "行ごとに合計100%です。"));
