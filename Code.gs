@@ -8,6 +8,10 @@ const SHEET = "記録";
 const HEAD = ["id", "日時", "持ち主", "かぎ", "パック", "シャッフル前の5枚", "欲しい（前の場所）", "GET（後の場所）", "シャッフル後（後の場所ごとの前の場所）", "当たり", "消した"];
 const MAX_PUSH = 50;          // 1回に送れる記録の数
 const STATS_CACHE_SEC = 600;  // 全員の統計を覚えておく時間（秒）
+const LOOK_SHEET = "見た目";   // スクショ読み取り用の、カードの見た目（小さな色の並び）。画像そのものは保存しない
+const LOOK_HEAD = ["パック", "カード名", "レア度", "見た目", "送った人", "日時"];
+const LOOK_PER_CARD = 8;      // 1種類のカードにつき覚えておく数
+const RARITY_OK = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr", "item"];
 
 function doGet(e) {
   return json({ ok: true, app: "getchallenge" });
@@ -20,6 +24,8 @@ function doPost(e) {
     if (b.action === "gc_push") return json(push(b));
     if (b.action === "gc_mine") return json(mine(b));
     if (b.action === "gc_stats") return json({ ok: true, stats: stats(String(b.pack || "")) });
+    if (b.action === "gc_looks_add") return json(looksAdd(b));
+    if (b.action === "gc_looks") return json({ ok: true, looks: looks(String(b.pack || "")) });
     return json({ ok: false, error: "bad_action" });
   } catch (err) {
     return json({ ok: false, error: String(err && err.message || err) });
@@ -167,4 +173,56 @@ function stats(pack) {
   S.users = Object.keys(users).length;
   try { cache.put(ck, JSON.stringify(S), STATS_CACHE_SEC); } catch (e) {}
   return S;
+}
+
+// ---- カードの見た目（みんなで覚える） ----
+function lookSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(LOOK_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(LOOK_SHEET);
+    sh.getRange(1, 1, 1, LOOK_HEAD.length).setValues([LOOK_HEAD]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function looksAdd(b) {
+  const uid = cleanUid(b.uid);
+  if (!uid) return { ok: false, error: "bad_uid" };
+  const list = (Array.isArray(b.looks) ? b.looks : []).slice(0, 20).filter((x) =>
+    x && /^[A-Za-z0-9-]{1,10}$/.test(String(x.pack || "")) && typeof x.name === "string" && x.name.length > 0 && x.name.length <= 30 &&
+    RARITY_OK.indexOf(x.r) >= 0 && typeof x.t === "string" && /^[A-Za-z0-9+/=]{380,390}$/.test(x.t));
+  if (!list.length) return { ok: true, saved: 0 };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = lookSheet(), last = sh.getLastRow();
+    const rows = last > 1 ? sh.getRange(2, 1, last - 1, LOOK_HEAD.length).getValues() : [];
+    const add = [], packs = {};
+    list.forEach((x) => {
+      const same = rows.map((r, i) => ({ r, i })).filter((o) => o.r[0] === x.pack && o.r[1] === x.name && o.r[2] === x.r);
+      const mine = same.find((o) => o.r[4] === uid);
+      if (mine) { sh.getRange(mine.i + 2, 4, 1, 3).setValues([[x.t, uid, new Date()]]); }       // 同じ人は1つだけ（新しいものにする）
+      else if (same.length < LOOK_PER_CARD) { add.push([x.pack, x.name, x.r, x.t, uid, new Date()]); rows.push([x.pack, x.name, x.r, x.t, uid]); }
+      packs[x.pack] = 1;
+    });
+    if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, LOOK_HEAD.length).setValues(add);
+    CacheService.getScriptCache().removeAll(Object.keys(packs).map((p) => "looks:" + p));
+    return { ok: true, saved: list.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function looks(pack) {
+  if (!pack) return {};
+  const cache = CacheService.getScriptCache(), ck = "looks:" + pack, hit = cache.get(ck);
+  if (hit) return JSON.parse(hit);
+  const sh = lookSheet(), last = sh.getLastRow();
+  const rows = last > 1 ? sh.getRange(2, 1, last - 1, 4).getValues() : [];
+  const out = {};
+  rows.forEach((r) => { if (r[0] !== pack) return; const k = r[1] + "|" + r[2]; (out[k] = out[k] || []).push(r[3]); });
+  try { cache.put(ck, JSON.stringify(out), 600); } catch (e) {}
+  return out;
 }
