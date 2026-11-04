@@ -396,7 +396,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/4 22:25";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/5 0:08";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -1327,10 +1327,13 @@
     if (!pend.length) { pushLooks(); return; }
     pushing = true;
     try {
-      const r = await api({ action: "gc_push", uid: o.uid, key: o.key, records: pend.map(packForServer) }, 25000);
+      const batch = pend.slice(0, 50);   // サーバーは1回に50件まで
+      const r = await api({ action: "gc_push", uid: o.uid, key: o.key, records: batch.map(packForServer) }, 25000);
       if (r && r.ok) {
-        const done = new Set(r.saved || []);
-        saveRecords(loadRecords().map((x) => done.has(x.id) ? Object.assign({}, x, { synced: true, delSynced: !!x.deleted }) : x).filter((x) => !(x.deleted && x.delSynced)));
+        const done = new Set(r.saved || []), sent = new Set(batch.map((x) => x.id));
+        // 送りなおし（resync）の記録で受け付けられなかったものは、何度も送らない
+        saveRecords(loadRecords().map((x) => done.has(x.id) ? Object.assign({}, x, { synced: true, delSynced: !!x.deleted, resync: false })
+          : (x.resync && sent.has(x.id) ? Object.assign({}, x, { synced: true, resync: false }) : x)).filter((x) => !(x.deleted && x.delSynced)));
         ls.set(STATS_KEY, null); pushError = "";
       } else if (r && r.error === "bad_key") {
         pushError = "保存した「入力を保存」の内容が、前に記録したときとちがうため送れませんでした。前と同じトレーナーネーム・XのIDにすると送れます（記録はこのスマホに残っています）。";
@@ -1584,6 +1587,12 @@
   }
 
   // ============ 起動 ============
+  // 前のApps Script（今のスプレッドシートではない所）に送っていた記録を、1回だけ今のスプレッドシートに送りなおす
+  // （同じ記録はサーバーで2回入らない）
+  if (!ls.get("getChallenge:resync1", false)) {
+    saveRecords(loadRecords().map((r) => r.synced && !r.deleted && sendable(r) ? Object.assign({}, r, { synced: false, resync: true }) : r));
+    ls.set("getChallenge:resync1", true);
+  }
   renderLoginBar(); renderBoard(); renderFoot();
   pushPending(); syncMine();
   window.addEventListener("online", pushPending);
