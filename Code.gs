@@ -1,17 +1,19 @@
 /**
  * ゲットチャレンジ記録（全員の記録を集める用）
  * リクエスト箱・配布ルーレットの Apps Script とは別のものです。
- * Apps Script にこれをまるごと貼り付けてください。
- * スプレッドシートから作った Apps Script でも、直接作った Apps Script でも動きます。
- * 直接作った場合は、最初の記録が届いたときに「ゲットチャレンジ記録」というスプレッドシートが自動で作られます
- * （場所を知りたいときは、上で showSheetUrl を選んで「実行」すると、実行ログにURLが出ます）。
+ * ゲットチャレンジ用の Apps Script（無題のプロジェクト）にこれをまるごと貼り付けてください。
+ * 記録は、カードリクエスト箱のスプレッドシートの「ゲットチャレンジ記録」「ゲットチャレンジ見た目」シートに入ります
+ * （シートはなければ自動で作られます。ほかのシートには書きこみません）。
  */
 
-const SHEET = "記録";
+// 記録を入れるスプレッドシート（カードリクエスト箱と同じもの）
+const SHEET_ID = "1i5JR5t0Szowl4zxlLopsNgRT1PayENAUH1HY-4JeXac";
+
+const SHEET = "ゲットチャレンジ記録";
 const HEAD = ["id", "日時", "持ち主", "かぎ", "パック", "シャッフル前の5枚", "欲しい（前の場所）", "GET（後の場所）", "シャッフル後（後の場所ごとの前の場所）", "当たり", "消した"];
 const MAX_PUSH = 50;          // 1回に送れる記録の数
 const STATS_CACHE_SEC = 600;  // 全員の統計を覚えておく時間（秒）
-const LOOK_SHEET = "見た目";   // スクショ読み取り用の、カードの見た目（小さな色の並び）。画像そのものは保存しない
+const LOOK_SHEET = "ゲットチャレンジ見た目";   // スクショ読み取り用の、カードの見た目（小さな色の並び）。画像そのものは保存しない
 const LOOK_HEAD = ["パック", "カード名", "レア度", "見た目", "送った人", "日時"];
 const LOOK_PER_CARD = 8;      // 1種類のカードにつき覚えておく数
 const RARITY_OK = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr", "item"];
@@ -39,21 +41,14 @@ function json(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// 記録を入れるスプレッドシート（つながっているものがなければ、自動で作って覚えておく）
 function book() {
-  const a = SpreadsheetApp.getActiveSpreadsheet();
-  if (a) return a;
-  const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty("SHEET_ID");
-  if (id) { try { return SpreadsheetApp.openById(id); } catch (e) {} }
-  const ss = SpreadsheetApp.create("ゲットチャレンジ記録");
-  props.setProperty("SHEET_ID", ss.getId());
-  return ss;
+  return SpreadsheetApp.openById(SHEET_ID);
 }
 
-// スプレッドシートの場所を調べる：この関数を選んで「実行」すると、実行ログにURLが出ます
-function showSheetUrl() {
-  Logger.log(book().getUrl());
+// 最初に1回だけ：この関数を選んで「実行」すると、許可の確認が出て、シートが作られます
+function setup() {
+  sheet(); lookSheet();
+  Logger.log("できました：" + book().getUrl());
 }
 
 function sheet() {
