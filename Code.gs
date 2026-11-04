@@ -1,7 +1,10 @@
 /**
  * ゲットチャレンジ記録（全員の記録を集める用）
  * リクエスト箱・配布ルーレットの Apps Script とは別のものです。
- * 新しいスプレッドシートの「拡張機能 → Apps Script」に、これをまるごと貼り付けてください。
+ * Apps Script にこれをまるごと貼り付けてください。
+ * スプレッドシートから作った Apps Script でも、直接作った Apps Script でも動きます。
+ * 直接作った場合は、最初の記録が届いたときに「ゲットチャレンジ記録」というスプレッドシートが自動で作られます
+ * （場所を知りたいときは、上で showSheetUrl を選んで「実行」すると、実行ログにURLが出ます）。
  */
 
 const SHEET = "記録";
@@ -36,8 +39,25 @@ function json(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// 記録を入れるスプレッドシート（つながっているものがなければ、自動で作って覚えておく）
+function book() {
+  const a = SpreadsheetApp.getActiveSpreadsheet();
+  if (a) return a;
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty("SHEET_ID");
+  if (id) { try { return SpreadsheetApp.openById(id); } catch (e) {} }
+  const ss = SpreadsheetApp.create("ゲットチャレンジ記録");
+  props.setProperty("SHEET_ID", ss.getId());
+  return ss;
+}
+
+// スプレッドシートの場所を調べる：この関数を選んで「実行」すると、実行ログにURLが出ます
+function showSheetUrl() {
+  Logger.log(book().getUrl());
+}
+
 function sheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = book();
   let sh = ss.getSheetByName(SHEET);
   if (!sh) {
     sh = ss.insertSheet(SHEET);
@@ -177,7 +197,7 @@ function stats(pack) {
 
 // ---- カードの見た目（みんなで覚える） ----
 function lookSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = book();
   let sh = ss.getSheetByName(LOOK_SHEET);
   if (!sh) {
     sh = ss.insertSheet(LOOK_SHEET);
