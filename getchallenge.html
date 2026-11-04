@@ -260,7 +260,7 @@
   .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; max-width: calc(100% - 32px);
     background: var(--ink); color: var(--panel); font-weight: 800; font-size: .9rem; padding: 10px 18px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
   .toast.err { background: var(--error); color: #fff; }
-  .foot-note { color: #C9D1EA; font-size: .76rem; text-align: center; margin-top: 8px; }
+  .foot-note { color: #C9D1EA; font-size: .76rem; text-align: center; margin-top: 8px; white-space: pre-line; }
   @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
   @media (max-width: 380px) { .card { min-height: 88px; } .card .nm { font-size: .76rem; } .tabs a { font-size: .66rem; } .marks button { font-size: .64rem; } }
 </style>
@@ -396,6 +396,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
+  const APP_VERSION = "11/4 22:25";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -536,7 +537,10 @@
       acards: [null, null, null, null, null],            // 後だけ先に分かったときの、後の場所ごとのカード
       unsureB: [false, false, false, false, false], unsureA: [false, false, false, false, false],   // 「確認」の印
       thumbB: [null, null, null, null, null], thumbA: [null, null, null, null, null],               // スクショのカードの見た目
-      kindB: [0, 0, 0, 0, 0], kindA: [0, 0, 0, 0, 0] };                                              // スクショでアイテムだったか
+      kindB: [0, 0, 0, 0, 0], kindA: [0, 0, 0, 0, 0],                                               // スクショでアイテムだったか
+      okB: [false, false, false, false, false], okA: [false, false, false, false, false],            // 見た目を覚えてよいか（自信をもって読めた・自分で選んだ）
+      manB: [false, false, false, false, false],                                                     // 自分で選んだ（読み直しても変えない）
+      slotsB: null, slotsA: null, getA: -1, match: null };                                                        // 読み取った手がかり（あとからもう片方を読んだときに使う）
   }
   function fillPackSelect(sel, withAll) {
     sel.innerHTML = "";
@@ -548,7 +552,16 @@
   fillPackSelect($("pack"), false);
   $("pack").value = packByCode(ls.get(LAST_PACK_KEY, "")) ? ls.get(LAST_PACK_KEY, "") : (PACKS[0] ? PACKS[0].code : "X");
   draft = newDraft($("pack").value);
-  $("pack").addEventListener("change", () => {
+  $("pack").addEventListener("change", async () => {
+    if (draft.slotsB || draft.slotsA) {
+      const pk = $("pack").value, o = { SB: draft.slotsB, SA: draft.slotsA, getIdx: draft.getA, m: draft.match, freshB: false }, want = draft.want.slice();
+      ls.set(LAST_PACK_KEY, pk);
+      draft = newDraft(pk); draft.want = want;
+      await loadSharedLooks(pk);
+      fillFromShots(packByCode(pk), o); renderBoard();
+      toast("パックを変えたので、スクショの読み取りをこのパックでやり直しました。");
+      return;
+    }
     const keep = draft.cards.some(Boolean) || draft.acards.some(Boolean);
     draft.pack = $("pack").value; ls.set(LAST_PACK_KEY, draft.pack);
     if (keep) { draft = newDraft(draft.pack); toast("パックを変えたので、5枚を空にしました。"); setShotStatus(""); }
@@ -567,7 +580,7 @@
     // 前が4か所決まっていて、つながっていない後のカードが1枚だけなら、残りの前に入れる
     const emptyB = [0, 1, 2, 3, 4].filter((p) => !draft.cards[p]);
     const freeA = [0, 1, 2, 3, 4].filter((i) => draft.after[i] < 0 && draft.acards[i]);
-    if (emptyB.length === 1 && freeA.length === 1) { const p = emptyB[0], i = freeA[0]; draft.cards[p] = draft.acards[i]; draft.unsureB[p] = draft.unsureA[i]; draft.after[i] = p; }
+    if (emptyB.length === 1 && freeA.length === 1) { const p = emptyB[0], i = freeA[0]; draft.cards[p] = draft.acards[i]; draft.unsureB[p] = draft.unsureA[i]; draft.okB[p] = draft.okA[i]; draft.after[i] = p; }
     // 前が全部決まっていて、後が4か所決まっていれば、残りの1か所も決まる
     if (draft.cards.every(Boolean)) {
       const emptyA = [0, 1, 2, 3, 4].filter((i) => draft.after[i] < 0);
@@ -664,7 +677,7 @@
     draft.want.forEach((w) => { const d = draft.after.indexOf(w); s.append("♥ ", mk("b", "", draft.cards[w].name), "：前 " + (w + 1) + POS_LABEL[w] + " → 後 ", mk("b", "", (d + 1) + POS_LABEL[d]), mk("br")); });
     s.append("GET：", mk("b", "", draft.cards[got].name + "（後 " + (draft.get + 1) + POS_LABEL[draft.get] + "）"), mk("br"), "結果：", mk("b", "", hit ? "当たり！" : "はずれ"));
     const n = draft.unsureB.filter(Boolean).length;
-    if (n) s.append(mk("br"), mk("span", "", "「確認」の印が" + n + "か所あります。合っていればそのまま記録してOKです。"));
+    if (n) s.append(mk("br"), mk("span", "", "「確認」の印が" + n + "か所あります。合っていればそのまま記録してOKです（タップして正しいカードを選ぶと、見た目を覚えて次から当たりやすくなります）。"));
     $("save").disabled = false;
   }
   $("clear").addEventListener("click", () => { draft = newDraft($("pack").value); renderBoard(); setStatus("rec-status", ""); setShotStatus(""); });
@@ -698,7 +711,7 @@
   function pickFromAfter(k) {
     const p = pickIdx;
     const old = draft.after.indexOf(p); if (old >= 0) draft.after[old] = -1;
-    draft.cards[p] = draft.acards[k]; draft.unsureB[p] = draft.unsureA[k]; draft.after[k] = p;
+    draft.cards[p] = draft.acards[k]; draft.unsureB[p] = draft.unsureA[k]; draft.after[k] = p; draft.manB[p] = true;
     autoLink(); closeSheets(); renderBoard(); nextBefore();
   }
   function renderRarChips() {
@@ -742,15 +755,15 @@
   });
   $("pick-clear").addEventListener("click", () => {
     if (pickSide === "after") { draft.after[pickIdx] = -1; draft.acards[pickIdx] = null; draft.unsureA[pickIdx] = false; }
-    else { draft.cards[pickIdx] = null; draft.unsureB[pickIdx] = false; draft.want = draft.want.filter((i) => i !== pickIdx); draft.after = draft.after.map((v) => v === pickIdx ? -1 : v); }
+    else { draft.cards[pickIdx] = null; draft.unsureB[pickIdx] = false; draft.okB[pickIdx] = draft.manB[pickIdx] = false; draft.want = draft.want.filter((i) => i !== pickIdx); draft.after = draft.after.map((v) => v === pickIdx ? -1 : v); }
     closeSheets(); renderBoard();
   });
   function setCard(c) {
     if (pickSide === "after") {
       const i = pickIdx, link = draft.after[i];
-      if (link >= 0) { learnLook(draft.thumbB[link], c); draft.cards[link] = c; draft.unsureB[link] = false; }
+      if (link >= 0) { learnLook(draft.thumbB[link], c); draft.cards[link] = c; draft.unsureB[link] = false; draft.okB[link] = draft.manB[link] = true; }
       learnLook(draft.thumbA[i], c);
-      draft.acards[i] = c; draft.unsureA[i] = false;
+      draft.acards[i] = c; draft.unsureA[i] = false; draft.okA[i] = true;
       autoLink(); closeSheets(); renderBoard();
       const next = [0, 1, 2, 3, 4].find((k) => !afterCard(k));
       if (next !== undefined) setTimeout(() => openPicker(next, "after"), 120);
@@ -758,8 +771,8 @@
     }
     const p = pickIdx;
     learnLook(draft.thumbB[p], c);
-    draft.cards[p] = c; draft.unsureB[p] = false;
-    const k = draft.after.indexOf(p); if (k >= 0) { learnLook(draft.thumbA[k], c); draft.acards[k] = c; draft.unsureA[k] = false; }
+    draft.cards[p] = c; draft.unsureB[p] = false; draft.okB[p] = draft.manB[p] = true;
+    const k = draft.after.indexOf(p); if (k >= 0) { learnLook(draft.thumbA[k], c); draft.acards[k] = c; draft.unsureA[k] = false; draft.okA[k] = true; }
     autoLink(); closeSheets(); renderBoard(); nextBefore();
   }
   // 次の空いている前の場所へ自動で進む
@@ -788,7 +801,7 @@
     return ocrWorker;
   }
   function fileToImage(file) {
-    return new Promise((ok, ng) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => ok(im); im.onerror = () => ng(new Error("image")); im.src = u; });
+    return new Promise((ok, ng) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); ok(im); }; im.onerror = () => { URL.revokeObjectURL(u); ng(new Error("image")); }; im.src = u; });
   }
   const rgbHsv = (r, g, b) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
     if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; if (h < 0) h += 1; }
@@ -806,18 +819,29 @@
     // 少しふくらませて、すき間で分かれたかけらをつなげる
     for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) if (fg[y * sw + x]) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy >= 0 && yy < sh && xx >= 0 && xx < sw) dl[yy * sw + xx] = 1; }
     // つながったかたまりを探す
-    const seen = new Uint8Array(N), comps = [], q = new Int32Array(N);
+    const seen = new Uint8Array(N), comps = [], q = new Int32Array(N), lab = new Int32Array(N);
+    let id = 0;
     for (let s0 = 0; s0 < N; s0++) {
       if (!dl[s0] || seen[s0]) continue;
+      id++;
       let qh = 0, qt = 0, x0 = sw, x1 = 0, y0 = sh, y1 = 0, f = 0; q[qt++] = s0; seen[s0] = 1;
       while (qh < qt) {
-        const p = q[qh++], x = p % sw, y = (p - x) / sw; f += fg[p];
+        const p = q[qh++], x = p % sw, y = (p - x) / sw; f += fg[p]; lab[p] = id;
         if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
         const nb = [x + 1 < sw ? p + 1 : -1, x > 0 ? p - 1 : -1, y + 1 < sh ? p + sw : -1, y > 0 ? p - sw : -1];
         for (const n of nb) if (n >= 0 && dl[n] && !seen[n]) { seen[n] = 1; q[qt++] = n; }
       }
       const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-      if (bw >= sw * 0.09 && bw <= sw * 0.36 && bh >= sw * 0.09 && bh <= sw * 0.6) comps.push({ x0, y0, x1: x1 + 1, y1: y1 + 1, w: bw, h: bh, fill: f / (bw * bh) });
+      if (bw >= sw * 0.09 && bw <= sw * 0.36 && bh >= sw * 0.09 && bh <= sw * 0.6) {
+        // 形：まん中あたり（上の12%と下の15%を除く）で、横はばがいちばん狭い行の割合。
+        // カードは四角なのでほぼ1（白っぽいカードで中が背景色に近くても、ふちがあるので1に近い）。アイテム（砂時計）はくびれていて0.3くらい
+        let shape = 1;
+        for (let y = y0 + Math.floor(bh * 0.12); y < y0 + Math.floor(bh * 0.85); y++) {
+          let a = -1, b = -1; for (let x = x0; x <= x1; x++) if (lab[y * sw + x] === id) { if (a < 0) a = x; b = x; }
+          if (a >= 0) shape = Math.min(shape, (b - a + 1) / bw);
+        }
+        comps.push({ x0, y0, x1: x1 + 1, y1: y1 + 1, w: bw, h: bh, fill: f / (bw * bh), shape });
+      }
     }
     // 横の段ごとに分ける
     comps.sort((a, b) => (a.y0 + a.h / 2) - (b.y0 + b.h / 2));
@@ -832,12 +856,14 @@
       const u = rows.findIndex((r, i) => i > t && r.c.length === 2 && Math.abs(ctr(r.c[0]) - m1) < tol && Math.abs(ctr(r.c[1]) - m2) < tol);
       if (u < 0) continue;
       const all = top.concat(rows[u].c), rowOf = [0, 0, 0, 1, 1];
+      if (window.__gcDebugOn) window.__gcComps = all.map((c) => ({ x0: c.x0, y0: c.y0, w: c.w, h: c.h, fill: +c.fill.toFixed(3), shape: +c.shape.toFixed(3) }));
       const out = all.map((c) => {
-        const isCard = c.fill >= 0.68;
+        // 中の色ではなく形で決める（白っぽいカードの中は背景と見分けにくく、すき間が多くなるため）
+        const isCard = c.shape >= 0.6 || c.fill >= 0.8;
         if (!isCard) {
           // アイテム（砂時計など）：下をそろえて、上の「GET」マークの分は入れない
           const w = c.w * k, h = Math.min(c.h * k, w * 1.18);
-          return { x: c.x0 * k, y: c.y1 * k - h, w, h, item: true };
+          return { x: c.x0 * k, y: c.y1 * k - h, w, h, item: true, shape: c.shape };
         }
         return refineByTab(img, { x: c.x0 * k, y: c.y0 * k, w: c.w * k, h: c.w * k * 1.397 }, c.x0 * k, c.x1 * k, c.y1 * k);
       });
@@ -849,9 +875,9 @@
       const bottoms = [0, 1].map((ri) => { const b = out.filter((r, i) => rowOf[i] === ri && r.tab).map((r) => r.y + r.h); return b.length ? med(b) : null; });
       return out.map((r, i) => {
         if (r.item) return r;
-        if (r.tab) return { x: r.x, y: r.y + r.h - Hh, w: Wc, h: Hh };
+        if (r.tab) return { x: r.x, y: r.y + r.h - Hh, w: Wc, h: Hh, shape: all[i].shape };
         const cxm = r.x + r.w / 2, bt = bottoms[rowOf[i]], c = all[i];
-        return { x: cxm - Wc / 2, y: bt !== null ? bt - Hh : c.y1 * k - Hh, w: Wc, h: Hh };
+        return { x: cxm - Wc / 2, y: bt !== null ? bt - Hh : c.y1 * k - Hh, w: Wc, h: Hh, shape: c.shape };
       });
     }
     return null;
@@ -954,9 +980,10 @@
   function nameSim(ocr, base) { if (!ocr || !base) return 0; const l = lcs(ocr, base); return 0.65 * l / base.length + 0.35 * l / Math.max(ocr.length, base.length); }
   const NORMAL_R = ["d1", "d2", "d3"], FULL_R = ["d4", "s1", "s2", "sh1", "sh2", "s3", "cr"];
   // そのパックで、読み取った文字にいちばん近い名前を探す
+  const NORM = new Map(), normC = (n) => { let v = NORM.get(n); if (v === undefined) { v = normName(n); NORM.set(n, v); } return v; };
   function bestBase(pack, ocrNorm) {
     const seen = {}; let best = null, bs = 0, second = 0;
-    pack.cards.forEach((c) => { const b = normName(c[1]); if (seen[b]) return; seen[b] = 1; const sc = nameSim(ocrNorm, b); if (sc > bs) { second = bs; bs = sc; best = b; } else if (sc > second) second = sc; });
+    pack.cards.forEach((c) => { const b = normC(c[1]); if (seen[b]) return; seen[b] = 1; const sc = nameSim(ocrNorm, b); if (sc > bs) { second = bs; bs = sc; best = b; } else if (sc > second) second = sc; });
     return { base: best, score: bs, gap: bs - second };
   }
   function loadLooks() { const v = ls.get(LOOK_KEY, {}); return v && typeof v === "object" ? v : {}; }
@@ -1015,7 +1042,12 @@
   function identify(pack, s) {
     // 誰かが記録したことのあるカードと見た目がほぼ同じなら、名前が読めなくてもそのカードにする
     const nl = s.thumb ? nearestLook(s.thumb) : null;
-    if (nl && nl.d < 0.06 && (!s.item) === (nl.card.r !== "item")) return { card: nl.card, unsure: false, score: 1 };
+    if (nl && nl.d < 0.06 && (!s.item) === (nl.card.r !== "item")) {
+      // 読めた文字がはっきり別のカードを指しているときは、見た目より文字を信じる（まちがって覚えた見た目を使わないため）
+      let q0 = { base: null, score: 0 };
+      if (!s.item) (s.texts || []).forEach((t) => { const r = bestBase(pack, normName(t)); if (r.score > q0.score) q0 = r; });
+      if (!(q0.score >= 0.8 && q0.base !== normName(nl.card.name))) return { card: nl.card, unsure: false, score: 1 };
+    }
     if (s.item) {
       // 覚えている見た目があれば、それを優先する
       const looks = loadLooks(); let hit = null, hd = 1;
@@ -1034,7 +1066,7 @@
     // ラッキーチャレンジなど、ほかのパックのカードが混ざることがあるので、はっきり合う名前がほかにあればそちらを使う
     if (bb.score < 0.8) { const g = best(ALL_PACK); if (g.score >= 0.85 && g.score > bb.score + 0.1) { bb = g; src = ALL_PACK; } }
     if (!bb.base || bb.score < 0.34) return null;
-    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
+    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normC(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
     let cands = pick(src);
     const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
     // HPが読めて、HPの合うカードがあれば、それだけにする（exとexでないカードはHPがちがう）
@@ -1070,10 +1102,24 @@
     const clear = s.full < 50 || s.full > 85;
     return { card: pool[0], unsure: unsure || pool.length > 1 || !clear, score: bb.score };
   }
-  // パックが分からないとき：読み取った名前がいちばん合うパックを選ぶ
-  function guessPack(texts) {
+  // パックの中で、見た目（全面イラスト・ふつうの枠）に合うレア度のカードだけ
+  function packLook(p, look) { const k = look === FULL_R ? "_full" : "_norm"; if (!p[k]) p[k] = { cards: p.cards.filter((c) => look.indexOf(c[2]) >= 0) }; return p[k]; }
+  // 1枚の手がかりが、そのパックのカードにどれだけ合うか（全面イラストなのに、パックにはふつうの枠しかない名前なら弱くする）
+  function slotScore(p, s) {
+    if (!s || s.item) return 0;
+    const look = s.full > 85 ? FULL_R : s.full < 50 ? NORMAL_R : null; let m = 0;
+    (s.texts || []).forEach((t) => {
+      const x = normName(t); if (x.length < 2) return;
+      let v = bestBase(look ? packLook(p, look) : p, x).score;
+      if (look) { const u = bestBase(p, x).score; if (u > v + 0.3) v = u * 0.85; }
+      if (v > m) m = v;
+    });
+    return m;
+  }
+  // パックが分からないとき：読み取った名前がいちばん合うパックを選ぶ（同じくらいなら新しいパック）
+  function guessPack(ev) {
     let best = null, bs = -1, bn = 0;
-    const strong = (p) => { let sc = 0, n = 0; texts.forEach((tt) => { let m = 0; tt.forEach((t) => { const x = normName(t); if (x.length >= 2) m = Math.max(m, bestBase(p, x).score); }); if (m >= 0.75) { sc += m; n++; } }); return [sc, n]; };
+    const strong = (p) => { let sc = 0, n = 0; ev.forEach((s) => { const m = slotScore(p, s); if (m >= 0.75) { sc += m; n++; } }); return [sc, n]; };
     PACKS.forEach((p) => { const [sc, n] = strong(p); const v = sc + (p.code === draft.pack ? 0.01 : 0); if (v > bs) { bs = v; best = p; bn = n; } });
     // 1つのパックではそろわないカードが2枚以上あれば、ラッキーチャレンジなどの「いろいろなパック」
     const [, mn] = strong(MIX);
@@ -1087,35 +1133,94 @@
     for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); if ((hh > 0.88 || hh < 0.03) && ss > 0.2 && ss < 0.75 && vv > 0.7) n++; }
     return n / 480;
   }
-  async function readShot(img) {
+  async function readShot(img, onCard) {
     // ふつうの背景で見つからなければ、ピンクなど明るい色の背景（ラッキーチャレンジ）として探す
     const rects = findCards(img) || findCards(img, true);
     if (!rects) return null;
     const w = await getOcr(), slots = [];
     for (const r of rects) {
-      if (r.item) { const it = itemOf(img, r); slots.push({ item: true, itemName: it.name, itemUnsure: it.unsure, text: "", texts: [], thumb: thumbOf(img, r), full: 0, get: getScore(img, r) }); continue; }
+      if (r.item) { const it = itemOf(img, r); slots.push({ item: true, itemName: it.name, itemUnsure: it.unsure, text: "", texts: [], thumb: thumbOf(img, r), full: 0, get: getScore(img, r), shape: r.shape }); if (onCard) onCard(slots.length); continue; }
       // 少しずらして2回読み、合うほうを使う
       // 名前の行に合わせて読む（ふつう・濃いところだけ・少し下・トレーナーズの2行目）
       const cy = nameRowY(img, r);
       const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || "";
       const t2 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "", t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "";
-      slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), cy, r });
+      slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+      if (onCard) onCard(slots.length);
     }
     slots.forEach((sl) => { delete sl.r; });
-    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), th: s.thumb })) }]);
+    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, shape: s.shape })) }]);
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
     const lucky = rects.filter((r) => !r.item && luckyOf(img, r) > 0.2).length >= 3;
     return { slots, isAfter: slots[gi].get > 0.15, getIdx: slots[gi].get > 0.15 ? gi : -1, lucky };
   }
   // 前と後のカードを、見た目の近さで組み合わせる（5枚の並べ方120通りから一番近いもの）
   let lastMatchDist = 0;
+  // アイテムかどうかが食い違う組み合わせは少しだけ不利にする（読み間違いのこともあるので、それだけで別のチャレンジとはしない）
   function matchAfter(tb, ta, kb, ka) {
-    let best = null, bd = 1e9;
-    const perm = (arr, l) => { if (l === 5) { let d = 0; for (let i = 0; i < 5; i++) d += thumbDist(ta[i], tb[arr[i]]) + (kb && ka && kb[arr[i]] !== ka[i] ? 1 : 0); if (d < bd) { bd = d; best = arr.slice(); } return; }
+    let best = null, bd = 1e9, bt = 0;
+    const perm = (arr, l) => { if (l === 5) { let d = 0, t = 0; for (let i = 0; i < 5; i++) { const x = thumbDist(ta[i], tb[arr[i]]); t += x; d += x + (kb && ka && kb[arr[i]] !== ka[i] ? 0.05 : 0); } if (d < bd) { bd = d; bt = t; best = arr.slice(); } return; }
       for (let i = l; i < 5; i++) { [arr[l], arr[i]] = [arr[i], arr[l]]; perm(arr, l + 1); [arr[l], arr[i]] = [arr[i], arr[l]]; } };
     perm([0, 1, 2, 3, 4], 0);
-    lastMatchDist = bd / 5;
+    lastMatchDist = bt / 5;
     return best;
+  }
+  // 前と後で同じカードの手がかりをまとめる（文字は両方、全面イラストかどうかは大きいほう）
+  function mergeSlot(sb, sa, aIsGet) {
+    if (!sa) return sb;
+    let base = sb;
+    if (!!sb.item !== !!sa.item) {
+      // 片方だけアイテムと読んだときは、形がよりはっきりしているほう（四角いカード／くびれた砂時計）を信じる
+      const cb = Math.abs((sb.shape === undefined ? 0.6 : sb.shape) - 0.6), ca = Math.abs((sa.shape === undefined ? 0.6 : sa.shape) - 0.6);
+      base = ca > cb ? sa : sb;
+    }
+    if (base.item) return (sb.item && sa.item && sb.itemUnsure && !sa.itemUnsure) ? sa : base;
+    const tb = sb.item ? [] : (sb.texts || []), ta = sa.item || aIsGet ? [] : (sa.texts || []);
+    return Object.assign({}, base, { item: false, texts: tb.concat(ta), full: Math.max(sb.item ? 0 : sb.full || 0, sa.item ? 0 : sa.full || 0), gold: Math.max(sb.gold || 0, sa.gold || 0) });
+  }
+
+  // 読み取った手がかり（前・後の5か所）から、カードと移動を決める。パックを選び直したときも、これでやり直す
+  function fillFromShots(pack, o) {
+    const { SB, SA, getIdx, m } = o;
+    draft.slotsB = SB; draft.slotsA = SA; draft.getA = getIdx; draft.match = m;
+    if (o.freshB) { draft.want = []; draft.manB = [false, false, false, false, false]; }
+    const ev = SB ? SB.map((sb, p) => m ? mergeSlot(sb, SA[m.indexOf(p)], m.indexOf(p) === getIdx) : sb) : null, sc = [0, 0, 0, 0, 0];
+    if (ev) ev.forEach((x, p) => {
+      draft.thumbB[p] = SB[p].thumb; draft.kindB[p] = x.item ? 1 : 0;
+      if (draft.manB[p]) return;   // 自分で選んだカードはそのまま
+      const id = identify(pack, x);
+      draft.cards[p] = id ? id.card : null; draft.unsureB[p] = !!(id && id.unsure); draft.okB[p] = !!(id && !id.unsure); sc[p] = id ? id.score : 0;
+    });
+    if (SA) {
+      draft.get = getIdx; draft.after = m ? m.slice() : [-1, -1, -1, -1, -1];
+      SA.forEach((x, i) => {
+        draft.thumbA[i] = x.thumb; draft.kindA[i] = x.item ? 1 : 0;
+        if (m) { const p = m[i]; draft.acards[i] = draft.cards[p]; draft.unsureA[i] = draft.unsureB[p]; draft.okA[i] = draft.okB[p]; return; }
+        const id = identify(pack, x);
+        // GETのカードは名前が「GET」のマークで隠れるので、はっきり読めたときだけ入れる
+        const use = !!(id && (i !== getIdx || id.score >= 0.85));
+        draft.acards[i] = use ? id.card : null; draft.unsureA[i] = use && (id.unsure || i === getIdx); draft.okA[i] = use && !draft.unsureA[i];
+      });
+    }
+    // 同じ画面に同じカードが2枚あるとき（見た目がほぼ同じ）、自信のある方に合わせる
+    // （どちらも自信がないときは、名前がよく読めたほうに合わせて、2枚とも「確認」のまま）
+    const sameFix = (cards, uns, thumbs, ok, scs) => { for (let a = 0; a < 5; a++) for (let b = 0; b < 5; b++) {
+      if (a === b || !thumbs[a] || !thumbs[b] || !cards[a] || !uns[b]) continue;
+      if (uns[a] && !(scs && (scs[a] || 0) > (scs[b] || 0) + 0.05)) continue;
+      if (thumbDist(thumbs[a], thumbs[b]) < 0.06) { cards[b] = cards[a]; uns[b] = uns[a]; ok[b] = ok[a]; if (scs) scs[b] = scs[a]; }
+    } };
+    sameFix(draft.cards, draft.unsureB, draft.thumbB, draft.okB, sc);
+    if (!m) sameFix(draft.acards, draft.unsureA, draft.thumbA, draft.okA);
+    else m.forEach((p, i) => { draft.acards[i] = draft.cards[p]; draft.unsureA[i] = draft.unsureB[p]; draft.okA[i] = draft.okB[p]; });
+    autoLink();
+    // 前と後の両方を読んだのに、つながらないカードが残ったら（どちらかの読み間違い）、「確認」をつけて知らせる
+    let odd = 0;
+    if (SB && SA && !m) {
+      [0, 1, 2, 3, 4].forEach((p) => { if (draft.cards[p] && draft.after.indexOf(p) < 0) { draft.unsureB[p] = true; draft.okB[p] = false; odd++; } });
+      [0, 1, 2, 3, 4].forEach((i) => { if (draft.acards[i] && draft.after[i] < 0) { draft.unsureA[i] = true; draft.okA[i] = false; } });
+    }
+    const unsure = draft.unsureB.filter(Boolean).length + [0, 1, 2, 3, 4].filter((i) => draft.after[i] < 0 && draft.unsureA[i]).length;
+    return { odd, unsure };
   }
 
   $("shot-file").addEventListener("change", async (e) => {
@@ -1126,9 +1231,10 @@
       let shots = [], skipped = [];
       await getOcr();   // 文字を読む準備（通信できないときは、ここで止まる）
       for (let f = 0; f < files.length; f++) {
-        setShotStatus("読み取っています…（" + (f + 1) + "/" + files.length + "枚目）");
+        const head = "読み取っています…（" + (files.length > 1 ? (f + 1) + "/" + files.length + "枚目・" : "");
+        setShotStatus(head + "カードを探しています）");
         let r = null;
-        try { const img = await fileToImage(files[f]); r = await readShot(img); } catch (er) { r = null; }
+        try { const img = await fileToImage(files[f]); r = await readShot(img, (k) => setShotStatus(head + "カード " + k + "/5）")); } catch (er) { r = null; }
         if (r) shots.push(r); else skipped.push(f + 1);
       }
       if (!shots.length) { setShotStatus("カード5枚の場所が見つかりませんでした。シャッフル前かチャレンジ結果の画面を、切り取らずにそのままスクショしてください（「チャレンジ済み」で暗くなった画面は読めません）。", true); return; }
@@ -1137,74 +1243,53 @@
       if (shots.length === 2) {
         if (shots[0].isAfter) { after = shots[0]; before = shots[1]; } else { before = shots[0]; after = shots[1]; }
       } else if (shots[0].isAfter) after = shots[0]; else before = shots[0];
-      // パックを決める
-      const texts = (before ? before.slots : after.slots).map((s) => s.texts);
-      const pk = (before && before.lucky) || (after && after.lucky) ? MIX : guessPack(texts);
+      // 前に読んだもう片方（同じ記録の途中）があれば、それも使う
+      const both = !!(before && after);
+      let SB = before ? before.slots : (!both && draft.slotsB) || null;
+      let SA = after ? after.slots : (!both && draft.slotsA) || null;
+      let getIdx = after ? after.getIdx : (SA ? draft.getA : -1);
+      // 前と後は同じ5枚なので、見た目の近さで同じカードどうしを組み合わせる（120通りから一番近いもの）
+      let m = null, mismatch = false, dropped = false;
+      if (SB && SA) {
+        m = matchAfter(SB.map((x) => x.thumb), SA.map((x) => x.thumb), SB.map((x) => x.item ? 1 : 0), SA.map((x) => x.item ? 1 : 0));
+        if (window.__gcDebugOn) window.__gcMatch = { m, d: lastMatchDist };
+        if (lastMatchDist >= 0.16) {
+          m = null;
+          // 1枚だけ読んで、前に読んだもう片方と合わなければ、別のチャレンジなので古いほうは使わない
+          if (!both) { dropped = true; if (before) { SA = null; getIdx = -1; } else SB = null; } else mismatch = true;
+        }
+      }
+      // 同じカードの手がかり（前と後の両方で読めた文字など）をまとめる
+      const ev = SB ? SB.map((sb, p) => m ? mergeSlot(sb, SA[m.indexOf(p)], m.indexOf(p) === getIdx) : sb) : null;
+      // パックを決める（前と後の両方の名前で。GETのマークで隠れた名前は使わない）
+      const lucky = (before && before.lucky) || (after && after.lucky);
+      const pk = lucky ? MIX : guessPack(ev || SA.filter((x, i) => i !== getIdx));
       if (pk && pk.code !== $("pack").value) { $("pack").value = pk.code; ls.set(LAST_PACK_KEY, pk.code); toast("パックを「" + pk.name + "」にしました。違うときは①で選び直してください。"); }
       const pack = packByCode($("pack").value);
       await loadSharedLooks(pack.code);
-      // 前だけ・後だけを読んだときは、もう片方の入力は残す（パックが変わったときと、2枚同時のときは最初から）
-      if (pack.code !== draft.pack || (before && after)) draft = newDraft(pack.code);
-      let unsure = 0;
-      if (before) {
-        draft.cards = [null, null, null, null, null]; draft.unsureB = [false, false, false, false, false]; draft.want = []; draft.after = [-1, -1, -1, -1, -1];
-        before.slots.forEach((s, p) => { const id = identify(pack, s); draft.thumbB[p] = s.thumb; draft.kindB[p] = s.item ? 1 : 0; if (id) { draft.cards[p] = id.card; draft.unsureB[p] = id.unsure; if (id.unsure) unsure++; } });
-      }
-      if (after) {
-        draft.acards = [null, null, null, null, null]; draft.unsureA = [false, false, false, false, false]; draft.after = [-1, -1, -1, -1, -1];
-        draft.get = after.getIdx;
-        after.slots.forEach((s, i) => {
-          draft.thumbA[i] = s.thumb; draft.kindA[i] = s.item ? 1 : 0;
-          const id = identify(pack, s);
-          // GETのカードは名前が「GET」のマークで隠れるので、はっきり読めたときだけ入れる
-          if (id && (i !== after.getIdx || id.score >= 0.85)) { draft.acards[i] = id.card; draft.unsureA[i] = id.unsure || i === after.getIdx; }
-        });
-      }
-      // 前と後の両方の見た目があれば、見た目の近さで移動を決める（名前が隠れたGETのカードも決まる）
-      let mismatch = false;
-      if (draft.thumbB.every(Boolean) && draft.thumbA.every(Boolean)) {
-        const m = matchAfter(draft.thumbB, draft.thumbA, draft.kindB, draft.kindA);
-        if (lastMatchDist < 0.16) {
-          draft.after = m;
-          // 前で読めなかった（または自信がない）カードは、後で読めた名前を使う（「イベント」の札で名前が隠れるときなど）
-          m.forEach((p, i) => { const a = draft.acards[i]; if (a && (!draft.cards[p] || (draft.unsureB[p] && !draft.unsureA[i]))) { draft.cards[p] = a; draft.unsureB[p] = draft.unsureA[i]; } });
-          // 両方の画面で読めた文字を合わせて、もう一度決める（片方だけ読みにくいときに強い）
-          if (before && after) m.forEach((p, i) => {
-            const sb = before.slots[p], sa = after.slots[i]; if (sb.item || sa.item) return;
-            const id = identify(pack, Object.assign({}, sb, { texts: sb.texts.concat(i === after.getIdx ? [] : sa.texts), full: Math.max(sb.full, sa.full), gold: Math.max(sb.gold || 0, sa.gold || 0) }));
-            if (id && (!draft.cards[p] || draft.unsureB[p] || id.score > 0.85)) { draft.cards[p] = id.card; draft.unsureB[p] = id.unsure; }
-          });
-        }
-        else if (!(before && after)) {
-          // 前に読んだもう片方と見た目が合わない（別のチャレンジ）ので、そちらは消す
-          mismatch = true;
-          if (before) { draft.acards = [null, null, null, null, null]; draft.unsureA = [false, false, false, false, false]; draft.thumbA = [null, null, null, null, null]; draft.get = -1; }
-          else { draft.cards = [null, null, null, null, null]; draft.unsureB = [false, false, false, false, false]; draft.thumbB = [null, null, null, null, null]; draft.want = []; }
-        }
-      }
-      if (!draft.cards.every(Boolean) || !draft.thumbB.every(Boolean)) unsure += draft.unsureA.filter(Boolean).length;
-      // 同じ画面に同じカードが2枚あるとき（見た目がほぼ同じ）、自信のある方に合わせる
-      const sameFix = (cards, uns, thumbs) => { for (let a = 0; a < 5; a++) for (let b = 0; b < 5; b++) {
-        if (a === b || !thumbs[a] || !thumbs[b] || !cards[a] || !uns[b] || uns[a]) continue;
-        if (thumbDist(thumbs[a], thumbs[b]) < 0.06) { cards[b] = cards[a]; uns[b] = false; }
-      } };
-      sameFix(draft.cards, draft.unsureB, draft.thumbB); sameFix(draft.acards, draft.unsureA, draft.thumbA);
-      autoLink(); renderBoard();
+      // パックが変わったとき・2枚同時のとき・古いほうを使わないときは最初から。片方だけ読んだときは、もう片方の入力は残す
+      if (pack.code !== draft.pack || both || dropped) draft = newDraft(pack.code);
+      const { odd, unsure } = fillFromShots(pack, { SB, SA, getIdx, m, freshB: !!before });
+      renderBoard();
       const miss = draft.cards.filter((c) => !c).length;
       const parts = [];
       if (before) parts.push("シャッフル前の5枚" + (miss ? "（" + miss + "枚は読めませんでした。タップで入れてください）" : ""));
-      if (after) parts.push(before ? "シャッフル後の移動とGET" : "チャレンジ結果の5枚とGET");
-      const missA = after && !before ? [0, 1, 2, 3, 4].filter((i) => !draft.acards[i]) : [];
+      if (after) parts.push(SB ? "シャッフル後の移動とGET" : "チャレンジ結果の5枚とGET");
+      else if (SA && m) parts.push("前に読んだチャレンジ結果とつなげました");
+      const missA = SA && !SB ? [0, 1, 2, 3, 4].filter((i) => !draft.acards[i]) : [];
       let msg = "読み取りました：" + parts.join("・");
       if (skipped.length) msg += "\n" + skipped.map((n) => n + "枚目").join("・") + "は読み取れなかったので、使いませんでした。";
-      if (mismatch) msg += "\n前に読んだスクショとカードが合わなかったので、そちらは消しました。";
+      if (dropped) msg += "\n前に読んだスクショとカードが合わなかったので、そちらは消しました。";
+      if (mismatch) msg += "\nシャッフル前と後のスクショで、カードの見た目が合いませんでした。同じチャレンジのスクショか確かめてください。";
+      if (odd) msg += "\nシャッフル前と後で、読み取ったカードが合わないところがあります（「確認」の印）。タップして直してください。";
       if (unsure) msg += "\n「確認」の印は自信がないところです。違っていればタップで直してください（直すと見た目を覚えて、次から正しく入ります）。";
-      if (missA.length) msg += "\n" + missA.map((i) => "後" + (i + 1)).join("・") + "は" + (missA.indexOf(after.getIdx) >= 0 ? "（GETのマークで名前が隠れていて）" : "") + "読めませんでした。タップで入れてください。";
-      if (!before) msg += "\nシャッフル前の5か所は、タップすると結果の5枚から選べます。";
+      if (missA.length) msg += "\n" + missA.map((i) => "後" + (i + 1)).join("・") + "は" + (missA.indexOf(getIdx) >= 0 ? "（GETのマークで名前が隠れていて）" : "") + "読めませんでした。タップで入れてください。";
+      if (!SB) msg += "\nシャッフル前の5か所は、タップすると結果の5枚から選べます。";
       msg += "\n欲しかったカードに「♥欲しい」をつけてください。";
       setShotStatus(msg);
     } catch (err) {
-      setShotStatus("読み取れませんでした。通信できる場所で、もう一度お試しください。", true);
+      if (window.__gcDebugOn) window.__gcErr = String((err && err.stack) || err);
+      setShotStatus(ocrWorker ? "読み取りの途中でうまくいきませんでした。もう一度お試しください。" : "読み取れませんでした。通信できる場所で、もう一度お試しください。", true);
     }
   });
 
@@ -1220,10 +1305,14 @@
       hit: draft.want.indexOf(draft.after[draft.get]) >= 0, uid: o.uid, synced: false
     };
     const list = loadRecords().slice(); list.unshift(rec); saveRecords(list);
-    // スクショから入れたカードは、記録した内容を正しいものとして見た目を覚える
-    for (let q = 0; q < 5; q++) { learnLook(draft.thumbB[q], draft.cards[q]); learnLook(draft.thumbA[q], afterCard(q)); }
-    // 同じカードが前と後にあるので、前の見た目（なければ後）を1つだけ送る
-    for (let q = 0; q < 5; q++) { const c = draft.cards[q], k = draft.after.indexOf(q); const t = draft.thumbB[q] || (k >= 0 ? draft.thumbA[k] : null); if (c && t) queueLook(t, c); }
+    // 見た目を覚えるのは、自信をもって読めたカードと、自分で選んだカードだけ（「確認」のまま記録したカードは、まちがいかもしれないので覚えない）
+    for (let q = 0; q < 5; q++) {
+      const k = draft.after.indexOf(q), c = draft.cards[q];
+      if (!c || !(draft.okB[q] || (k >= 0 && draft.okA[k]))) continue;
+      learnLook(draft.thumbB[q], c); if (k >= 0) learnLook(draft.thumbA[k], c);
+      // 同じカードが前と後にあるので、みんなには前の見た目（なければ後）を1つだけ送る
+      const t = draft.thumbB[q] || (k >= 0 ? draft.thumbA[k] : null); if (t) queueLook(t, c);
+    }
     toast(rec.hit ? "記録しました。当たり！" : "記録しました。");
     draft = newDraft(draft.pack); renderBoard(); setStatus("rec-status", ""); setShotStatus("");
     statsCacheDirty = true;
@@ -1234,8 +1323,8 @@
   let pushing = false, pushError = "";
   async function pushPending() {
     if (!CONFIG.GAS_URL || pushing) return;
-    const o = owner(); const pend = loadRecords().filter((r) => !r.synced || r.deleted && !r.delSynced);
-    if (!pend.length) return;
+    const o = owner(); const pend = loadRecords().filter((r) => (!r.synced && sendable(r)) || r.deleted && !r.delSynced);
+    if (!pend.length) { pushLooks(); return; }
     pushing = true;
     try {
       const r = await api({ action: "gc_push", uid: o.uid, key: o.key, records: pend.map(packForServer) }, 25000);
@@ -1249,6 +1338,8 @@
     } catch (e) { /* 通信できないときは、次に開いたときに送ります */ }
     finally { pushing = false; renderFoot(); pushLooks(); }
   }
+  // サーバーが受け付ける形か（前の版でつけた、移動のない記録などは送らない）
+  function sendable(r) { return !!r && Array.isArray(r.after) && r.after.length === 5 && [0, 1, 2, 3, 4].every((x) => r.after.indexOf(x) >= 0) && Array.isArray(r.want) && r.want.length > 0 && Number.isInteger(r.get) && r.get >= 0 && r.get < 5; }
   function packForServer(r) { return { id: r.id, at: r.at, pack: r.pack, cards: r.cards, want: r.want, get: r.get, after: r.after, deleted: !!r.deleted, moveFrom: r.moveFrom || "" }; }
   // ログイン中なら、別のスマホでつけた自分の記録も取り込む（1日1回まで。記録画面を開くたびには読みに行かない）
   async function syncMine(force) {
@@ -1487,8 +1578,9 @@
   }
 
   function renderFoot() {
-    const pend = loadRecords().filter((r) => !r.synced && !r.deleted).length;
-    $("foot-note").textContent = pushError ? pushError : CONFIG.GAS_URL ? (pend ?"送信待ちの記録が " + pend + "件あります（通信できたときに自動で送ります）" : "") : "記録はこのスマホの中に保存されます。";
+    const pend = loadRecords().filter((r) => !r.synced && !r.deleted && sendable(r)).length;
+    const t = pushError ? pushError : CONFIG.GAS_URL ? (pend ? "送信待ちの記録が " + pend + "件あります（通信できたときに自動で送ります）" : "") : "記録はこのスマホの中に保存されます。";
+    $("foot-note").textContent = (t ? t + "\n" : "") + "ページの版：" + APP_VERSION;
   }
 
   // ============ 起動 ============

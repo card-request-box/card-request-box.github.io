@@ -68,6 +68,16 @@ function hash(s) {
   return Utilities.base64EncodeWebSafe(raw).slice(0, 22);
 }
 
+// シートに書く文字が「=」「+」「-」「@」で始まると、式として読まれてしまうので、先頭に「'」をつけて文字のまま入れる
+function txt(v) {
+  v = String(v);
+  return /^[=+\-@']/.test(v) ? "'" + v : v;
+}
+// シートから読んだ文字（先頭の「'」はつけた印なので外す）
+function untxt(v) {
+  return String(v).replace(/^'/, "");
+}
+
 function cleanUid(u) {
   u = String(u || "");
   return /^(p:\d{8,20}|d:[\w-]{8,64})$/.test(u) ? u : "";
@@ -75,6 +85,7 @@ function cleanUid(u) {
 
 function validRecord(r) {
   if (!r || typeof r.id !== "string" || !/^[a-z0-9]{6,20}$/.test(r.id)) return false;
+  if (!/^[A-Za-z0-9-]{1,10}$/.test(String(r.pack || ""))) return false;
   if (!Array.isArray(r.cards) || r.cards.length !== 5) return false;
   if (!Array.isArray(r.want) || !r.want.length || r.want.length > 5) return false;
   if (!r.want.every((w) => Number.isInteger(w) && w >= 0 && w < 5)) return false;
@@ -100,7 +111,7 @@ function push(b) {
     rows.forEach((r, i) => { byId[r[0]] = i; });
     // 同じ持ち主がほかのかぎで送ってきたら受け付けない（なりすまし防止）
     const owned = rows.find((r) => r[2] === uid);
-    if (owned && owned[3] !== key) return { ok: false, error: "bad_key" };
+    if (owned && untxt(owned[3]) !== key) return { ok: false, error: "bad_key" };
     const saved = [], add = [];
     let moved = false;
     recs.forEach((r) => {
@@ -110,8 +121,8 @@ function push(b) {
         if (rows[i][2] !== uid) {
           // ログイン前にこのスマホでつけた記録を、ログインした持ち主にまとめる（そのスマホのかぎが合うときだけ）
           const from = cleanUid(r.moveFrom);
-          if (!from || rows[i][2] !== from || from.indexOf("d:") !== 0 || rows[i][3] !== hash(from.slice(2))) return;
-          sh.getRange(i + 2, 3, 1, 2).setValues([[uid, key]]); rows[i][2] = uid; rows[i][3] = key; moved = true;
+          if (!from || rows[i][2] !== from || from.indexOf("d:") !== 0 || untxt(rows[i][3]) !== hash(from.slice(2))) return;
+          sh.getRange(i + 2, 3, 1, 2).setValues([[uid, txt(key)]]); rows[i][2] = uid; rows[i][3] = key; moved = true;
         }
         if (r.deleted && !rows[i][10]) sh.getRange(i + 2, 11).setValue(true);
         saved.push(r.id);
@@ -120,7 +131,7 @@ function push(b) {
       if (r.deleted) { saved.push(r.id); return; }
       const cards = r.cards.map((c) => c ? [Number(c.no) || 0, String(c.name || "").slice(0, 30), String(c.r || "").slice(0, 4)] : null);
       const hit = r.want.indexOf(r.after[r.get]) >= 0;
-      add.push([r.id, new Date(Number(r.at) || Date.now()), uid, key, String(r.pack || "").slice(0, 10), JSON.stringify(cards), JSON.stringify(r.want), r.get, JSON.stringify(r.after), hit, false]);
+      add.push([r.id, new Date(Number(r.at) || Date.now()), uid, txt(key), String(r.pack), JSON.stringify(cards), JSON.stringify(r.want), r.get, JSON.stringify(r.after), hit, false]);
       saved.push(r.id);
     });
     if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, HEAD.length).setValues(add);
@@ -137,7 +148,7 @@ function mine(b) {
   const key = hash(b.key);
   const sh = sheet(), last = sh.getLastRow();
   const rows = last > 1 ? sh.getRange(2, 1, last - 1, HEAD.length).getValues() : [];
-  const list = rows.filter((r) => r[2] === uid && r[3] === key && !r[10]).map(toRecord);
+  const list = rows.filter((r) => r[2] === uid && untxt(r[3]) === key && !r[10]).map(toRecord);
   return { ok: true, records: list };
 }
 
@@ -216,10 +227,10 @@ function looksAdd(b) {
     const rows = last > 1 ? sh.getRange(2, 1, last - 1, LOOK_HEAD.length).getValues() : [];
     const add = [], packs = {};
     list.forEach((x) => {
-      const same = rows.map((r, i) => ({ r, i })).filter((o) => o.r[0] === x.pack && o.r[1] === x.name && o.r[2] === x.r);
+      const same = rows.map((r, i) => ({ r, i })).filter((o) => o.r[0] === x.pack && untxt(o.r[1]) === x.name && o.r[2] === x.r);
       const mine = same.find((o) => o.r[4] === uid);
-      if (mine) { sh.getRange(mine.i + 2, 4, 1, 3).setValues([[x.t, uid, new Date()]]); }       // 同じ人は1つだけ（新しいものにする）
-      else if (same.length < LOOK_PER_CARD) { add.push([x.pack, x.name, x.r, x.t, uid, new Date()]); rows.push([x.pack, x.name, x.r, x.t, uid]); }
+      if (mine) { sh.getRange(mine.i + 2, 4, 1, 3).setValues([[txt(x.t), uid, new Date()]]); }       // 同じ人は1つだけ（新しいものにする）
+      else if (same.length < LOOK_PER_CARD) { add.push([x.pack, txt(x.name), x.r, txt(x.t), uid, new Date()]); rows.push([x.pack, x.name, x.r, x.t, uid]); }
       packs[x.pack] = 1;
     });
     if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, LOOK_HEAD.length).setValues(add);
@@ -237,7 +248,7 @@ function looks(pack) {
   const sh = lookSheet(), last = sh.getLastRow();
   const rows = last > 1 ? sh.getRange(2, 1, last - 1, 4).getValues() : [];
   const out = {};
-  rows.forEach((r) => { if (r[0] !== pack) return; const k = r[1] + "|" + r[2]; (out[k] = out[k] || []).push(r[3]); });
+  rows.forEach((r) => { if (r[0] !== pack) return; const k = untxt(r[1]) + "|" + r[2]; (out[k] = out[k] || []).push(untxt(r[3])); });
   try { cache.put(ck, JSON.stringify(out), 600); } catch (e) {}
   return out;
 }
