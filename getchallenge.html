@@ -396,7 +396,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/5 0:08";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/5 1:45";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -1296,6 +1296,10 @@
   // ---- 保存 ----
   $("save").addEventListener("click", () => {
     if (draftProblem()) return;
+    // 同じチャレンジ（同じ5枚・同じ移動）を2回記録すると統計がずれるので、記録しない
+    const sig = (pk, cards, after) => pk + "|" + cards.map((c) => c ? c.name + c.r : "").join(",") + "|" + after.join(",");
+    const me = sig(draft.pack, draft.cards, draft.after);
+    if (loadRecords().some((r) => !r.deleted && Array.isArray(r.after) && sig(r.pack, r.cards, r.after) === me)) { toast("このチャレンジはもう記録しています（履歴にあります）。", true); return; }
     const p = packByCode(draft.pack), o = owner();
     const rec = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
