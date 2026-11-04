@@ -830,7 +830,7 @@
       const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
       const cards = out.filter((r) => !r.item);
       if (!cards.length) return out;
-      const tabbed = cards.filter((r) => r.tab), Wc = tabbed.length ? med(tabbed.map((r) => r.w)) : med(cards.map((r) => r.w)), Hh = Wc * 1.397;
+      const tabbed = cards.filter((r) => r.tab), Wc = tabbed.length ? med(tabbed.map((r) => r.w)) : med(cards.map((r) => r.w)), Hh = Wc * 1.393;
       const bottoms = [0, 1].map((ri) => { const b = out.filter((r, i) => rowOf[i] === ri && r.tab).map((r) => r.y + r.h); return b.length ? med(b) : null; });
       return out.map((r, i) => {
         if (r.item) return r;
@@ -855,9 +855,10 @@
     }
     if (xs.length < c.width * c.height * 0.04) return r;
     xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
-    const left = X + xs[Math.floor(xs.length * 0.03)], bottom = Y + ys[Math.floor(ys.length * 0.97)];
+    const left = X + xs[Math.floor(xs.length * 0.03)], bottom = Y + ys[Math.floor(ys.length * 0.97)], tabW = xs[Math.floor(xs.length * 0.97)] - xs[Math.floor(xs.length * 0.03)];
     const off = Math.min(Math.max(0, sx0 - left), sw0 * 0.08), w = sx1 + off - left, h = w * 1.397;
-    return { x: left, y: bottom - h, w, h, tab: true };
+    // タブの幅はカードの幅の約49%
+    return { x: left, y: bottom - h, w, h, tab: true, tw: tabW / 0.492 };
   }
   function cropCanvas(img, x, y, w, h, ow, oh) {
     const c = document.createElement("canvas"); c.width = ow; c.height = oh;
@@ -903,6 +904,12 @@
     for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - med[0]) < 28 && Math.abs(d[i + 1] - med[1]) < 28 && Math.abs(d[i + 2] - med[2]) < 28) near++;
     return Math.round((1 - near / (d.length / 4)) * 100);
   }
+  // カード全体のうち、金色（王冠のカード）の割合
+  function goldOf(img, r) {
+    const c = cropCanvas(img, r.x, r.y + r.h * 0.12, r.w, r.h * 0.75, 24, 30), d = c.getContext("2d").getImageData(0, 0, 24, 30).data; let g = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); n++; if (hh >= 0.09 && hh < 0.17 && ss > 0.25 && ss < 0.8 && vv > 0.45) g++; }
+    return g / n;
+  }
   // アイテムの色（オレンジ＝チャレンジ砂時計、青紫＝パック砂時計）
   function itemOf(img, r) {
     const c = cropCanvas(img, r.x, r.y, r.w, r.h, 30, 34), d = c.getContext("2d").getImageData(0, 0, 30, 34).data; let o = 0, pu = 0;
@@ -937,6 +944,49 @@
     return { base: best, score: bs, gap: bs - second };
   }
   function loadLooks() { const v = ls.get(LOOK_KEY, {}); return v && typeof v === "object" ? v : {}; }
+  // ---- みんなの見た目（記録した人のカードの見た目を集めたもの。小さな色の並びだけ） ----
+  const SHARED_KEY = "getChallenge:sharedLooks", LOOKQ_KEY = "getChallenge:lookQueue";
+  const thumbToStr = (t) => { let b = ""; for (let i = 0; i < t.length; i++) b += String.fromCharCode(t[i]); return btoa(b); };
+  const strToThumb = (s) => { try { const b = atob(s), out = []; for (let i = 0; i < b.length; i++) out.push(b.charCodeAt(i)); return out.length === 288 ? out : null; } catch (e) { return null; } };
+  let sharedMem = {};
+  function sharedLooks(pack) { if (sharedMem[pack]) return sharedMem[pack]; const c = (ls.get(SHARED_KEY, {}) || {})[pack]; return c ? (sharedMem[pack] = c.looks) : {}; }
+  async function loadSharedLooks(pack) {
+    if (!CONFIG.GAS_URL || !pack) return;
+    const all = ls.get(SHARED_KEY, {}) || {}, c = all[pack];
+    if (c && Date.now() - c.at < 6 * 3600 * 1000) { sharedMem[pack] = c.looks; return; }
+    try {
+      const r = await api({ action: "gc_looks", pack }, 8000);
+      if (r && r.ok && r.looks) {
+        const looks = {}; Object.keys(r.looks).forEach((k) => { looks[k] = (r.looks[k] || []).map(strToThumb).filter(Boolean); });
+        sharedMem[pack] = looks; all[pack] = { at: Date.now(), looks };
+        const ks = Object.keys(all); if (ks.length > 8) delete all[ks[0]];
+        ls.set(SHARED_KEY, all);
+      }
+    } catch (e) {}
+  }
+  // 候補のカードの見た目（自分が覚えたもの＋みんなのもの）
+  function looksFor(c) { const k = draft.pack + "|" + c.name + "|" + c.r; return (loadLooks()[k] || []).concat(sharedLooks(draft.pack)[c.name + "|" + c.r] || []); }
+  // このパックで覚えている見た目（自分＋みんな）から、いちばん近いカードを探す
+  function nearestLook(thumb) {
+    let best = null, bd = 1;
+    const mine = loadLooks(), pre = draft.pack + "|";
+    Object.keys(mine).forEach((k) => { if (k.indexOf(pre) !== 0) return; mine[k].forEach((t) => { const d = thumbDist(t, thumb); if (d < bd) { bd = d; best = k.slice(pre.length); } }); });
+    const sh = sharedLooks(draft.pack);
+    Object.keys(sh).forEach((k) => sh[k].forEach((t) => { const d = thumbDist(t, thumb); if (d < bd) { bd = d; best = k; } }));
+    if (!best) return null;
+    const i = best.lastIndexOf("|"), name = best.slice(0, i), r = best.slice(i + 1);
+    const c = (packByCode(draft.pack) || { cards: [] }).cards.find((x) => x[1] === name && x[2] === r);
+    return { card: { no: c ? c[0] : 0, name, r }, d: bd };
+  }
+  function queueLook(thumb, c) {
+    if (!thumb || !c || !draft || !CONFIG.GAS_URL) return;
+    const q = ls.get(LOOKQ_KEY, []) || []; q.push({ pack: draft.pack, name: c.name, r: c.r, t: thumbToStr(thumb) }); ls.set(LOOKQ_KEY, q.slice(-60));
+  }
+  async function pushLooks() {
+    const q = ls.get(LOOKQ_KEY, []) || []; if (!q.length || !CONFIG.GAS_URL) return;
+    const o = owner(), batch = q.slice(0, 20);
+    try { const r = await api({ action: "gc_looks_add", uid: o.uid, key: o.key, looks: batch }, 20000); if (r && r.ok) ls.set(LOOKQ_KEY, (ls.get(LOOKQ_KEY, []) || []).slice(batch.length)); } catch (e) {}
+  }
   function learnLook(thumb, c) {
     if (!thumb || !c || !draft) return;
     const looks = loadLooks(), key = draft.pack + "|" + c.name + "|" + c.r;
@@ -947,6 +997,9 @@
   // 読み取った1枚を、パックのカード（名前・レア度）に決める
   const ALL_PACK = { code: "*", cards: [].concat.apply([], PACKS.map((p) => p.cards)) };
   function identify(pack, s) {
+    // 誰かが記録したことのあるカードと見た目がほぼ同じなら、名前が読めなくてもそのカードにする
+    const nl = s.thumb ? nearestLook(s.thumb) : null;
+    if (nl && nl.d < 0.06 && (!s.item) === (nl.card.r !== "item")) return { card: nl.card, unsure: false, score: 1 };
     if (s.item) {
       // 覚えている見た目があれば、それを優先する
       const looks = loadLooks(); let hit = null, hd = 1;
@@ -965,20 +1018,34 @@
     // ラッキーチャレンジなど、ほかのパックのカードが混ざることがあるので、はっきり合う名前がほかにあればそちらを使う
     if (bb.score < 0.8) { const g = best(ALL_PACK); if (g.score >= 0.85 && g.score > bb.score + 0.1) { bb = g; src = ALL_PACK; } }
     if (!bb.base || bb.score < 0.34) return null;
-    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2] })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
+    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
     let cands = pick(src);
     const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
-    const wantEx = exText || s.full > 70;
-    if (!cands.some((c) => /ex$/.test(c.name) === wantEx)) { const g = pick(ALL_PACK).filter((c) => /ex$/.test(c.name) === wantEx); if (g.length) cands = g; }
-    if (cands.some((c) => /ex$/.test(c.name)) && cands.some((c) => !/ex$/.test(c.name))) {
+    // HPが読めて、HPの合うカードがあれば、それだけにする（exとexでないカードはHPがちがう）
+    let hpOk = false;
+    if (s.hp) {
+      let f = cands.filter((c) => c.hp === s.hp);
+      if (!f.length && exText) f = pick(ALL_PACK).filter((c) => c.hp === s.hp && /ex$/.test(c.name));
+      if (f.length) { cands = f; hpOk = true; }
+    }
+    if (!hpOk && exText && !cands.some((c) => /ex$/.test(c.name))) { const g = pick(ALL_PACK).filter((c) => /ex$/.test(c.name)); if (g.length) cands = g; }
+    // ふつうの枠のカードはexではない（exのカードはどれも全面イラスト）。パックにexしかなければ、ほかのパックのexでないカードを探す
+    if (!hpOk && !exText && s.full < 50 && cands.length && cands.every((c) => /ex$/.test(c.name))) { const g = pick(ALL_PACK).filter((c) => !/ex$/.test(c.name)); if (g.length) cands = g; }
+    if (!hpOk && cands.some((c) => /ex$/.test(c.name)) && cands.some((c) => !/ex$/.test(c.name))) {
+      const wantEx = exText || s.full > 70;
       const f = cands.filter((c) => /ex$/.test(c.name) === wantEx); if (f.length) cands = f;
     }
+    cands = cands.map((c) => ({ no: c.no, name: c.name, r: c.r }));
     let unsure = bb.score < 0.6 || bb.gap < 0.12;
     if (cands.length === 1) return { card: cands[0], unsure, score: bb.score };
-    // 覚えている見た目があれば、それに近いものを選ぶ
-    const looks = loadLooks(); let hit = null, hd = 1;
-    cands.forEach((c) => (looks[draft.pack + "|" + c.name + "|" + c.r] || []).forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = c; } }));
+    // 覚えている見た目（自分＋みんな）があれば、それに近いものを選ぶ
+    let hit = null, hd = 1; const known = [];
+    cands.forEach((c) => { const ls2 = looksFor(c); if (ls2.length) known.push(c); ls2.forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = c; } }); });
     if (hit && hd < 0.09) return { card: hit, unsure, score: bb.score };
+    // 見た目を覚えているレア度のどれとも合わないなら、まだ覚えていないレア度のどれか
+    if (known.length && hd > 0.13) { const rest = cands.filter((c) => known.indexOf(c) < 0); if (rest.length) cands = rest; if (cands.length === 1) return { card: cands[0], unsure: true, score: bb.score }; }
+    // 全体が金色なら王冠
+    if (s.gold > 0.55 && cands.some((c) => c.r === "cr")) return { card: cands.find((c) => c.r === "cr"), unsure: true, score: bb.score };
     // 見た目（ふつうの枠か、全面イラストか）で、ありそうなレア度を選ぶ
     const group = s.full > 70 ? FULL_R : NORMAL_R;
     let pool = cands.filter((c) => group.indexOf(c.r) >= 0); if (!pool.length) pool = cands;
@@ -1005,8 +1072,10 @@
       const cy = nameRowY(img, r);
       const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || "";
       const t2 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "", t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "";
-      slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), get: getScore(img, r) });
+      slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), cy, r });
     }
+    slots.forEach((sl) => { delete sl.r; });
+    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), hp: s.hp })) }]);
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
     return { slots, isAfter: slots[gi].get > 0.15, getIdx: slots[gi].get > 0.15 ? gi : -1 };
   }
@@ -1026,16 +1095,18 @@
     if (!files.length) return;
     setShotStatus("読み取っています…（はじめての時は、文字を読むデータの読み込みに少しかかります）");
     try {
-      const shots = [];
+      let shots = [], skipped = [];
+      await getOcr();   // 文字を読む準備（通信できないときは、ここで止まる）
       for (let f = 0; f < files.length; f++) {
         setShotStatus("読み取っています…（" + (f + 1) + "/" + files.length + "枚目）");
-        const img = await fileToImage(files[f]); const r = await readShot(img);
-        if (!r) { setShotStatus((files.length > 1 ? (f + 1) + "枚目：" : "") + "カード5枚の場所が見つかりませんでした。シャッフル前かチャレンジ結果の画面を、切り取らずにそのままスクショしてください。", true); return; }
-        shots.push(r);
+        let r = null;
+        try { const img = await fileToImage(files[f]); r = await readShot(img); } catch (er) { r = null; }
+        if (r) shots.push(r); else skipped.push(f + 1);
       }
+      if (!shots.length) { setShotStatus("カード5枚の場所が見つかりませんでした。シャッフル前かチャレンジ結果の画面を、切り取らずにそのままスクショしてください（「チャレンジ済み」で暗くなった画面は読めません）。", true); return; }
       let before = null, after = null;
+      if (shots.length === 2 && shots[0].isAfter && shots[1].isAfter) { skipped.push(2); shots = [shots[0]]; }
       if (shots.length === 2) {
-        if (shots[0].isAfter && shots[1].isAfter) { setShotStatus("2枚ともチャレンジ結果の画面でした。シャッフル前の画面とチャレンジ結果の画面を1枚ずつ選んでください。", true); return; }
         if (shots[0].isAfter) { after = shots[0]; before = shots[1]; } else { before = shots[0]; after = shots[1]; }
       } else if (shots[0].isAfter) after = shots[0]; else before = shots[0];
       // パックを決める
@@ -1043,6 +1114,7 @@
       const pk = guessPack(texts);
       if (pk && pk.code !== $("pack").value) { $("pack").value = pk.code; ls.set(LAST_PACK_KEY, pk.code); toast("パックを「" + pk.name + "」にしました。違うときは①で選び直してください。"); }
       const pack = packByCode($("pack").value);
+      await loadSharedLooks(pack.code);
       // 前だけ・後だけを読んだときは、もう片方の入力は残す（パックが変わったときと、2枚同時のときは最初から）
       if (pack.code !== draft.pack || (before && after)) draft = newDraft(pack.code);
       let unsure = 0;
@@ -1068,6 +1140,12 @@
           draft.after = m;
           // 前で読めなかった（または自信がない）カードは、後で読めた名前を使う（「イベント」の札で名前が隠れるときなど）
           m.forEach((p, i) => { const a = draft.acards[i]; if (a && (!draft.cards[p] || (draft.unsureB[p] && !draft.unsureA[i]))) { draft.cards[p] = a; draft.unsureB[p] = draft.unsureA[i]; } });
+          // 両方の画面で読めた文字を合わせて、もう一度決める（片方だけ読みにくいときに強い）
+          if (before && after) m.forEach((p, i) => {
+            const sb = before.slots[p], sa = after.slots[i]; if (sb.item || sa.item) return;
+            const id = identify(pack, Object.assign({}, sb, { texts: sb.texts.concat(i === after.getIdx ? [] : sa.texts), full: Math.max(sb.full, sa.full), gold: Math.max(sb.gold || 0, sa.gold || 0) }));
+            if (id && (!draft.cards[p] || draft.unsureB[p] || id.score > 0.85)) { draft.cards[p] = id.card; draft.unsureB[p] = id.unsure; }
+          });
         }
         else if (!(before && after)) {
           // 前に読んだもう片方と見た目が合わない（別のチャレンジ）ので、そちらは消す
@@ -1084,6 +1162,7 @@
       if (after) parts.push(before ? "シャッフル後の移動とGET" : "チャレンジ結果の5枚とGET");
       const missA = after && !before ? [0, 1, 2, 3, 4].filter((i) => !draft.acards[i]) : [];
       let msg = "読み取りました：" + parts.join("・");
+      if (skipped.length) msg += "\n" + skipped.map((n) => n + "枚目").join("・") + "は読み取れなかったので、使いませんでした。";
       if (mismatch) msg += "\n前に読んだスクショとカードが合わなかったので、そちらは消しました。";
       if (unsure) msg += "\n「確認」の印は自信がないところです。違っていればタップで直してください（直すと見た目を覚えて、次から正しく入ります）。";
       if (missA.length) msg += "\n" + missA.map((i) => "後" + (i + 1)).join("・") + "は" + (missA.indexOf(after.getIdx) >= 0 ? "（GETのマークで名前が隠れていて）" : "") + "読めませんでした。タップで入れてください。";
@@ -1109,6 +1188,8 @@
     const list = loadRecords().slice(); list.unshift(rec); saveRecords(list);
     // スクショから入れたカードは、記録した内容を正しいものとして見た目を覚える
     for (let q = 0; q < 5; q++) { learnLook(draft.thumbB[q], draft.cards[q]); learnLook(draft.thumbA[q], afterCard(q)); }
+    // 同じカードが前と後にあるので、前の見た目（なければ後）を1つだけ送る
+    for (let q = 0; q < 5; q++) { const c = draft.cards[q], k = draft.after.indexOf(q); const t = draft.thumbB[q] || (k >= 0 ? draft.thumbA[k] : null); if (c && t) queueLook(t, c); }
     toast(rec.hit ? "記録しました。当たり！" : "記録しました。");
     draft = newDraft(draft.pack); renderBoard(); setStatus("rec-status", ""); setShotStatus("");
     statsCacheDirty = true;
@@ -1132,7 +1213,7 @@
         pushError = "保存した「入力を保存」の内容が、前に記録したときとちがうため送れませんでした。前と同じトレーナーネーム・XのIDにすると送れます（記録はこのスマホに残っています）。";
       }
     } catch (e) { /* 通信できないときは、次に開いたときに送ります */ }
-    finally { pushing = false; renderFoot(); }
+    finally { pushing = false; renderFoot(); pushLooks(); }
   }
   function packForServer(r) { return { id: r.id, at: r.at, pack: r.pack, cards: r.cards, want: r.want, get: r.get, after: r.after, deleted: !!r.deleted, moveFrom: r.moveFrom || "" }; }
   // ログイン中なら、別のスマホでつけた自分の記録も取り込む（1日1回まで。記録画面を開くたびには読みに行かない）
