@@ -194,6 +194,17 @@
   .flow-label { margin: 8px 0 4px; font-size: .78rem; font-weight: 800; color: var(--muted); }
   table.mx td.top { font-weight: 800; }
   table.mx td { color: var(--ink); }
+  .vh { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .shotbox { margin: 12px 0 4px; padding: 12px; border-radius: 14px; border: 2px dashed var(--line); background: var(--soft); }
+  .shot-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; }
+  .shot-head b { font-size: .95rem; }
+  .shot-head span { font-size: .78rem; color: var(--muted); font-weight: 700; }
+  .shotbtn { display: block; text-align: center; font-weight: 800; font-size: .95rem; padding: 11px; border-radius: 12px; background: var(--ink); color: var(--panel); cursor: pointer; }
+  #shot-file:focus-visible + .shot-status, .shotbtn:focus-within { outline: 3px solid var(--gold); }
+  .shot-status { margin: 8px 0 0; font-size: .85rem; font-weight: 700; min-height: 1.2em; white-space: pre-line; }
+  .shot-status.error { color: var(--error); }
+  .shot-status:empty { display: none; }
+  .card .chk { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); font-size: .62rem; font-weight: 800; color: #fff; background: var(--error); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
   .sample-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 12px; border: 2px dashed var(--gold-deep); background: var(--get-soft); color: var(--ink); font-size: .82rem; font-weight: 700; }
   .warn { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--want-soft); color: var(--ink); font-size: .82rem; border: 1px solid var(--want); }
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 6px; }
@@ -267,7 +278,7 @@
   </div>
   <header>
     <h1><span class="mark" aria-hidden="true">★</span>ゲットチャレンジ記録</h1>
-    <p class="lead">チャレンジ結果の5枚と、欲しかったカード・GETした場所を記録します。みんなの記録から、どこを選ぶと当たりやすいかも見られます。</p>
+    <p class="lead">シャッフル前と結果の5枚、欲しかったカード・GETした場所を記録します（スクショからも入力できます）。みんなの記録から、どこを選ぶと当たりやすいかも見られます。</p>
   </header>
 
   <div class="seg" role="tablist" aria-label="表示の切り替え">
@@ -281,6 +292,14 @@
     <div class="panel">
       <h2><span class="step">1</span>パック</h2>
       <div class="field"><label for="pack" class="sub" style="margin:0 0 4px">5枚が入っていたパック</label><select id="pack"></select></div>
+
+      <div class="shotbox">
+        <div class="shot-head"><b>スクショから入力</b><span>前・後どちらか1枚、または両方</span></div>
+        <label class="shotbtn" for="shot-file">スクショを選ぶ</label>
+        <input type="file" id="shot-file" accept="image/*" multiple class="vh">
+        <p class="shot-status" id="shot-status" role="status"></p>
+        <p class="note" id="shot-note">シャッフル前・チャレンジ結果の画面のスクショから、カードを読み取って入れます。読み取りはこのスマホの中だけで行い、画像はどこにも送りません。</p>
+      </div>
 
       <h2 style="margin-top:14px"><span class="step">2</span>シャッフル前の5枚</h2>
       <p class="sub">シャッフルする<b>前</b>の画面と同じ並びです。四角をタップしてカードを入れ、欲しいカードに<b>♥欲しい</b>の印をつけてください。</p>
@@ -330,6 +349,11 @@
 <div class="sheet" id="pick-sheet" role="dialog" aria-modal="true" aria-labelledby="pick-title" hidden>
   <h2 id="pick-title">カードを選ぶ</h2>
   <p class="sub" id="pick-sub"></p>
+  <div id="pick-from" hidden>
+    <p class="flow-label" id="pick-from-label">結果の5枚から選ぶ</p>
+    <ul class="clist" id="pick-from-list"></ul>
+    <p class="flow-label">一覧から選ぶ</p>
+  </div>
   <div class="field" style="margin-bottom:8px"><input id="pick-q" type="search" placeholder="名前で検索（ひらがなでもOK）" autocomplete="off" aria-label="カード名で検索"></div>
   <div class="chips" id="pick-rar"></div>
   <ul class="clist" id="pick-list"></ul>
@@ -498,7 +522,12 @@
 
   // ============ 記録する ============
   let draft = null;
-  function newDraft(pack) { return { pack: pack, cards: [null, null, null, null, null], want: [], after: [-1, -1, -1, -1, -1], get: -1 }; }
+  function newDraft(pack) {
+    return { pack: pack, cards: [null, null, null, null, null], want: [], after: [-1, -1, -1, -1, -1], get: -1,
+      acards: [null, null, null, null, null],            // 後だけ先に分かったときの、後の場所ごとのカード
+      unsureB: [false, false, false, false, false], unsureA: [false, false, false, false, false],   // 「確認」の印
+      thumbB: [null, null, null, null, null], thumbA: [null, null, null, null, null] };              // スクショのカードの見た目
+  }
   function fillPackSelect(sel, withAll) {
     sel.innerHTML = "";
     if (withAll) sel.appendChild(new Option("すべてのパック", ""));
@@ -509,11 +538,31 @@
   $("pack").value = packByCode(ls.get(LAST_PACK_KEY, "")) ? ls.get(LAST_PACK_KEY, "") : (PACKS[0] ? PACKS[0].code : "X");
   draft = newDraft($("pack").value);
   $("pack").addEventListener("change", () => {
-    const keep = draft.cards.some(Boolean);
+    const keep = draft.cards.some(Boolean) || draft.acards.some(Boolean);
     draft.pack = $("pack").value; ls.set(LAST_PACK_KEY, draft.pack);
-    if (keep) { draft = newDraft(draft.pack); toast("パックを変えたので、5枚を空にしました。"); }
+    if (keep) { draft = newDraft(draft.pack); toast("パックを変えたので、5枚を空にしました。"); setShotStatus(""); }
     renderBoard();
   });
+  const sameCard = (a, b) => !!(a && b && a.name === b.name && a.r === b.r);
+  // 後の場所 i に来ているカード（前とつながっていれば前のカード、まだなら後だけのカード）
+  const afterCard = (i) => draft.after[i] >= 0 ? draft.cards[draft.after[i]] : draft.acards[i];
+  // 前のカードが決まったとき、まだつながっていない後のカードで同じものがあればつなぐ
+  function autoLink() {
+    for (let p = 0; p < 5; p++) {
+      if (!draft.cards[p] || draft.after.indexOf(p) >= 0) continue;
+      const i = draft.acards.findIndex((c, k) => draft.after[k] < 0 && sameCard(c, draft.cards[p]));
+      if (i >= 0) draft.after[i] = p;
+    }
+    // 前が4か所決まっていて、つながっていない後のカードが1枚だけなら、残りの前に入れる
+    const emptyB = [0, 1, 2, 3, 4].filter((p) => !draft.cards[p]);
+    const freeA = [0, 1, 2, 3, 4].filter((i) => draft.after[i] < 0 && draft.acards[i]);
+    if (emptyB.length === 1 && freeA.length === 1) { const p = emptyB[0], i = freeA[0]; draft.cards[p] = draft.acards[i]; draft.unsureB[p] = draft.unsureA[i]; draft.after[i] = p; }
+    // 前が全部決まっていて、後が4か所決まっていれば、残りの1か所も決まる
+    if (draft.cards.every(Boolean)) {
+      const emptyA = [0, 1, 2, 3, 4].filter((i) => draft.after[i] < 0);
+      if (emptyA.length === 1) { const rest = [0, 1, 2, 3, 4].find((x) => draft.after.indexOf(x) < 0); draft.after[emptyA[0]] = rest; }
+    }
+  }
 
   // ---- ② シャッフル前の5枚 ----
   function renderBoard() {
@@ -524,8 +573,9 @@
       btn.type = "button"; btn.setAttribute("aria-label", "シャッフル前 " + (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：カードを入れる"));
       btn.append(mk("span", "no", String(i + 1)));
       if (draft.want.indexOf(i) >= 0) btn.append(mk("span", "wtag", "♥"));
-      if (c) { btn.append(mk("span", "nm", c.name), rarEl(c.r)); } else { btn.append(mk("span", "ph", "＋ カード")); }
-      btn.addEventListener("click", () => openPicker(i));
+      if (c) { btn.append(mk("span", "nm", c.name), rarEl(c.r)); if (draft.unsureB[i]) btn.append(mk("span", "chk", "確認")); }
+      else btn.append(mk("span", "ph", draft.acards.some(Boolean) ? "＋ 結果から選ぶ" : "＋ カード"));
+      btn.addEventListener("click", () => openPicker(i, "before"));
       const marks = mk("div", "marks one");
       const w = mk("button", "w", "♥欲しい"); w.type = "button"; w.setAttribute("aria-pressed", draft.want.indexOf(i) >= 0 ? "true" : "false");
       w.addEventListener("click", () => { const k = draft.want.indexOf(i); if (k >= 0) draft.want.splice(k, 1); else draft.want.push(i); draft.want.sort(); renderBoard(); });
@@ -536,29 +586,32 @@
   // ---- ③ シャッフル後（それぞれの場所に来たカード） ----
   function renderBoard2() {
     const b = $("board2"); b.innerHTML = "";
-    const ready = draft.cards.every(Boolean);
-    draft.after.forEach((pi, i) => {
-      const c = pi >= 0 ? draft.cards[pi] : null;
+    for (let i = 0; i < 5; i++) {
+      const pi = draft.after[i], c = afterCard(i);
       const isWant = pi >= 0 && draft.want.indexOf(pi) >= 0;
       const pos = mk("div", "pos");
       const btn = mk("button", "card" + (c ? " filled" : "") + (draft.get === i ? " is-get" : "") + (isWant ? " is-want" : ""));
-      btn.type = "button"; btn.disabled = !ready;
+      btn.type = "button";
       btn.setAttribute("aria-label", "シャッフル後 " + (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：来たカードを選ぶ"));
       btn.append(mk("span", "no", String(i + 1)));
       if (draft.get === i) btn.append(mk("span", "tag", "GET"));
       if (isWant) btn.append(mk("span", "wtag", "♥"));
-      if (c) { btn.append(mk("span", "nm", c.name), mk("span", "from", "前は " + (pi + 1) + POS_LABEL[pi])); }
-      else btn.append(mk("span", "ph", ready ? "＋ 来たカード" : "先に②を入れる"));
+      if (c) {
+        btn.append(mk("span", "nm", c.name), pi >= 0 ? mk("span", "from", "前は " + (pi + 1) + POS_LABEL[pi]) : rarEl(c.r));
+        if (pi >= 0 ? draft.unsureB[pi] : draft.unsureA[i]) btn.append(mk("span", "chk", "確認"));
+      } else btn.append(mk("span", "ph", "＋ 来たカード"));
       btn.addEventListener("click", () => openAfter(i));
       const marks = mk("div", "marks one");
-      const g = mk("button", "g", "GET"); g.type = "button"; g.setAttribute("aria-pressed", draft.get === i ? "true" : "false"); g.disabled = !ready;
+      const g = mk("button", "g", "GET"); g.type = "button"; g.setAttribute("aria-pressed", draft.get === i ? "true" : "false");
       g.addEventListener("click", () => { draft.get = draft.get === i ? -1 : i; renderBoard2(); });
       marks.append(g); pos.append(btn, marks); b.append(pos);
-    });
+    }
     renderSummary();
   }
   let afterIdx = 0;
   function openAfter(i) {
+    // 前の5枚がまだそろっていなければ、パックの一覧から選ぶ
+    if (!draft.cards.every(Boolean)) { openPicker(i, "after"); return; }
     afterIdx = i;
     $("after-title").textContent = "シャッフル後 " + (i + 1) + "番目（" + POS_LABEL[i] + "）に来たカード";
     const ul = $("after-list"); ul.innerHTML = "";
@@ -569,21 +622,19 @@
       bt.addEventListener("click", () => setAfter(pi));
       li.append(bt); ul.append(li);
     });
-    $("after-clear").hidden = draft.after[i] < 0;
+    $("after-clear").hidden = draft.after[i] < 0 && !draft.acards[i];
     openSheet("after-sheet");
   }
   function setAfter(pi) {
     const old = draft.after.indexOf(pi);
     if (old >= 0 && old !== afterIdx) draft.after[old] = -1;   // 同じカードは1か所だけ
     draft.after[afterIdx] = pi;
-    // 4か所決まったら、残りの1か所は自動で入れる
-    const empty = draft.after.map((v, i) => v < 0 ? i : -1).filter((i) => i >= 0);
-    if (empty.length === 1) { const rest = [0, 1, 2, 3, 4].find((x) => draft.after.indexOf(x) < 0); draft.after[empty[0]] = rest; }
+    autoLink();
     closeSheets(); renderBoard2();
     const next = draft.after.findIndex((v) => v < 0);
     if (next >= 0) setTimeout(() => openAfter(next), 120);
   }
-  $("after-clear").addEventListener("click", () => { draft.after[afterIdx] = -1; closeSheets(); renderBoard2(); });
+  $("after-clear").addEventListener("click", () => { draft.after[afterIdx] = -1; draft.acards[afterIdx] = null; draft.unsureA[afterIdx] = false; closeSheets(); renderBoard(); });
 
   function draftProblem() {
     const empty = draft.cards.filter((c) => !c).length;
@@ -601,25 +652,43 @@
     const got = draft.after[draft.get], hit = draft.want.indexOf(got) >= 0;
     draft.want.forEach((w) => { const d = draft.after.indexOf(w); s.append("♥ ", mk("b", "", draft.cards[w].name), "：前 " + (w + 1) + POS_LABEL[w] + " → 後 ", mk("b", "", (d + 1) + POS_LABEL[d]), mk("br")); });
     s.append("GET：", mk("b", "", draft.cards[got].name + "（後 " + (draft.get + 1) + POS_LABEL[draft.get] + "）"), mk("br"), "結果：", mk("b", "", hit ? "当たり！" : "はずれ"));
+    const n = draft.unsureB.filter(Boolean).length;
+    if (n) s.append(mk("br"), mk("span", "", "「確認」の印が" + n + "か所あります。合っていればそのまま記録してOKです。"));
     $("save").disabled = false;
   }
-  $("clear").addEventListener("click", () => { draft = newDraft($("pack").value); renderBoard(); setStatus("rec-status", ""); });
+  $("clear").addEventListener("click", () => { draft = newDraft($("pack").value); renderBoard(); setStatus("rec-status", ""); setShotStatus(""); });
 
-  // ---- カードを選ぶ ----
-  let pickIdx = 0, pickRar = "";
-  function openPicker(i) {
-    pickIdx = i; pickRar = "";
+  // ---- カードを選ぶ（前の場所／後の場所） ----
+  let pickIdx = 0, pickRar = "", pickSide = "before";
+  function openPicker(i, side) {
+    pickIdx = i; pickRar = ""; pickSide = side || "before";
     const p = packByCode(draft.pack);
-    $("pick-title").textContent = (i + 1) + "番目（" + POS_LABEL[i] + "）のカード";
+    $("pick-title").textContent = (pickSide === "after" ? "シャッフル後 " : "シャッフル前 ") + (i + 1) + "番目（" + POS_LABEL[i] + "）のカード";
     $("pick-sub").textContent = p ? p.name : "";
     $("pick-q").value = "";
     $("free-name").value = "";
     const fr = $("free-rar"); fr.innerHTML = ""; RAR_ORDER.forEach((r) => fr.appendChild(new Option(RAR[r].s, r)));
-    $("pick-clear").hidden = !draft.cards[i];
+    $("pick-clear").hidden = pickSide === "after" ? !afterCard(i) : !draft.cards[i];
+    // 前の場所を選ぶとき、結果の5枚が分かっていれば、その中から選べるようにする
+    const from = $("pick-from"), fl = $("pick-from-list"); fl.innerHTML = "";
+    const free = pickSide === "before" ? [0, 1, 2, 3, 4].filter((k) => draft.acards[k] && draft.after[k] < 0) : [];
+    from.hidden = !free.length;
+    free.forEach((k) => {
+      const c = draft.acards[k], li = mk("li"), bt = mk("button"); bt.type = "button";
+      bt.append(mk("span", "num", "後" + (k + 1) + POS_LABEL[k]), mk("span", "nm", c.name + (draft.get === k ? "（GET）" : "")), rarEl(c.r));
+      bt.addEventListener("click", () => pickFromAfter(k));
+      li.append(bt); fl.append(li);
+    });
     const det = document.querySelector("#pick-sheet details"); det.open = !(p && p.cards.length);
     renderRarChips(); renderPickList();
     openSheet("pick-sheet");
-    setTimeout(() => { if (p && p.cards.length && window.matchMedia("(pointer:fine)").matches) $("pick-q").focus(); }, 60);
+    setTimeout(() => { if (!free.length && p && p.cards.length && window.matchMedia("(pointer:fine)").matches) $("pick-q").focus(); }, 60);
+  }
+  function pickFromAfter(k) {
+    const p = pickIdx;
+    const old = draft.after.indexOf(p); if (old >= 0) draft.after[old] = -1;
+    draft.cards[p] = draft.acards[k]; draft.unsureB[p] = draft.unsureA[k]; draft.after[k] = p;
+    autoLink(); closeSheets(); renderBoard(); nextBefore();
   }
   function renderRarChips() {
     const p = packByCode(draft.pack), have = new Set((p ? p.cards : []).map((c) => c[2]));
@@ -650,14 +719,269 @@
     if (!n) { $("free-name").focus(); return; }
     setCard({ no: 0, name: n.slice(0, 30), r: $("free-rar").value });
   });
-  $("pick-clear").addEventListener("click", () => { draft.cards[pickIdx] = null; draft.want = draft.want.filter((i) => i !== pickIdx); draft.after = draft.after.map((v) => v === pickIdx ? -1 : v); closeSheets(); renderBoard(); });
+  $("pick-clear").addEventListener("click", () => {
+    if (pickSide === "after") { draft.after[pickIdx] = -1; draft.acards[pickIdx] = null; draft.unsureA[pickIdx] = false; }
+    else { draft.cards[pickIdx] = null; draft.unsureB[pickIdx] = false; draft.want = draft.want.filter((i) => i !== pickIdx); draft.after = draft.after.map((v) => v === pickIdx ? -1 : v); }
+    closeSheets(); renderBoard();
+  });
   function setCard(c) {
-    draft.cards[pickIdx] = c; closeSheets(); renderBoard();
-    // 次の空いている場所へ自動で進む
+    if (pickSide === "after") {
+      const i = pickIdx, link = draft.after[i];
+      if (link >= 0) { learnLook(draft.thumbB[link], c); draft.cards[link] = c; draft.unsureB[link] = false; }
+      learnLook(draft.thumbA[i], c);
+      draft.acards[i] = c; draft.unsureA[i] = false;
+      autoLink(); closeSheets(); renderBoard();
+      const next = [0, 1, 2, 3, 4].find((k) => !afterCard(k));
+      if (next !== undefined) setTimeout(() => openPicker(next, "after"), 120);
+      return;
+    }
+    const p = pickIdx;
+    learnLook(draft.thumbB[p], c);
+    draft.cards[p] = c; draft.unsureB[p] = false;
+    const k = draft.after.indexOf(p); if (k >= 0) { learnLook(draft.thumbA[k], c); draft.acards[k] = c; draft.unsureA[k] = false; }
+    autoLink(); closeSheets(); renderBoard(); nextBefore();
+  }
+  // 次の空いている前の場所へ自動で進む
+  function nextBefore() {
     const next = draft.cards.findIndex((x) => !x);
-    if (next >= 0) setTimeout(() => openPicker(next), 120);
+    if (next >= 0) setTimeout(() => openPicker(next, "before"), 120);
     else if (!draft.want.length) setTimeout(() => toast("欲しかったカードに「♥欲しい」をつけてください"), 150);
   }
+
+  // ============ スクショから読み取る ============
+  const OCR_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+  const OCR_OPT = {
+    workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+    corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
+    langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/jpn@1.0.0/4.0.0", gzip: true
+  };
+  const LOOK_KEY = "getChallenge:looks";
+  function setShotStatus(t, err) { const e = $("shot-status"); e.textContent = t || ""; e.className = "shot-status" + (err ? " error" : ""); $("shot-note").hidden = !!t; }
+  let ocrWorker = null;
+  function loadScript(src) { return new Promise((ok, ng) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => ng(new Error("script")); document.head.appendChild(s); }); }
+  async function getOcr() {
+    if (ocrWorker) return ocrWorker;
+    if (!window.Tesseract) await loadScript(OCR_SRC);
+    ocrWorker = await window.Tesseract.createWorker("jpn", 1, OCR_OPT);
+    await ocrWorker.setParameters({ tessedit_pageseg_mode: "7" });   // 1行の文字として読む
+    return ocrWorker;
+  }
+  function fileToImage(file) {
+    return new Promise((ok, ng) => { const u = URL.createObjectURL(file), im = new Image(); im.onload = () => ok(im); im.onerror = () => ng(new Error("image")); im.src = u; });
+  }
+  const rgbHsv = (r, g, b) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+    if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; if (h < 0) h += 1; }
+    return [h, mx ? d / mx : 0, mx / 255]; };
+
+  // カード5枚（上3・下2）の場所を探す。背景（明るくて色の薄いところ）以外をカードとみなす
+  function findCards(img) {
+    const W = img.naturalWidth, H = img.naturalHeight, sw = 270, k = W / sw, sh = Math.round(H / k);
+    const cv = document.createElement("canvas"); cv.width = sw; cv.height = sh;
+    const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(img, 0, 0, sw, sh);
+    const d = cx.getImageData(0, 0, sw, sh).data;
+    const fg = new Uint8Array(sw * sh);
+    for (let i = 0; i < sw * sh; i++) { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); fg[i] = (mx > 185 && (mx - mn) / mx < 0.14) ? 0 : 1; }
+    const rowv = []; for (let y = 0; y < sh; y++) { let n = 0; for (let x = 0; x < sw; x++) n += fg[y * sw + x]; rowv.push(n / sw); }
+    // 横の帯（カードの段）を探す。すき間が小さければつなげる
+    let bands = [], y0 = -1;
+    for (let y = 0; y <= sh; y++) { const on = y < sh && rowv[y] > 0.25; if (on && y0 < 0) y0 = y; if (!on && y0 >= 0) { bands.push([y0, y]); y0 = -1; } }
+    const merged = [];
+    bands.forEach((b) => { const last = merged[merged.length - 1]; if (last && b[0] - last[1] < sw * 0.06) last[1] = b[1]; else merged.push(b.slice()); });
+    const segsOf = (a, b) => {
+      const segs = []; let x0 = -1;
+      for (let x = 0; x <= sw; x++) { let n = 0; if (x < sw) for (let y = a; y < b; y++) n += fg[y * sw + x]; const on = x < sw && n / (b - a) > 0.5; if (on && x0 < 0) x0 = x; if (!on && x0 >= 0) { if (x - x0 > sw * 0.12) segs.push([x0, x]); x0 = -1; } }
+      return segs;
+    };
+    const rows = merged.filter((b) => b[1] - b[0] > sw * 0.12).map((b) => ({ b, segs: segsOf(b[0], b[1]) }));
+    for (let t = 0; t + 1 < rows.length; t++) {
+      if (rows[t].segs.length === 3 && rows[t + 1].segs.length === 2) {
+        const two = [rows[t], rows[t + 1]], ws = [];
+        two.forEach((r) => r.segs.forEach((s) => ws.push(s[1] - s[0])));
+        // ふつうのカードは銀色のふちが背景と同じに見えるので、ふちのない全面イラストの幅か、ふちの分を足した幅を本当の幅にする
+        const mxw = Math.max.apply(null, ws), mnw = Math.min.apply(null, ws), ow = mxw / mnw > 1.04 ? mxw : mnw * 1.078;
+        const out = [];
+        two.forEach((r) => r.segs.forEach((s) => {
+          const sw0 = s[1] - s[0], off = (ow - sw0) / 2;
+          let top = r.b[0];
+          for (let y = r.b[0]; y < r.b[1]; y++) { let n = 0; for (let x = s[0]; x < s[1]; x++) n += fg[y * sw + x]; if (n / sw0 > 0.5) { top = y; break; } }
+          out.push({ x: (s[0] - off) * k, y: (top - off) * k, w: ow * k, h: ow * k * 1.397 });
+        }));
+        return out;
+      }
+    }
+    return null;
+  }
+  function cropCanvas(img, x, y, w, h, ow, oh) {
+    const c = document.createElement("canvas"); c.width = ow; c.height = oh;
+    c.getContext("2d", { willReadFrequently: true }).drawImage(img, x, y, w, h, 0, 0, ow, oh); return c;
+  }
+  // 名前の帯（カードの上のほう）を、読みやすいように白黒・大きめにする
+  function nameStrip(img, r, dy) {
+    const x = r.x + r.w * 0.15, y = r.y + r.h * (0.02 + (dy || 0)), w = r.w * 0.59, h = r.h * 0.08;
+    const oh = 96, ow = Math.round(oh * w / h), c = cropCanvas(img, x, y, w, h, ow, oh), cx = c.getContext("2d");
+    const id = cx.getImageData(0, 0, ow, oh), d = id.data; let mn = 255, mx = 0;
+    for (let i = 0; i < d.length; i += 4) { const v = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; d[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
+    const sc = 255 / Math.max(1, mx - mn);
+    for (let i = 0; i < d.length; i += 4) { const v = (d[i] - mn) * sc; d[i] = d[i + 1] = d[i + 2] = v; }
+    cx.putImageData(id, 0, 0); return c;
+  }
+  // カードの見た目（名前とGETマークを除いた部分の小さな色の並び）
+  function thumbOf(img, r) {
+    const c = cropCanvas(img, r.x + r.w * 0.05, r.y + r.h * 0.14, r.w * 0.9, r.h * 0.8, 8, 12);
+    const d = c.getContext("2d").getImageData(0, 0, 8, 12).data, out = [];
+    for (let i = 0; i < d.length; i += 4) out.push(d[i], d[i + 1], d[i + 2]);
+    return out;
+  }
+  const thumbDist = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length / 255; };
+  // 全面イラストかどうか（下半分の色のばらつき）
+  function fullArtScore(img, r) {
+    const c = cropCanvas(img, r.x + r.w * 0.06, r.y + r.h * 0.55, r.w * 0.88, r.h * 0.37, 40, 30);
+    const d = c.getContext("2d").getImageData(0, 0, 40, 30).data; let s = 0, s2 = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { const v = (d[i] + d[i + 1] + d[i + 2]) / 3; s += v; s2 += v * v; n++; }
+    return Math.sqrt(Math.max(0, s2 / n - (s / n) * (s / n)));
+  }
+  // 「GET」のマーク（青緑）がカードの上にあるか
+  function getScore(img, r) {
+    const x = Math.max(0, r.x), y = Math.max(0, r.y - r.h * 0.1), w = r.w, h = r.h * 0.18;
+    const c = cropCanvas(img, x, y, w, h, 60, 18), d = c.getContext("2d").getImageData(0, 0, 60, 18).data; let n = 0;
+    for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); if (hh > 0.43 && hh < 0.54 && ss > 0.55 && vv > 0.5) n++; }
+    return n / (60 * 18);
+  }
+
+  // ---- 名前の照らし合わせ ----
+  const SMALL = { "ァ": "ア", "ィ": "イ", "ゥ": "ウ", "ェ": "エ", "ォ": "オ", "ッ": "ツ", "ャ": "ヤ", "ュ": "ユ", "ョ": "ヨ", "ヮ": "ワ" };
+  function normName(s) {
+    s = kata(s).normalize("NFD").replace(/[゙゚]/g, "").normalize("NFC");
+    s = s.replace(/[ァィゥェォッャュョヮ]/g, (c) => SMALL[c]).replace(/[一―‐\-－]/g, "ー");
+    return s.replace(/ex$/i, "").replace(/[^゠-ヿ一-鿿]/g, "");
+  }
+  function lcs(a, b) { const m = a.length, n = b.length; if (!m || !n) return 0; let prev = new Array(n + 1).fill(0);
+    for (let i = 1; i <= m; i++) { const cur = [0]; for (let j = 1; j <= n; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]); prev = cur; } return prev[n]; }
+  function nameSim(ocr, base) { if (!ocr || !base) return 0; const l = lcs(ocr, base); return 0.65 * l / base.length + 0.35 * l / Math.max(ocr.length, base.length); }
+  const NORMAL_R = ["d1", "d2", "d3"], FULL_R = ["d4", "s1", "s2", "sh1", "sh2", "s3", "cr"];
+  // そのパックで、読み取った文字にいちばん近い名前を探す
+  function bestBase(pack, ocrNorm) {
+    const seen = {}; let best = null, bs = 0, second = 0;
+    pack.cards.forEach((c) => { const b = normName(c[1]); if (seen[b]) return; seen[b] = 1; const sc = nameSim(ocrNorm, b); if (sc > bs) { second = bs; bs = sc; best = b; } else if (sc > second) second = sc; });
+    return { base: best, score: bs, gap: bs - second };
+  }
+  function loadLooks() { const v = ls.get(LOOK_KEY, {}); return v && typeof v === "object" ? v : {}; }
+  function learnLook(thumb, c) {
+    if (!thumb || !c || !draft) return;
+    const looks = loadLooks(), key = draft.pack + "|" + c.name + "|" + c.r;
+    const list = (looks[key] || []).filter((t) => thumbDist(t, thumb) > 0.01); list.unshift(thumb); looks[key] = list.slice(0, 3);
+    const keys = Object.keys(looks); if (keys.length > 300) delete looks[keys[0]];
+    ls.set(LOOK_KEY, looks);
+  }
+  // 読み取った1枚を、パックのカード（名前・レア度）に決める
+  function identify(pack, s) {
+    let bb = { base: null, score: 0, gap: 0 };
+    (s.texts || [s.text]).forEach((t) => { const r = bestBase(pack, normName(t)); if (r.score > bb.score) bb = r; });
+    if (!bb.base || bb.score < 0.34) return null;
+    let cands = pack.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2] }));
+    const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
+    if (cands.some((c) => /ex$/.test(c.name)) && cands.some((c) => !/ex$/.test(c.name))) {
+      const want = exText || s.full > 32;
+      const f = cands.filter((c) => /ex$/.test(c.name) === want); if (f.length) cands = f;
+    }
+    let unsure = bb.score < 0.6 || bb.gap < 0.12;
+    if (cands.length === 1) return { card: cands[0], unsure, score: bb.score };
+    // 覚えている見た目があれば、それに近いものを選ぶ
+    const looks = loadLooks(); let hit = null, hd = 1;
+    cands.forEach((c) => (looks[draft.pack + "|" + c.name + "|" + c.r] || []).forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = c; } }));
+    if (hit && hd < 0.09) return { card: hit, unsure, score: bb.score };
+    // 見た目（ふつうの枠か、全面イラストか）で、ありそうなレア度を選ぶ
+    const group = s.full > 32 ? FULL_R : NORMAL_R;
+    let pool = cands.filter((c) => group.indexOf(c.r) >= 0); if (!pool.length) pool = cands;
+    pool.sort((a, b) => RAR_ORDER.indexOf(a.r) - RAR_ORDER.indexOf(b.r));
+    return { card: pool[0], unsure: true, score: bb.score };
+  }
+  // パックが分からないとき：読み取った名前がいちばん合うパックを選ぶ
+  function guessPack(texts) {
+    let best = null, bs = -1;
+    PACKS.forEach((p) => { let sc = 0; texts.forEach((tt) => { let m = 0; tt.forEach((t) => { const n = normName(t); if (n.length >= 2) m = Math.max(m, bestBase(p, n).score); }); sc += m; }); if (p.code === draft.pack) sc += 0.15; if (sc > bs) { bs = sc; best = p; } });
+    return best;
+  }
+
+  async function readShot(img) {
+    const rects = findCards(img);
+    if (!rects) return null;
+    const w = await getOcr(), slots = [];
+    for (const r of rects) {
+      // 少しずらして2回読み、合うほうを使う
+      const t1 = (await w.recognize(nameStrip(img, r, 0))).data.text || "", t2 = (await w.recognize(nameStrip(img, r, 0.01))).data.text || "";
+      slots.push({ text: t1, texts: [t1, t2], thumb: thumbOf(img, r), full: fullArtScore(img, r), get: getScore(img, r) });
+    }
+    const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
+    return { slots, isAfter: slots[gi].get > 0.03, getIdx: slots[gi].get > 0.03 ? gi : -1 };
+  }
+  // 前と後のカードを、見た目の近さで組み合わせる（5枚の並べ方120通りから一番近いもの）
+  function matchAfter(tb, ta) {
+    let best = null, bd = 1e9;
+    const perm = (arr, l) => { if (l === 5) { let d = 0; for (let i = 0; i < 5; i++) d += thumbDist(ta[i], tb[arr[i]]); if (d < bd) { bd = d; best = arr.slice(); } return; }
+      for (let i = l; i < 5; i++) { [arr[l], arr[i]] = [arr[i], arr[l]]; perm(arr, l + 1); [arr[l], arr[i]] = [arr[i], arr[l]]; } };
+    perm([0, 1, 2, 3, 4], 0);
+    return best;
+  }
+
+  $("shot-file").addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []).slice(0, 2); e.target.value = "";
+    if (!files.length) return;
+    setShotStatus("読み取っています…（はじめての時は、文字を読むデータの読み込みに少しかかります）");
+    try {
+      const shots = [];
+      for (let f = 0; f < files.length; f++) {
+        setShotStatus("読み取っています…（" + (f + 1) + "/" + files.length + "枚目）");
+        const img = await fileToImage(files[f]); const r = await readShot(img);
+        if (!r) { setShotStatus((files.length > 1 ? (f + 1) + "枚目：" : "") + "カード5枚の場所が見つかりませんでした。シャッフル前かチャレンジ結果の画面を、切り取らずにそのままスクショしてください。", true); return; }
+        shots.push(r);
+      }
+      let before = null, after = null;
+      if (shots.length === 2) {
+        if (shots[0].isAfter && shots[1].isAfter) { setShotStatus("2枚ともチャレンジ結果の画面でした。シャッフル前の画面とチャレンジ結果の画面を1枚ずつ選んでください。", true); return; }
+        if (shots[0].isAfter) { after = shots[0]; before = shots[1]; } else { before = shots[0]; after = shots[1]; }
+      } else if (shots[0].isAfter) after = shots[0]; else before = shots[0];
+      // パックを決める
+      const texts = (before ? before.slots : after.slots).map((s) => s.texts);
+      const pk = guessPack(texts);
+      if (pk && pk.code !== $("pack").value) { $("pack").value = pk.code; ls.set(LAST_PACK_KEY, pk.code); toast("パックを「" + pk.name + "」にしました。違うときは①で選び直してください。"); }
+      const pack = packByCode($("pack").value);
+      // 前だけ・後だけを読んだときは、もう片方の入力は残す（パックが変わったときと、2枚同時のときは最初から）
+      if (pack.code !== draft.pack || (before && after)) draft = newDraft(pack.code);
+      let unsure = 0;
+      if (before) {
+        draft.cards = [null, null, null, null, null]; draft.unsureB = [false, false, false, false, false]; draft.want = []; draft.after = [-1, -1, -1, -1, -1];
+        before.slots.forEach((s, p) => { const id = identify(pack, s); draft.thumbB[p] = s.thumb; if (id) { draft.cards[p] = id.card; draft.unsureB[p] = id.unsure; if (id.unsure) unsure++; } });
+      }
+      if (after) {
+        draft.acards = [null, null, null, null, null]; draft.unsureA = [false, false, false, false, false]; draft.after = [-1, -1, -1, -1, -1];
+        draft.get = after.getIdx;
+        after.slots.forEach((s, i) => {
+          draft.thumbA[i] = s.thumb;
+          const id = identify(pack, s);
+          // GETのカードは名前が「GET」のマークで隠れるので、はっきり読めたときだけ入れる
+          if (id && (i !== after.getIdx || id.score >= 0.6)) { draft.acards[i] = id.card; draft.unsureA[i] = id.unsure || i === after.getIdx; }
+        });
+      }
+      // 前と後の両方の見た目があれば、見た目の近さで移動を決める（名前が隠れたGETのカードも決まる）
+      if (draft.thumbB.every(Boolean) && draft.thumbA.every(Boolean)) draft.after = matchAfter(draft.thumbB, draft.thumbA);
+      if (!draft.cards.every(Boolean) || !draft.thumbB.every(Boolean)) unsure += draft.unsureA.filter(Boolean).length;
+      autoLink(); renderBoard();
+      const miss = draft.cards.filter((c) => !c).length;
+      const parts = [];
+      if (before) parts.push("シャッフル前の5枚" + (miss ? "（" + miss + "枚は読めませんでした。タップで入れてください）" : ""));
+      if (after) parts.push(before ? "シャッフル後の移動とGET" : "チャレンジ結果の5枚とGET");
+      const missA = after && !before ? [0, 1, 2, 3, 4].filter((i) => !draft.acards[i]) : [];
+      let msg = "読み取りました：" + parts.join("・");
+      if (unsure) msg += "\n「確認」の印は自信がないところです。違っていればタップで直してください（直すと見た目を覚えて、次から正しく入ります）。";
+      if (missA.length) msg += "\n" + missA.map((i) => "後" + (i + 1)).join("・") + "は" + (missA.indexOf(after.getIdx) >= 0 ? "（GETのマークで名前が隠れていて）" : "") + "読めませんでした。タップで入れてください。";
+      if (!before) msg += "\nシャッフル前の5か所は、タップすると結果の5枚から選べます。";
+      msg += "\n欲しかったカードに「♥欲しい」をつけてください。";
+      setShotStatus(msg);
+    } catch (err) {
+      setShotStatus("読み取れませんでした。通信できる場所で、もう一度お試しください。", true);
+    }
+  });
 
   // ---- 保存 ----
   $("save").addEventListener("click", () => {
@@ -671,8 +995,10 @@
       hit: draft.want.indexOf(draft.after[draft.get]) >= 0, uid: o.uid, synced: false
     };
     const list = loadRecords().slice(); list.unshift(rec); saveRecords(list);
+    // スクショから入れたカードは、記録した内容を正しいものとして見た目を覚える
+    for (let q = 0; q < 5; q++) { learnLook(draft.thumbB[q], draft.cards[q]); learnLook(draft.thumbA[q], afterCard(q)); }
     toast(rec.hit ? "記録しました。当たり！" : "記録しました。");
-    draft = newDraft(draft.pack); renderBoard(); setStatus("rec-status", "");
+    draft = newDraft(draft.pack); renderBoard(); setStatus("rec-status", ""); setShotStatus("");
     statsCacheDirty = true;
     pushPending();
   });
