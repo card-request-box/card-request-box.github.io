@@ -125,6 +125,7 @@
   .rar { font-size: .7rem; font-weight: 800; letter-spacing: .02em; color: var(--dia); white-space: nowrap; }
   .rar.st, .rar.cr { color: var(--gold-deep); }
   .rar.sh { color: var(--shiny); }
+  .rar.it { color: var(--muted); }
   .marks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
   .marks button { font: inherit; font-size: .7rem; font-weight: 800; padding: 5px 0; white-space: nowrap; min-width: 0; overflow: hidden; border-radius: 8px; border: 1.5px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; }
   .marks button.w[aria-pressed="true"] { background: var(--want-soft); border-color: var(--want); color: var(--want); }
@@ -412,11 +413,14 @@
   const RAR = {
     d1: { s: "◆", c: "" }, d2: { s: "◆◆", c: "" }, d3: { s: "◆◆◆", c: "" }, d4: { s: "◆◆◆◆", c: "" },
     s1: { s: "☆", c: "st" }, s2: { s: "☆☆", c: "st" }, s3: { s: "☆☆☆", c: "st" },
-    sh1: { s: "色違い☆", c: "sh" }, sh2: { s: "色違い☆☆", c: "sh" }, cr: { s: "王冠", c: "cr" }
+    sh1: { s: "色違い☆", c: "sh" }, sh2: { s: "色違い☆☆", c: "sh" }, cr: { s: "王冠", c: "cr" },
+    item: { s: "アイテム", c: "it" }
   };
-  const RAR_ORDER = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr"];
-  const RAR_GROUP = { d1: "◆1〜2", d2: "◆1〜2", d3: "◆3", d4: "◆4", s1: "☆1", s2: "☆2", s3: "☆3以上", sh1: "色違い", sh2: "色違い", cr: "☆3以上" };
-  const RAR_GROUPS = ["◆1〜2", "◆3", "◆4", "☆1", "☆2", "☆3以上", "色違い"];
+  const RAR_ORDER = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr", "item"];
+  const RAR_GROUP = { d1: "◆1〜2", d2: "◆1〜2", d3: "◆3", d4: "◆4", s1: "☆1", s2: "☆2", s3: "☆3以上", sh1: "色違い", sh2: "色違い", cr: "☆3以上", item: "アイテム" };
+  const RAR_GROUPS = ["◆1〜2", "◆3", "◆4", "☆1", "☆2", "☆3以上", "色違い", "アイテム"];
+  // フリーチャレンジなどで、カードの代わりに出てくるアイテム（color：スクショで見分けるときの色）
+  const ITEMS = [{ name: "チャレンジ砂時計", color: "orange" }, { name: "パック砂時計", color: "purple" }];
   const PACKS = (window.GC_PACKS || []);
   const OTHER = { code: "X", name: "そのほかのパック（一覧にない）", cards: [] };
   const packByCode = (c) => PACKS.find((p) => p.code === c) || (c === "X" ? OTHER : null);
@@ -526,7 +530,8 @@
     return { pack: pack, cards: [null, null, null, null, null], want: [], after: [-1, -1, -1, -1, -1], get: -1,
       acards: [null, null, null, null, null],            // 後だけ先に分かったときの、後の場所ごとのカード
       unsureB: [false, false, false, false, false], unsureA: [false, false, false, false, false],   // 「確認」の印
-      thumbB: [null, null, null, null, null], thumbA: [null, null, null, null, null] };              // スクショのカードの見た目
+      thumbB: [null, null, null, null, null], thumbA: [null, null, null, null, null],               // スクショのカードの見た目
+      kindB: [0, 0, 0, 0, 0], kindA: [0, 0, 0, 0, 0] };                                              // スクショでアイテムだったか
   }
   function fillPackSelect(sel, withAll) {
     sel.innerHTML = "";
@@ -691,7 +696,7 @@
     autoLink(); closeSheets(); renderBoard(); nextBefore();
   }
   function renderRarChips() {
-    const p = packByCode(draft.pack), have = new Set((p ? p.cards : []).map((c) => c[2]));
+    const p = packByCode(draft.pack), have = new Set((p ? p.cards : []).map((c) => c[2])); if (have.size) have.add("item");
     const box = $("pick-rar"); box.innerHTML = "";
     if (!have.size) return;
     [""].concat(RAR_ORDER.filter((r) => have.has(r))).forEach((r) => {
@@ -703,12 +708,13 @@
   function renderPickList() {
     const p = packByCode(draft.pack), ul = $("pick-list"); ul.innerHTML = "";
     const q = kata($("pick-q").value.trim());
-    const rows = (p ? p.cards : []).filter((c) => (!pickRar || c[2] === pickRar) && (!q || kata(c[1]).indexOf(q) >= 0 || String(c[0]) === q));
+    const all = (p ? p.cards : []).concat(p && p.cards.length ? ITEMS.map((it) => [0, it.name, "item"]) : []);
+    const rows = all.filter((c) => (!pickRar || c[2] === pickRar) && (!q || kata(c[1]).indexOf(q) >= 0 || String(c[0]) === q));
     ul.hidden = !(p && p.cards.length);
     if (!rows.length && p && p.cards.length) { const li = mk("li", "empty", "見つかりませんでした。"); ul.append(li); return; }
     rows.forEach((c) => {
       const li = mk("li"), b = mk("button"); b.type = "button";
-      b.append(mk("span", "num", "No." + c[0]), mk("span", "nm", c[1]), rarEl(c[2]));
+      b.append(mk("span", "num", c[0] ? "No." + c[0] : ""), mk("span", "nm", c[1]), rarEl(c[2]));
       b.addEventListener("click", () => setCard({ no: c[0], name: c[1], r: c[2] }));
       li.append(b); ul.append(li);
     });
@@ -773,46 +779,65 @@
     if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; if (h < 0) h += 1; }
     return [h, mx ? d / mx : 0, mx / 255]; };
 
-  // カード5枚（上3・下2）の場所を探す。背景（明るくて少し青みのある灰色）以外をカードとみなす
+  // 5か所（上3・下2）を探す。背景（明るくて少し青みのある灰色）以外のかたまりを、カードかアイテムとみなす
   // （白っぽいカードは青みがないので、背景とは分けられる）
   function findCards(img) {
     const W = img.naturalWidth, H = img.naturalHeight, sw = 270, k = W / sw, sh = Math.round(H / k);
     const cv = document.createElement("canvas"); cv.width = sw; cv.height = sh;
     const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(img, 0, 0, sw, sh);
-    const d = cx.getImageData(0, 0, sw, sh).data;
-    const fg = new Uint8Array(sw * sh);
-    for (let i = 0; i < sw * sh; i++) { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); fg[i] = (mx > 200 && (mx - mn) / mx < 0.14 && g - r >= 3 && b - r >= 5) ? 0 : 1; }
-    const rowv = []; for (let y = 0; y < sh; y++) { let n = 0; for (let x = 0; x < sw; x++) n += fg[y * sw + x]; rowv.push(n / sw); }
-    // 横の帯（カードの段）を探す。1行だけのすき間はつなげる
-    let bands = [], y0 = -1;
-    for (let y = 0; y <= sh; y++) { const on = y < sh && rowv[y] > 0.25; if (on && y0 < 0) y0 = y; if (!on && y0 >= 0) { bands.push([y0, y]); y0 = -1; } }
-    const merged = [];
-    bands.forEach((b) => { const last = merged[merged.length - 1]; if (last && b[0] - last[1] < 2) last[1] = b[1]; else merged.push(b.slice()); });
-    const segsOf = (a, b) => {
-      const segs = []; let x0 = -1;
-      for (let x = 0; x <= sw; x++) { let n = 0; if (x < sw) for (let y = a; y < b; y++) n += fg[y * sw + x]; const on = x < sw && n / (b - a) > 0.5; if (on && x0 < 0) x0 = x; if (!on && x0 >= 0) { if (x - x0 > sw * 0.12) segs.push([x0, x]); x0 = -1; } }
-      return segs;
-    };
-    const rows = merged.filter((b) => b[1] - b[0] > sw * 0.05).map((b) => ({ b, segs: segsOf(b[0], b[1]) }));
-    for (let t = 0; t < rows.length; t++) {
-      if (rows[t].segs.length !== 3) continue;
-      // 上の段（3枚）の下にある、下の段（2枚）を探す（カード1枚の高さの8割以上下）
-      const cw = rows[t].segs[0][1] - rows[t].segs[0][0];
-      const u = rows.findIndex((r, i) => i > t && r.segs.length === 2 && r.b[0] - rows[t].b[0] > cw * 1.397 * 0.8);
-      if (u >= 0) {
-        const two = [rows[t], rows[u]], ws = [];
-        two.forEach((r) => r.segs.forEach((s) => ws.push(s[1] - s[0])));
-        // ふつうのカードは銀色のふちが背景と同じに見えるので、ふちのない全面イラストの幅か、ふちの分を足した幅を本当の幅にする
-        const mxw = Math.max.apply(null, ws), mnw = Math.min.apply(null, ws), ow = mxw / mnw > 1.04 ? mxw : mnw * 1.078;
-        const out = [];
-        two.forEach((r) => r.segs.forEach((s) => {
-          const sw0 = s[1] - s[0], off = (ow - sw0) / 2;
-          let top = r.b[0];
-          for (let y = r.b[0]; y < r.b[1]; y++) { let n = 0; for (let x = s[0]; x < s[1]; x++) n += fg[y * sw + x]; if (n / sw0 > 0.5) { top = y; break; } }
-          out.push(refineByTab(img, { x: (s[0] - off) * k, y: (top - off) * k, w: ow * k, h: ow * k * 1.397 }, s[0] * k, s[1] * k));
-        }));
-        return out;
+    const d = cx.getImageData(0, 0, sw, sh).data, N = sw * sh;
+    const fg = new Uint8Array(N), dl = new Uint8Array(N);
+    for (let i = 0; i < N; i++) { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); fg[i] = (mx > 200 && (mx - mn) / mx < 0.14 && g - r >= 3 && b - r >= 5) ? 0 : 1; }
+    // 少しふくらませて、すき間で分かれたかけらをつなげる
+    for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) if (fg[y * sw + x]) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy >= 0 && yy < sh && xx >= 0 && xx < sw) dl[yy * sw + xx] = 1; }
+    // つながったかたまりを探す
+    const seen = new Uint8Array(N), comps = [], q = new Int32Array(N);
+    for (let s0 = 0; s0 < N; s0++) {
+      if (!dl[s0] || seen[s0]) continue;
+      let qh = 0, qt = 0, x0 = sw, x1 = 0, y0 = sh, y1 = 0, f = 0; q[qt++] = s0; seen[s0] = 1;
+      while (qh < qt) {
+        const p = q[qh++], x = p % sw, y = (p - x) / sw; f += fg[p];
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        const nb = [x + 1 < sw ? p + 1 : -1, x > 0 ? p - 1 : -1, y + 1 < sh ? p + sw : -1, y > 0 ? p - sw : -1];
+        for (const n of nb) if (n >= 0 && dl[n] && !seen[n]) { seen[n] = 1; q[qt++] = n; }
       }
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      if (bw >= sw * 0.09 && bw <= sw * 0.36 && bh >= sw * 0.09 && bh <= sw * 0.6) comps.push({ x0, y0, x1: x1 + 1, y1: y1 + 1, w: bw, h: bh, fill: f / (bw * bh) });
+    }
+    // 横の段ごとに分ける
+    comps.sort((a, b) => (a.y0 + a.h / 2) - (b.y0 + b.h / 2));
+    const rows = [];
+    comps.forEach((c) => { const cy = c.y0 + c.h / 2, last = rows[rows.length - 1]; if (last && Math.abs(cy - last.cy) < last.h * 0.35) last.c.push(c); else rows.push({ cy, h: c.h, c: [c] }); });
+    rows.forEach((r) => r.c.sort((a, b) => a.x0 - b.x0));
+    const ctr = (c) => (c.x0 + c.x1) / 2;
+    for (let t = 0; t < rows.length; t++) {
+      if (rows[t].c.length !== 3) continue;
+      const top = rows[t].c, m1 = (ctr(top[0]) + ctr(top[1])) / 2, m2 = (ctr(top[1]) + ctr(top[2])) / 2, tol = sw * 0.09;
+      // 下の段は、上の段のカードのあいだに2つ並ぶ
+      const u = rows.findIndex((r, i) => i > t && r.c.length === 2 && Math.abs(ctr(r.c[0]) - m1) < tol && Math.abs(ctr(r.c[1]) - m2) < tol);
+      if (u < 0) continue;
+      const all = top.concat(rows[u].c), rowOf = [0, 0, 0, 1, 1];
+      const out = all.map((c) => {
+        const isCard = c.fill >= 0.68;
+        if (!isCard) {
+          // アイテム（砂時計など）：下をそろえて、上の「GET」マークの分は入れない
+          const w = c.w * k, h = Math.min(c.h * k, w * 1.18);
+          return { x: c.x0 * k, y: c.y1 * k - h, w, h, item: true };
+        }
+        return refineByTab(img, { x: c.x0 * k, y: c.y0 * k, w: c.w * k, h: c.w * k * 1.397 }, c.x0 * k, c.x1 * k);
+      });
+      // カードは同じ大きさなので、タブで決まったカードの幅のまん中の値にそろえる
+      const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+      const cards = out.filter((r) => !r.item);
+      if (!cards.length) return out;
+      const tabbed = cards.filter((r) => r.tab), Wc = tabbed.length ? med(tabbed.map((r) => r.w)) : med(cards.map((r) => r.w)), Hh = Wc * 1.397;
+      const bottoms = [0, 1].map((ri) => { const b = out.filter((r, i) => rowOf[i] === ri && r.tab).map((r) => r.y + r.h); return b.length ? med(b) : null; });
+      return out.map((r, i) => {
+        if (r.item) return r;
+        if (r.tab) return { x: r.x, y: r.y + r.h - Hh, w: Wc, h: Hh };
+        const cxm = r.x + r.w / 2, bt = bottoms[rowOf[i]], c = all[i];
+        return { x: cxm - Wc / 2, y: bt !== null ? bt - Hh : c.y1 * k - Hh, w: Wc, h: Hh };
+      });
     }
     return null;
   }
@@ -832,16 +857,26 @@
     xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
     const left = X + xs[Math.floor(xs.length * 0.03)], bottom = Y + ys[Math.floor(ys.length * 0.97)];
     const off = Math.min(Math.max(0, sx0 - left), sw0 * 0.08), w = sx1 + off - left, h = w * 1.397;
-    return { x: left, y: bottom - h, w, h };
+    return { x: left, y: bottom - h, w, h, tab: true };
   }
   function cropCanvas(img, x, y, w, h, ow, oh) {
     const c = document.createElement("canvas"); c.width = ow; c.height = oh;
     c.getContext("2d", { willReadFrequently: true }).drawImage(img, x, y, w, h, 0, 0, ow, oh); return c;
   }
   // 名前の帯（カードの上のほう）を、読みやすいように白黒・大きめにする
-  function nameStrip(img, r, dy, trainer, bin) {
+  // 名前の行の高さを探す（カードの上のほうで、濃い点がいちばん多く並ぶ行）。見つからなければふつうの位置
+  function nameRowY(img, r) {
+    const x = r.x + r.w * 0.15, w = r.w * 0.59, y0 = r.y - r.h * 0.03, hh = r.h * 0.16, cw = 120, ch = Math.round(cw * hh / w);
+    const c = cropCanvas(img, x, y0, w, hh, cw, ch), d = c.getContext("2d").getImageData(0, 0, cw, ch).data, rowv = [];
+    for (let y = 0; y < ch; y++) { let n = 0; for (let xx = 0; xx < cw; xx++) { const i = (y * cw + xx) * 4; if (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11 < 100) n++; } rowv.push(n); }
+    const win = Math.max(2, Math.round(ch * 0.045 / 0.16)); let best = -1, bv = 0;
+    for (let y = 0; y + win <= ch; y++) { let n = 0; for (let k2 = 0; k2 < win; k2++) n += rowv[y + k2]; if (n > bv) { bv = n; best = y; } }
+    if (best < 0 || bv < cw * win * 0.06) return r.y + r.h * 0.06;
+    return y0 + (best + win / 2) * hh / ch;
+  }
+  function nameStrip(img, r, dy, trainer, bin, cy) {
     // ポケモンは1行目（左のマークとHPを除く）、トレーナーズ（グッズ・サポート）は2行目に名前がある
-    const x = r.x + r.w * (trainer ? 0.04 : 0.15), y = r.y + r.h * (trainer ? 0.075 : 0.02 + (dy || 0)), w = r.w * (trainer ? 0.6 : 0.59), h = r.h * (trainer ? 0.06 : 0.08);
+    const x = r.x + r.w * (trainer ? 0.04 : 0.15), y = trainer ? r.y + r.h * 0.075 : (cy !== undefined ? cy - r.h * 0.04 : r.y + r.h * 0.02) + r.h * (dy || 0), w = r.w * (trainer ? 0.6 : 0.59), h = r.h * (trainer ? 0.06 : 0.08);
     const oh = 96, ow = Math.round(oh * w / h), c = cropCanvas(img, x, y, w, h, ow, oh), cx = c.getContext("2d");
     const id = cx.getImageData(0, 0, ow, oh), d = id.data; let mn = 255, mx = 0;
     for (let i = 0; i < d.length; i += 4) { const v = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; d[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -868,6 +903,14 @@
     for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - med[0]) < 28 && Math.abs(d[i + 1] - med[1]) < 28 && Math.abs(d[i + 2] - med[2]) < 28) near++;
     return Math.round((1 - near / (d.length / 4)) * 100);
   }
+  // アイテムの色（オレンジ＝チャレンジ砂時計、青紫＝パック砂時計）
+  function itemOf(img, r) {
+    const c = cropCanvas(img, r.x, r.y, r.w, r.h, 30, 34), d = c.getContext("2d").getImageData(0, 0, 30, 34).data; let o = 0, pu = 0;
+    for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); if (ss < 0.3 || vv < 0.35) continue; if (hh >= 0.02 && hh < 0.16) o++; else if (hh >= 0.55 && hh < 0.9) pu++; }
+    // パック砂時計は上にピカチュウ（黄色）がのっているので、青紫が3割あればパック砂時計とみなす
+    const share = pu / Math.max(1, o + pu), color = share >= 0.3 ? "purple" : "orange", it = ITEMS.find((x) => x.color === color) || ITEMS[0];
+    return { name: it.name, unsure: share > 0.15 && share < 0.4 };
+  }
   // 「GET」のマーク（青緑）がカードの上にあるか
   function getScore(img, r) {
     const x = Math.max(0, r.x), y = Math.max(0, r.y - r.h * 0.1), w = r.w, h = r.h * 0.18;
@@ -879,7 +922,7 @@
   // ---- 名前の照らし合わせ ----
   const SMALL = { "ァ": "ア", "ィ": "イ", "ゥ": "ウ", "ェ": "エ", "ォ": "オ", "ッ": "ツ", "ャ": "ヤ", "ュ": "ユ", "ョ": "ヨ", "ヮ": "ワ" };
   function normName(s) {
-    s = kata(s).normalize("NFD").replace(/[゙゚]/g, "").normalize("NFC");
+    s = kata(s).replace(/イ\s*[ベヘ]\s*ン\s*ト/g, "").normalize("NFD").replace(/[゙゚]/g, "").normalize("NFC");
     s = s.replace(/[ァィゥェォッャュョヮ]/g, (c) => SMALL[c]).replace(/[一―‐\-－]/g, "ー");
     return s.replace(/ex$/i, "").replace(/[^゠-ヿ一-鿿]/g, "");
   }
@@ -902,15 +945,33 @@
     ls.set(LOOK_KEY, looks);
   }
   // 読み取った1枚を、パックのカード（名前・レア度）に決める
+  const ALL_PACK = { code: "*", cards: [].concat.apply([], PACKS.map((p) => p.cards)) };
   function identify(pack, s) {
-    let bb = { base: null, score: 0, gap: 0 };
-    (s.texts || [s.text]).forEach((t) => { const r = bestBase(pack, normName(t)); if (r.score > bb.score) bb = r; });
+    if (s.item) {
+      // 覚えている見た目があれば、それを優先する
+      const looks = loadLooks(); let hit = null, hd = 1;
+      ITEMS.forEach((it) => (looks[draft.pack + "|" + it.name + "|item"] || []).forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = it.name; } }));
+      return { card: { no: 0, name: hit && hd < 0.09 ? hit : s.itemName, r: "item" }, unsure: !(hit && hd < 0.09) && s.itemUnsure, score: 1 };
+    }
+    const best0 = (pk) => { let bb = { base: null, score: 0, gap: 0 }; (s.texts || [s.text]).forEach((t) => { const r = bestBase(pk, normName(t)); if (r.score > bb.score) bb = r; }); return bb; };
+    // 見た目で、ありえるカードをしぼる（全面イラストなら◆4・☆系、ふつうの枠なら◆1〜3）。しぼると全然合わないときは、しぼらない
+    const look = s.full > 85 ? FULL_R : s.full < 50 ? NORMAL_R : null;
+    const best = (pk) => {
+      const all = best0(pk); if (!look) return all;
+      const lim = best0({ cards: pk.cards.filter((c) => look.indexOf(c[2]) >= 0) });
+      return all.score > lim.score + 0.3 ? all : (lim.base ? lim : all);
+    };
+    let bb = best(pack), src = pack;
+    // ラッキーチャレンジなど、ほかのパックのカードが混ざることがあるので、はっきり合う名前がほかにあればそちらを使う
+    if (bb.score < 0.8) { const g = best(ALL_PACK); if (g.score >= 0.85 && g.score > bb.score + 0.1) { bb = g; src = ALL_PACK; } }
     if (!bb.base || bb.score < 0.34) return null;
-    let cands = pack.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2] }));
+    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2] })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
+    let cands = pick(src);
     const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
+    const wantEx = exText || s.full > 70;
+    if (!cands.some((c) => /ex$/.test(c.name) === wantEx)) { const g = pick(ALL_PACK).filter((c) => /ex$/.test(c.name) === wantEx); if (g.length) cands = g; }
     if (cands.some((c) => /ex$/.test(c.name)) && cands.some((c) => !/ex$/.test(c.name))) {
-      const want = exText || s.full > 70;
-      const f = cands.filter((c) => /ex$/.test(c.name) === want); if (f.length) cands = f;
+      const f = cands.filter((c) => /ex$/.test(c.name) === wantEx); if (f.length) cands = f;
     }
     let unsure = bb.score < 0.6 || bb.gap < 0.12;
     if (cands.length === 1) return { card: cands[0], unsure, score: bb.score };
@@ -929,7 +990,7 @@
   // パックが分からないとき：読み取った名前がいちばん合うパックを選ぶ
   function guessPack(texts) {
     let best = null, bs = -1;
-    PACKS.forEach((p) => { let sc = 0; texts.forEach((tt) => { let m = 0; tt.forEach((t) => { const n = normName(t); if (n.length >= 2) m = Math.max(m, bestBase(p, n).score); }); sc += m; }); if (p.code === draft.pack) sc += 0.15; if (sc > bs) { bs = sc; best = p; } });
+    PACKS.forEach((p) => { let sc = 0; texts.forEach((tt) => { let m = 0; tt.forEach((t) => { const n = normName(t); if (n.length >= 2) m = Math.max(m, bestBase(p, n).score); }); if (m >= 0.75) sc += m; }); if (p.code === draft.pack) sc += 0.01; if (sc > bs) { bs = sc; best = p; } });
     return best;
   }
 
@@ -938,20 +999,25 @@
     if (!rects) return null;
     const w = await getOcr(), slots = [];
     for (const r of rects) {
+      if (r.item) { const it = itemOf(img, r); slots.push({ item: true, itemName: it.name, itemUnsure: it.unsure, text: "", texts: [], thumb: thumbOf(img, r), full: 0, get: getScore(img, r) }); continue; }
       // 少しずらして2回読み、合うほうを使う
-      const t1 = (await w.recognize(nameStrip(img, r, 0))).data.text || "", t2 = (await w.recognize(nameStrip(img, r, 0.01))).data.text || "";
-      const t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "";
+      // 名前の行に合わせて読む（ふつう・濃いところだけ・少し下・トレーナーズの2行目）
+      const cy = nameRowY(img, r);
+      const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || "";
+      const t2 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "", t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "";
       slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), get: getScore(img, r) });
     }
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
-    return { slots, isAfter: slots[gi].get > 0.03, getIdx: slots[gi].get > 0.03 ? gi : -1 };
+    return { slots, isAfter: slots[gi].get > 0.15, getIdx: slots[gi].get > 0.15 ? gi : -1 };
   }
   // 前と後のカードを、見た目の近さで組み合わせる（5枚の並べ方120通りから一番近いもの）
-  function matchAfter(tb, ta) {
+  let lastMatchDist = 0;
+  function matchAfter(tb, ta, kb, ka) {
     let best = null, bd = 1e9;
-    const perm = (arr, l) => { if (l === 5) { let d = 0; for (let i = 0; i < 5; i++) d += thumbDist(ta[i], tb[arr[i]]); if (d < bd) { bd = d; best = arr.slice(); } return; }
+    const perm = (arr, l) => { if (l === 5) { let d = 0; for (let i = 0; i < 5; i++) d += thumbDist(ta[i], tb[arr[i]]) + (kb && ka && kb[arr[i]] !== ka[i] ? 1 : 0); if (d < bd) { bd = d; best = arr.slice(); } return; }
       for (let i = l; i < 5; i++) { [arr[l], arr[i]] = [arr[i], arr[l]]; perm(arr, l + 1); [arr[l], arr[i]] = [arr[i], arr[l]]; } };
     perm([0, 1, 2, 3, 4], 0);
+    lastMatchDist = bd / 5;
     return best;
   }
 
@@ -982,20 +1048,34 @@
       let unsure = 0;
       if (before) {
         draft.cards = [null, null, null, null, null]; draft.unsureB = [false, false, false, false, false]; draft.want = []; draft.after = [-1, -1, -1, -1, -1];
-        before.slots.forEach((s, p) => { const id = identify(pack, s); draft.thumbB[p] = s.thumb; if (id) { draft.cards[p] = id.card; draft.unsureB[p] = id.unsure; if (id.unsure) unsure++; } });
+        before.slots.forEach((s, p) => { const id = identify(pack, s); draft.thumbB[p] = s.thumb; draft.kindB[p] = s.item ? 1 : 0; if (id) { draft.cards[p] = id.card; draft.unsureB[p] = id.unsure; if (id.unsure) unsure++; } });
       }
       if (after) {
         draft.acards = [null, null, null, null, null]; draft.unsureA = [false, false, false, false, false]; draft.after = [-1, -1, -1, -1, -1];
         draft.get = after.getIdx;
         after.slots.forEach((s, i) => {
-          draft.thumbA[i] = s.thumb;
+          draft.thumbA[i] = s.thumb; draft.kindA[i] = s.item ? 1 : 0;
           const id = identify(pack, s);
           // GETのカードは名前が「GET」のマークで隠れるので、はっきり読めたときだけ入れる
-          if (id && (i !== after.getIdx || id.score >= 0.6)) { draft.acards[i] = id.card; draft.unsureA[i] = id.unsure || i === after.getIdx; }
+          if (id && (i !== after.getIdx || id.score >= 0.85)) { draft.acards[i] = id.card; draft.unsureA[i] = id.unsure || i === after.getIdx; }
         });
       }
       // 前と後の両方の見た目があれば、見た目の近さで移動を決める（名前が隠れたGETのカードも決まる）
-      if (draft.thumbB.every(Boolean) && draft.thumbA.every(Boolean)) draft.after = matchAfter(draft.thumbB, draft.thumbA);
+      let mismatch = false;
+      if (draft.thumbB.every(Boolean) && draft.thumbA.every(Boolean)) {
+        const m = matchAfter(draft.thumbB, draft.thumbA, draft.kindB, draft.kindA);
+        if (lastMatchDist < 0.16) {
+          draft.after = m;
+          // 前で読めなかった（または自信がない）カードは、後で読めた名前を使う（「イベント」の札で名前が隠れるときなど）
+          m.forEach((p, i) => { const a = draft.acards[i]; if (a && (!draft.cards[p] || (draft.unsureB[p] && !draft.unsureA[i]))) { draft.cards[p] = a; draft.unsureB[p] = draft.unsureA[i]; } });
+        }
+        else if (!(before && after)) {
+          // 前に読んだもう片方と見た目が合わない（別のチャレンジ）ので、そちらは消す
+          mismatch = true;
+          if (before) { draft.acards = [null, null, null, null, null]; draft.unsureA = [false, false, false, false, false]; draft.thumbA = [null, null, null, null, null]; draft.get = -1; }
+          else { draft.cards = [null, null, null, null, null]; draft.unsureB = [false, false, false, false, false]; draft.thumbB = [null, null, null, null, null]; draft.want = []; }
+        }
+      }
       if (!draft.cards.every(Boolean) || !draft.thumbB.every(Boolean)) unsure += draft.unsureA.filter(Boolean).length;
       autoLink(); renderBoard();
       const miss = draft.cards.filter((c) => !c).length;
@@ -1004,6 +1084,7 @@
       if (after) parts.push(before ? "シャッフル後の移動とGET" : "チャレンジ結果の5枚とGET");
       const missA = after && !before ? [0, 1, 2, 3, 4].filter((i) => !draft.acards[i]) : [];
       let msg = "読み取りました：" + parts.join("・");
+      if (mismatch) msg += "\n前に読んだスクショとカードが合わなかったので、そちらは消しました。";
       if (unsure) msg += "\n「確認」の印は自信がないところです。違っていればタップで直してください（直すと見た目を覚えて、次から正しく入ります）。";
       if (missA.length) msg += "\n" + missA.map((i) => "後" + (i + 1)).join("・") + "は" + (missA.indexOf(after.getIdx) >= 0 ? "（GETのマークで名前が隠れていて）" : "") + "読めませんでした。タップで入れてください。";
       if (!before) msg += "\nシャッフル前の5か所は、タップすると結果の5枚から選べます。";
