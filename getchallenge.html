@@ -773,29 +773,34 @@
     if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; if (h < 0) h += 1; }
     return [h, mx ? d / mx : 0, mx / 255]; };
 
-  // カード5枚（上3・下2）の場所を探す。背景（明るくて色の薄いところ）以外をカードとみなす
+  // カード5枚（上3・下2）の場所を探す。背景（明るくて少し青みのある灰色）以外をカードとみなす
+  // （白っぽいカードは青みがないので、背景とは分けられる）
   function findCards(img) {
     const W = img.naturalWidth, H = img.naturalHeight, sw = 270, k = W / sw, sh = Math.round(H / k);
     const cv = document.createElement("canvas"); cv.width = sw; cv.height = sh;
     const cx = cv.getContext("2d", { willReadFrequently: true }); cx.drawImage(img, 0, 0, sw, sh);
     const d = cx.getImageData(0, 0, sw, sh).data;
     const fg = new Uint8Array(sw * sh);
-    for (let i = 0; i < sw * sh; i++) { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); fg[i] = (mx > 185 && (mx - mn) / mx < 0.14) ? 0 : 1; }
+    for (let i = 0; i < sw * sh; i++) { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); fg[i] = (mx > 200 && (mx - mn) / mx < 0.14 && g - r >= 3 && b - r >= 5) ? 0 : 1; }
     const rowv = []; for (let y = 0; y < sh; y++) { let n = 0; for (let x = 0; x < sw; x++) n += fg[y * sw + x]; rowv.push(n / sw); }
-    // 横の帯（カードの段）を探す。すき間が小さければつなげる
+    // 横の帯（カードの段）を探す。1行だけのすき間はつなげる
     let bands = [], y0 = -1;
     for (let y = 0; y <= sh; y++) { const on = y < sh && rowv[y] > 0.25; if (on && y0 < 0) y0 = y; if (!on && y0 >= 0) { bands.push([y0, y]); y0 = -1; } }
     const merged = [];
-    bands.forEach((b) => { const last = merged[merged.length - 1]; if (last && b[0] - last[1] < sw * 0.06) last[1] = b[1]; else merged.push(b.slice()); });
+    bands.forEach((b) => { const last = merged[merged.length - 1]; if (last && b[0] - last[1] < 2) last[1] = b[1]; else merged.push(b.slice()); });
     const segsOf = (a, b) => {
       const segs = []; let x0 = -1;
       for (let x = 0; x <= sw; x++) { let n = 0; if (x < sw) for (let y = a; y < b; y++) n += fg[y * sw + x]; const on = x < sw && n / (b - a) > 0.5; if (on && x0 < 0) x0 = x; if (!on && x0 >= 0) { if (x - x0 > sw * 0.12) segs.push([x0, x]); x0 = -1; } }
       return segs;
     };
-    const rows = merged.filter((b) => b[1] - b[0] > sw * 0.12).map((b) => ({ b, segs: segsOf(b[0], b[1]) }));
-    for (let t = 0; t + 1 < rows.length; t++) {
-      if (rows[t].segs.length === 3 && rows[t + 1].segs.length === 2) {
-        const two = [rows[t], rows[t + 1]], ws = [];
+    const rows = merged.filter((b) => b[1] - b[0] > sw * 0.05).map((b) => ({ b, segs: segsOf(b[0], b[1]) }));
+    for (let t = 0; t < rows.length; t++) {
+      if (rows[t].segs.length !== 3) continue;
+      // 上の段（3枚）の下にある、下の段（2枚）を探す（カード1枚の高さの8割以上下）
+      const cw = rows[t].segs[0][1] - rows[t].segs[0][0];
+      const u = rows.findIndex((r, i) => i > t && r.segs.length === 2 && r.b[0] - rows[t].b[0] > cw * 1.397 * 0.8);
+      if (u >= 0) {
+        const two = [rows[t], rows[u]], ws = [];
         two.forEach((r) => r.segs.forEach((s) => ws.push(s[1] - s[0])));
         // ふつうのカードは銀色のふちが背景と同じに見えるので、ふちのない全面イラストの幅か、ふちの分を足した幅を本当の幅にする
         const mxw = Math.max.apply(null, ws), mnw = Math.min.apply(null, ws), ow = mxw / mnw > 1.04 ? mxw : mnw * 1.078;
@@ -804,25 +809,45 @@
           const sw0 = s[1] - s[0], off = (ow - sw0) / 2;
           let top = r.b[0];
           for (let y = r.b[0]; y < r.b[1]; y++) { let n = 0; for (let x = s[0]; x < s[1]; x++) n += fg[y * sw + x]; if (n / sw0 > 0.5) { top = y; break; } }
-          out.push({ x: (s[0] - off) * k, y: (top - off) * k, w: ow * k, h: ow * k * 1.397 });
+          out.push(refineByTab(img, { x: (s[0] - off) * k, y: (top - off) * k, w: ow * k, h: ow * k * 1.397 }, s[0] * k, s[1] * k));
         }));
         return out;
       }
     }
     return null;
   }
+  // カードの左下にある、枚数の入った紺色のタブで、カードの左端と下端を正確に決める
+  function refineByTab(img, r, sx0, sx1) {
+    const sw0 = sx1 - sx0, X = Math.max(0, sx0 - sw0 * 0.1), Y = Math.max(0, r.y + sw0 * 1.1);
+    const W = Math.min(img.naturalWidth - X, sw0 * 0.55), H = Math.min(img.naturalHeight - Y, sw0 * 0.55);
+    if (W < 10 || H < 10) return r;
+    const c = document.createElement("canvas"); c.width = Math.round(W); c.height = Math.round(H);
+    const cx = c.getContext("2d", { willReadFrequently: true }); cx.drawImage(img, X, Y, W, H, 0, 0, c.width, c.height);
+    const d = cx.getImageData(0, 0, c.width, c.height).data, xs = [], ys = [];
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const i = (y * c.width + x) * 4, R = d[i], G = d[i + 1], B = d[i + 2];
+      if (R >= 50 && R <= 125 && G >= 55 && G <= 130 && B >= 75 && B <= 150 && B - R >= 12 && B - R <= 50) { xs.push(x); ys.push(y); }
+    }
+    if (xs.length < c.width * c.height * 0.04) return r;
+    xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
+    const left = X + xs[Math.floor(xs.length * 0.03)], bottom = Y + ys[Math.floor(ys.length * 0.97)];
+    const off = Math.min(Math.max(0, sx0 - left), sw0 * 0.08), w = sx1 + off - left, h = w * 1.397;
+    return { x: left, y: bottom - h, w, h };
+  }
   function cropCanvas(img, x, y, w, h, ow, oh) {
     const c = document.createElement("canvas"); c.width = ow; c.height = oh;
     c.getContext("2d", { willReadFrequently: true }).drawImage(img, x, y, w, h, 0, 0, ow, oh); return c;
   }
   // 名前の帯（カードの上のほう）を、読みやすいように白黒・大きめにする
-  function nameStrip(img, r, dy) {
-    const x = r.x + r.w * 0.15, y = r.y + r.h * (0.02 + (dy || 0)), w = r.w * 0.59, h = r.h * 0.08;
+  function nameStrip(img, r, dy, trainer, bin) {
+    // ポケモンは1行目（左のマークとHPを除く）、トレーナーズ（グッズ・サポート）は2行目に名前がある
+    const x = r.x + r.w * (trainer ? 0.04 : 0.15), y = r.y + r.h * (trainer ? 0.075 : 0.02 + (dy || 0)), w = r.w * (trainer ? 0.6 : 0.59), h = r.h * (trainer ? 0.06 : 0.08);
     const oh = 96, ow = Math.round(oh * w / h), c = cropCanvas(img, x, y, w, h, ow, oh), cx = c.getContext("2d");
     const id = cx.getImageData(0, 0, ow, oh), d = id.data; let mn = 255, mx = 0;
     for (let i = 0; i < d.length; i += 4) { const v = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; d[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
     const sc = 255 / Math.max(1, mx - mn);
-    for (let i = 0; i < d.length; i += 4) { const v = (d[i] - mn) * sc; d[i] = d[i + 1] = d[i + 2] = v; }
+    // bin：濃いところだけ黒にする（全面イラストの、ふち取りされた名前が読みやすくなる）
+    for (let i = 0; i < d.length; i += 4) { const v = bin ? (d[i] < 110 ? 0 : 255) : (d[i] - mn) * sc; d[i] = d[i + 1] = d[i + 2] = v; }
     cx.putImageData(id, 0, 0); return c;
   }
   // カードの見た目（名前とGETマークを除いた部分の小さな色の並び）
@@ -833,18 +858,21 @@
     return out;
   }
   const thumbDist = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length / 255; };
-  // 全面イラストかどうか（下半分の色のばらつき）
+  // 全面イラストかどうか。ふつうのカードは技の欄がほぼ1色なので、まん中の色に近い点が多い。
+  // 0〜100で、全面イラストほど大きい（70より大きければ全面イラスト）
   function fullArtScore(img, r) {
-    const c = cropCanvas(img, r.x + r.w * 0.06, r.y + r.h * 0.55, r.w * 0.88, r.h * 0.37, 40, 30);
-    const d = c.getContext("2d").getImageData(0, 0, 40, 30).data; let s = 0, s2 = 0, n = 0;
-    for (let i = 0; i < d.length; i += 4) { const v = (d[i] + d[i + 1] + d[i + 2]) / 3; s += v; s2 += v * v; n++; }
-    return Math.sqrt(Math.max(0, s2 / n - (s / n) * (s / n)));
+    const c = cropCanvas(img, r.x + r.w * 0.06, r.y + r.h * 0.6, r.w * 0.88, r.h * 0.28, 40, 30);
+    const d = c.getContext("2d").getImageData(0, 0, 40, 30).data, ch = [[], [], []];
+    for (let i = 0; i < d.length; i += 4) { ch[0].push(d[i]); ch[1].push(d[i + 1]); ch[2].push(d[i + 2]); }
+    const med = ch.map((a) => a.slice().sort((x, y) => x - y)[a.length >> 1]); let near = 0;
+    for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - med[0]) < 28 && Math.abs(d[i + 1] - med[1]) < 28 && Math.abs(d[i + 2] - med[2]) < 28) near++;
+    return Math.round((1 - near / (d.length / 4)) * 100);
   }
   // 「GET」のマーク（青緑）がカードの上にあるか
   function getScore(img, r) {
     const x = Math.max(0, r.x), y = Math.max(0, r.y - r.h * 0.1), w = r.w, h = r.h * 0.18;
     const c = cropCanvas(img, x, y, w, h, 60, 18), d = c.getContext("2d").getImageData(0, 0, 60, 18).data; let n = 0;
-    for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); if (hh > 0.43 && hh < 0.54 && ss > 0.55 && vv > 0.5) n++; }
+    for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); if (hh > 0.42 && hh < 0.54 && ss > 0.38 && vv > 0.5) n++; }
     return n / (60 * 18);
   }
 
@@ -881,7 +909,7 @@
     let cands = pack.cards.filter((c) => normName(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2] }));
     const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
     if (cands.some((c) => /ex$/.test(c.name)) && cands.some((c) => !/ex$/.test(c.name))) {
-      const want = exText || s.full > 32;
+      const want = exText || s.full > 70;
       const f = cands.filter((c) => /ex$/.test(c.name) === want); if (f.length) cands = f;
     }
     let unsure = bb.score < 0.6 || bb.gap < 0.12;
@@ -891,10 +919,12 @@
     cands.forEach((c) => (looks[draft.pack + "|" + c.name + "|" + c.r] || []).forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = c; } }));
     if (hit && hd < 0.09) return { card: hit, unsure, score: bb.score };
     // 見た目（ふつうの枠か、全面イラストか）で、ありそうなレア度を選ぶ
-    const group = s.full > 32 ? FULL_R : NORMAL_R;
+    const group = s.full > 70 ? FULL_R : NORMAL_R;
     let pool = cands.filter((c) => group.indexOf(c.r) >= 0); if (!pool.length) pool = cands;
     pool.sort((a, b) => RAR_ORDER.indexOf(a.r) - RAR_ORDER.indexOf(b.r));
-    return { card: pool[0], unsure: true, score: bb.score };
+    // 見た目ではっきり分かれて、候補が1つに決まったときは「確認」をつけない
+    const clear = s.full < 50 || s.full > 85;
+    return { card: pool[0], unsure: unsure || pool.length > 1 || !clear, score: bb.score };
   }
   // パックが分からないとき：読み取った名前がいちばん合うパックを選ぶ
   function guessPack(texts) {
@@ -910,7 +940,8 @@
     for (const r of rects) {
       // 少しずらして2回読み、合うほうを使う
       const t1 = (await w.recognize(nameStrip(img, r, 0))).data.text || "", t2 = (await w.recognize(nameStrip(img, r, 0.01))).data.text || "";
-      slots.push({ text: t1, texts: [t1, t2], thumb: thumbOf(img, r), full: fullArtScore(img, r), get: getScore(img, r) });
+      const t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "";
+      slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), get: getScore(img, r) });
     }
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
     return { slots, isAfter: slots[gi].get > 0.03, getIdx: slots[gi].get > 0.03 ? gi : -1 };
