@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-10-08d -->
+<!-- version 2026-11-05a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>現在の価格表</title>
@@ -467,9 +467,16 @@
     $("pickbar").hidden = picked.size === 0;
     $("pick-count").textContent = picked.size;
   }
+  // 送る文章：カードごとの価格と、合計（価格が入っていないカードは合計に入れない）
   function dmText() {
-    const lines = [dmHead];
-    pickedCards().forEach((c) => lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "")));
+    const lines = [dmHead], list = pickedCards(), yen = (n) => "￥" + n.toLocaleString("ja-JP");
+    let total = 0, none = 0;
+    list.forEach((c) => {
+      const n = String(c[3]).trim() === "" ? null : num(c);
+      if (n === null) none++; else total += n;
+      lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "") + "　" + (n === null ? (String(c[3]).trim() || "価格なし") : yen(n)));
+    });
+    lines.push("合計：" + yen(total) + "（" + list.length + "枚）" + (none ? "\n※価格のないカード" + none + "枚は、合計に入っていません" : ""));
     return lines.join("\n");
   }
   const pickedCards = () => items.filter((c) => picked.has(keyOf(c))).sort((a, b) => (num(b) || 0) - (num(a) || 0));
