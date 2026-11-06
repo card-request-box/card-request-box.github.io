@@ -399,7 +399,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/6 10:30";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/6 10:35";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -427,8 +427,8 @@
   // フリーチャレンジなどで、カードの代わりに出てくるアイテム（color：スクショで見分けるときの色）
   const ITEMS = [{ name: "チャレンジ砂時計", color: "orange" }, { name: "パック砂時計", color: "purple" }];
   const PACKS = (window.GC_PACKS || []);
-  // ゲットチャレンジには色違いと王冠が出ないので、選ぶところと読み取りの候補から外す（手で入れる欄では、まだ選べる）
-  const NOT_IN_GC = { sh1: 1, sh2: 1, cr: 1 };
+  // ゲットチャレンジには☆3（イマーシブ）・色違い・王冠が出ないので、選ぶところと読み取りの候補から外す（手で入れる欄では、まだ選べる）
+  const NOT_IN_GC = { s3: 1, sh1: 1, sh2: 1, cr: 1 };
   PACKS.forEach((p) => { p.cards = p.cards.filter((c) => !NOT_IN_GC[c[2]]); });
   // ☆2で同じポケモンが2種類あるとき：番号の小さい方が黒枠、大きい方が虹枠（特別なイラストのカード）
   const FRAME = {};
