@@ -133,6 +133,22 @@
   .marks button { font: inherit; font-size: .7rem; font-weight: 800; padding: 5px 0; white-space: nowrap; min-width: 0; overflow: hidden; border-radius: 8px; border: 1.5px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; }
   .marks button.w[aria-pressed="true"] { background: var(--want-soft); border-color: var(--want); color: var(--want); }
   .marks button.g[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: #2B1F03; }
+  /* AI予想（♥のカードが、シャッフル後にどこへ行きやすいか） */
+  .ai { margin: 8px 0 6px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--want); background: var(--want-soft); }
+  .ai-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .ai-head b { font-size: .95rem; color: var(--want); }
+  .ai .chips { margin: 0; }
+  .ai-note { margin: 6px 0 0; font-size: .78rem; color: var(--ink); line-height: 1.6; }
+  .ai-note .w { color: var(--error); font-weight: 700; }
+  .ai-foot { margin: 4px 0 0; text-align: right; }
+  .ai-back { margin: 4px 0 6px; text-align: right; }
+  .card.ai-p { border-color: var(--want); overflow: hidden; }
+  .card.ai-p::before { content: ""; position: absolute; inset: 0; background: var(--want); opacity: calc(var(--ai, 0) * .55); pointer-events: none; }
+  .card.ai-p > * { position: relative; }
+  .card.ai-p .no, .card.ai-p .aibest { position: absolute; }
+  .card.ai-best { border-style: solid; box-shadow: 0 0 0 2px var(--want) inset; }
+  .card .aip { font-size: 1.3rem; font-weight: 800; color: var(--ink); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .card .aibest { right: 4px; top: 2px; font-size: .62rem; font-weight: 800; color: #fff; background: var(--want); border-radius: 999px; padding: 0 6px; }
   .marks button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 
   .marks.one { grid-template-columns: 1fr; }
@@ -312,6 +328,14 @@
 
       <h2 style="margin-top:16px"><span class="step">3</span>シャッフル後（チャレンジ結果）</h2>
       <p class="sub">結果画面と同じ並びです。それぞれの場所に<b>どのカードが来たか</b>を選び、GETした場所に<b>GET</b>の印をつけてください。</p>
+      <div class="ai" id="ai" hidden aria-live="polite">
+        <div class="ai-head"><b>AI予想</b>
+          <div class="chips" role="group" aria-label="予想に使う統計"><button type="button" id="ai-me" aria-pressed="false">自分の統計</button><button type="button" id="ai-all" aria-pressed="true">全体の統計</button></div>
+        </div>
+        <p class="ai-note" id="ai-note"></p>
+        <p class="ai-foot"><button type="button" class="linkbtn" id="ai-off">AI予想を消す</button></p>
+      </div>
+      <p class="ai-back" id="ai-back" hidden><button type="button" class="linkbtn" id="ai-on">AI予想を見る</button></p>
       <div class="board" id="board2"></div>
 
       <div class="summary" id="rec-summary"></div>
@@ -399,7 +423,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/6 10:35";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/6 11:05";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -550,6 +574,65 @@
   });
 
   // ============ 記録する ============
+  // ============ AI予想：♥のカードが、シャッフル後にどこへ行きやすいか ============
+  // 過去の記録の「5枚全部の動き」を、全部のパックで数えたものを使う。♥が2枚以上なら、どれかがその場所に来る確率
+  const AI_KEY = "getChallenge:ai";
+  const ai = Object.assign({ on: true, who: "all" }, ls.get(AI_KEY, {}) || {});
+  let aiLoading = false, aiFailed = false, aiTriedAt = 0;
+  const aiSave = () => ls.set(AI_KEY, { on: ai.on, who: ai.who });
+  // シャッフル後がまだ1つも入っていないときだけ出す
+  function aiWaiting() { return !!draft && !draft.after.some((v) => v >= 0) && !draft.acards.some(Boolean); }
+  function aiMatrix() {
+    if (ai.who === "me") return { M: aggregate(loadRecords(), "").moveAll };
+    if (!CONFIG.GAS_URL) return { msg: "全体の統計は準備中です。「自分の統計」に切りかえてください。" };
+    const c = (ls.get(STATS_KEY, null) || {})["_"];
+    if ((!c || Date.now() - c.at >= CONFIG.STATS_CACHE_MIN * 60000) && Date.now() - aiTriedAt > 60000) aiFetch();
+    if (c && c.data && c.data.moveAll) return { M: c.data.moveAll };
+    return { msg: aiFailed ? "全体の統計を読み込めませんでした。時間をおいて開き直すか、「自分の統計」に切りかえてください。" : "全体の統計を読み込んでいます…" };
+  }
+  async function aiFetch() {
+    if (aiLoading) return;
+    aiLoading = true; aiTriedAt = Date.now();
+    try { await loadAllStats(""); aiFailed = false; } catch (e) { aiFailed = true; }
+    aiLoading = false;
+    if (draft) renderBoard2();
+  }
+  function aiPredict() {
+    if (!ai.on || !draft.want.length || !aiWaiting()) return null;
+    const m = aiMatrix();
+    if (!m.M) return { msg: m.msg };
+    const p = [0, 0, 0, 0, 0]; let n = Infinity, used = 0;
+    draft.want.forEach((w) => {
+      const row = m.M[w] || [], sum = row.reduce((a, b) => a + b, 0);
+      n = Math.min(n, sum);
+      if (!sum) return;
+      used++; row.forEach((v, j) => { p[j] += v / sum; });
+    });
+    if (!used) return { msg: (ai.who === "me" ? "自分の記録には、" : "記録には、") + "♥の場所のデータがまだないので、予想できません。" + (ai.who === "me" ? "「全体の統計」に切りかえてみてください。" : "") };
+    const q = p.map((v) => Math.min(1, v)), max = Math.max.apply(null, q);
+    return { p: q, best: q.indexOf(max), max, n };
+  }
+  function renderAI(P) {
+    const wait = aiWaiting();
+    $("ai").hidden = !(ai.on && wait); $("ai-back").hidden = !(!ai.on && wait);
+    if ($("ai").hidden) return;
+    $("ai-me").setAttribute("aria-pressed", ai.who === "me" ? "true" : "false");
+    $("ai-all").setAttribute("aria-pressed", ai.who === "all" ? "true" : "false");
+    const note = $("ai-note"); note.innerHTML = "";
+    if (!draft.want.length) { note.textContent = "シャッフル前の5枚に「♥欲しい」をつけると、そのカードがシャッフル後にどこへ行きやすいかを、下の5つのマスに色と％で出します。"; return; }
+    if (!P || !P.p) { note.textContent = (P && P.msg) || ""; return; }
+    note.append("過去の記録から、♥のカードがシャッフル後にどこへ行きやすいかを出しています（当たるとは限りません）。"
+      + (draft.want.length > 1 ? "♥が2枚以上なので、どれかがその場所に来る確率です。" : "")
+      + "いちばん多いのは ", mk("b", "", (P.best + 1) + " " + POS_LABEL[P.best] + "（" + Math.round(P.max * 100) + "%）"), " です。"
+      + "（" + (ai.who === "me" ? "自分" : "全体") + "の記録 " + P.n + "回分）");
+    if (P.n < 10) note.append(mk("span", "w", " まだ記録が少ないので、参考程度にしてください。"));
+    if (ai.who === "all") note.append(" 全体の統計には、偽の記録がふくまれているかもしれません。");
+  }
+  $("ai-me").addEventListener("click", () => { ai.who = "me"; aiSave(); renderBoard2(); });
+  $("ai-all").addEventListener("click", () => { ai.who = "all"; aiSave(); renderBoard2(); });
+  $("ai-off").addEventListener("click", () => { ai.on = false; aiSave(); renderBoard2(); });
+  $("ai-on").addEventListener("click", () => { ai.on = true; aiSave(); renderBoard2(); });
+
   let draft = null;
   function newDraft(pack) {
     return { pack: pack, cards: [null, null, null, null, null], want: [], after: [-1, -1, -1, -1, -1], get: -1,
@@ -629,6 +712,7 @@
   // ---- ③ シャッフル後（それぞれの場所に来たカード） ----
   function renderBoard2() {
     const b = $("board2"); b.innerHTML = "";
+    const P = aiPredict();
     for (let i = 0; i < 5; i++) {
       const pi = draft.after[i], c = afterCard(i);
       const isWant = pi >= 0 && draft.want.indexOf(pi) >= 0;
@@ -642,6 +726,13 @@
       if (c) {
         btn.append(mk("span", "nm", c.name), pi >= 0 ? mk("span", "from", "前は " + (pi + 1) + POS_LABEL[pi]) : rarEl(c.r, frameOf(draft.pack, c.no, c.name)));
         if (pi >= 0 ? draft.unsureB[pi] : draft.unsureA[i]) btn.append(mk("span", "chk", "確認"));
+      } else if (P && P.p) {
+        // AI予想：行きやすいマスほど濃い色
+        btn.classList.add("ai-p"); if (i === P.best) btn.classList.add("ai-best");
+        btn.style.setProperty("--ai", (P.p[i] / (P.max || 1)).toFixed(3));
+        btn.setAttribute("aria-label", btn.getAttribute("aria-label") + "、AI予想 " + Math.round(P.p[i] * 100) + "%");
+        if (i === P.best) btn.append(mk("span", "aibest", "いちばん多い"));
+        btn.append(mk("span", "aip", Math.round(P.p[i] * 100) + "%"), mk("span", "ph", "＋ 来たカード"));
       } else btn.append(mk("span", "ph", "＋ 来たカード"));
       btn.addEventListener("click", () => openAfter(i));
       const marks = mk("div", "marks one");
@@ -649,6 +740,7 @@
       g.addEventListener("click", () => { draft.get = draft.get === i ? -1 : i; renderBoard2(); });
       marks.append(g); pos.append(btn, marks); b.append(pos);
     }
+    renderAI(P);
     renderSummary();
   }
   let afterIdx = 0;
