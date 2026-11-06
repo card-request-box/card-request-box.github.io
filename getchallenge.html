@@ -126,6 +126,9 @@
   .rar.st, .rar.cr { color: var(--gold-deep); }
   .rar.sh { color: var(--shiny); }
   .rar.it { color: var(--muted); }
+  .rar .frame { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: .64rem; line-height: 1.5; letter-spacing: 0; vertical-align: 1px; }
+  .rar .frame.bk { background: #2A2F45; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  .rar .frame.rb { background: linear-gradient(90deg, #FFB3B3, #FFE08A, #B8F0B0, #A8D8FF, #E0C3FF); color: #1E2235; }
   .marks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
   .marks button { font: inherit; font-size: .7rem; font-weight: 800; padding: 5px 0; white-space: nowrap; min-width: 0; overflow: hidden; border-radius: 8px; border: 1.5px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; }
   .marks button.w[aria-pressed="true"] { background: var(--want-soft); border-color: var(--want); color: var(--want); }
@@ -396,7 +399,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/5 1:45";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/6 10:30";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -424,10 +427,25 @@
   // フリーチャレンジなどで、カードの代わりに出てくるアイテム（color：スクショで見分けるときの色）
   const ITEMS = [{ name: "チャレンジ砂時計", color: "orange" }, { name: "パック砂時計", color: "purple" }];
   const PACKS = (window.GC_PACKS || []);
+  // ゲットチャレンジには色違いと王冠が出ないので、選ぶところと読み取りの候補から外す（手で入れる欄では、まだ選べる）
+  const NOT_IN_GC = { sh1: 1, sh2: 1, cr: 1 };
+  PACKS.forEach((p) => { p.cards = p.cards.filter((c) => !NOT_IN_GC[c[2]]); });
+  // ☆2で同じポケモンが2種類あるとき：番号の小さい方が黒枠、大きい方が虹枠（特別なイラストのカード）
+  const FRAME = {};
+  PACKS.forEach((p) => {
+    const by = {};
+    p.cards.forEach((c) => { if (c[2] === "s2") (by[c[1]] = by[c[1]] || []).push(c[0]); });
+    Object.keys(by).forEach((n) => {
+      const a = by[n].slice().sort((x, y) => x - y);
+      if (a.length < 2) return;
+      FRAME[p.code + "|" + a[0] + "|" + n] = "黒枠"; FRAME[p.code + "|" + a[a.length - 1] + "|" + n] = "虹枠";
+    });
+  });
+  const frameOf = (code, no, name) => FRAME[code + "|" + no + "|" + name] || "";
   const OTHER = { code: "X", name: "そのほかのパック（一覧にない）", cards: [] };
   // ラッキーチャレンジなど、いろいろなパックのカードが出るとき用（全パックのカードを名前とレア度で1つずつ）
   const MIX = { code: "MIX", name: "ラッキーチャレンジなど（いろいろなパック）", cards: [] };
-  (() => { const seen = {}; PACKS.forEach((p) => p.cards.forEach((c) => { const k = c[1] + "|" + c[2]; if (seen[k]) return; seen[k] = 1; MIX.cards.push([c[0], c[1], c[2], c[3] || 0, p.name]); })); })();
+  (() => { const seen = {}; PACKS.forEach((p) => p.cards.forEach((c) => { const f = frameOf(p.code, c[0], c[1]), k = c[1] + "|" + c[2] + "|" + f; if (seen[k]) return; seen[k] = 1; MIX.cards.push([c[0], c[1], c[2], c[3] || 0, p.name]); if (f) FRAME["MIX|" + c[0] + "|" + c[1]] = f; })); })();
   const packByCode = (c) => PACKS.find((p) => p.code === c) || (c === "X" ? OTHER : c === "MIX" ? MIX : null);
   const packOfCard = (name, r) => { const p = PACKS.find((pk) => pk.cards.some((c) => c[1] === name && c[2] === r)); return p ? p.name : ""; };
 
@@ -464,7 +482,8 @@
   // ============ 表示ユーティリティ ============
   function toast(text, err) { const t = $("toast"); t.textContent = text; t.className = "toast" + (err ? " err" : ""); t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3200); }
   function setStatus(id, t, err) { const s = $(id); s.className = "status" + (err ? " error" : ""); s.textContent = t || ""; }
-  function rarEl(r) { const x = RAR[r]; return mk("span", "rar" + (x && x.c ? " " + x.c : ""), x ? x.s : ""); }
+  // レア度の表示（f：☆2の黒枠・虹枠）
+  function rarEl(r, f) { const x = RAR[r], e = mk("span", "rar" + (x && x.c ? " " + x.c : ""), x ? x.s : ""); if (f) e.append(mk("span", "frame " + (f === "虹枠" ? "rb" : "bk"), f)); return e; }
   function openSheet(id) { closeSheets(); $(id).hidden = false; $("sheet-bg").hidden = false; document.body.style.overflow = "hidden"; }
   function closeSheets() { ["pick-sheet", "after-sheet", "login-sheet"].forEach((i) => { $(i).hidden = true; }); $("sheet-bg").hidden = true; document.body.style.overflow = ""; }
   $("sheet-bg").addEventListener("click", closeSheets);
@@ -597,7 +616,7 @@
       btn.type = "button"; btn.setAttribute("aria-label", "シャッフル前 " + (i + 1) + "番目（" + POS_LABEL[i] + "）" + (c ? "：" + c.name : "：カードを入れる"));
       btn.append(mk("span", "no", String(i + 1)));
       if (draft.want.indexOf(i) >= 0) btn.append(mk("span", "wtag", "♥"));
-      if (c) { btn.append(mk("span", "nm", c.name), rarEl(c.r)); if (draft.unsureB[i]) btn.append(mk("span", "chk", "確認")); }
+      if (c) { btn.append(mk("span", "nm", c.name), rarEl(c.r, frameOf(draft.pack, c.no, c.name))); if (draft.unsureB[i]) btn.append(mk("span", "chk", "確認")); }
       else btn.append(mk("span", "ph", draft.acards.some(Boolean) ? "＋ 結果から選ぶ" : "＋ カード"));
       btn.addEventListener("click", () => openPicker(i, "before"));
       const marks = mk("div", "marks one");
@@ -621,7 +640,7 @@
       if (draft.get === i) btn.append(mk("span", "tag", "GET"));
       if (isWant) btn.append(mk("span", "wtag", "♥"));
       if (c) {
-        btn.append(mk("span", "nm", c.name), pi >= 0 ? mk("span", "from", "前は " + (pi + 1) + POS_LABEL[pi]) : rarEl(c.r));
+        btn.append(mk("span", "nm", c.name), pi >= 0 ? mk("span", "from", "前は " + (pi + 1) + POS_LABEL[pi]) : rarEl(c.r, frameOf(draft.pack, c.no, c.name)));
         if (pi >= 0 ? draft.unsureB[pi] : draft.unsureA[i]) btn.append(mk("span", "chk", "確認"));
       } else btn.append(mk("span", "ph", "＋ 来たカード"));
       btn.addEventListener("click", () => openAfter(i));
@@ -699,7 +718,7 @@
     from.hidden = !free.length;
     free.forEach((k) => {
       const c = draft.acards[k], li = mk("li"), bt = mk("button"); bt.type = "button";
-      bt.append(mk("span", "num", "後" + (k + 1) + POS_LABEL[k]), mk("span", "nm", c.name + (draft.get === k ? "（GET）" : "")), rarEl(c.r));
+      bt.append(mk("span", "num", "後" + (k + 1) + POS_LABEL[k]), mk("span", "nm", c.name + (draft.get === k ? "（GET）" : "")), rarEl(c.r, frameOf(draft.pack, c.no, c.name)));
       bt.addEventListener("click", () => pickFromAfter(k));
       li.append(bt); fl.append(li);
     });
@@ -732,18 +751,18 @@
     let rows = all.filter(hit);
     ul.hidden = !(p && p.cards.length);
     if (!ul.hidden && mix && !q && !pickRar) { ul.append(mk("li", "empty", "いろいろなパックのカードから探します。上の欄に名前を入れてください。")); return; }
-    const addRow = (c, label) => {
+    const addRow = (c, label, code) => {
       const li = mk("li"), b = mk("button"); b.type = "button";
-      b.append(mk("span", "num", label), mk("span", "nm", c[1]), rarEl(c[2]));
+      b.append(mk("span", "num", label), mk("span", "nm", c[1]), rarEl(c[2], frameOf(code, c[0], c[1])));
       b.addEventListener("click", () => setCard({ no: c[0], name: c[1], r: c[2] }));
       li.append(b); ul.append(li);
     };
-    rows.slice(0, 200).forEach((c) => addRow(c, mix ? (c[4] || "").slice(0, 6) : c[0] ? "No." + c[0] : ""));
+    rows.slice(0, 200).forEach((c) => addRow(c, mix ? (c[4] || "").slice(0, 6) : c[0] ? "No." + c[0] : "", mix ? "MIX" : p.code));
     // 検索したときは、ほかのパックのカードも出す（ラッキーチャレンジなどで、選んだパックにないカードが出ることがあるため）
     if (!mix && q && p && p.cards.length) {
       const have = {}; rows.forEach((c) => { have[c[1] + "|" + c[2]] = 1; });
       const extra = MIX.cards.filter((c) => hit(c) && !have[c[1] + "|" + c[2]]).slice(0, 40);
-      if (extra.length) { ul.append(mk("li", "sep", "ほかのパックのカード")); extra.forEach((c) => addRow(c, (c[4] || "").slice(0, 6))); }
+      if (extra.length) { ul.append(mk("li", "sep", "ほかのパックのカード")); extra.forEach((c) => addRow(c, (c[4] || "").slice(0, 6), "MIX")); }
     }
     if (!ul.children.length && !ul.hidden) ul.append(mk("li", "empty", "見つかりませんでした。"));
   }
@@ -1384,7 +1403,7 @@
         const w = r.want.indexOf(pi) >= 0;
         const d = mk("div", (r.get === i ? "g" : "") + (w ? " w" : ""));
         const lb = "後" + (i + 1) + (A ? "←前" + (pi + 1) : "") + (r.get === i ? " GET" : "") + (w ? " ♥" : "");
-        d.append(mk("span", "lb", lb), mk("span", "nm", c ? c.name : "-"), rarEl(c ? c.r : ""));
+        d.append(mk("span", "lb", lb), mk("span", "nm", c ? c.name : "-"), rarEl(c ? c.r : "", c ? frameOf(r.pack, c.no, c.name) : ""));
         mini.append(d);
       });
       const foot = mk("div", "foot");
