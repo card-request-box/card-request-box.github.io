@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-11-05b -->
+<!-- version 2026-11-06a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>現在の価格表</title>
@@ -69,6 +69,9 @@
   h1 .mark { color: var(--gold); margin-right: 6px; }
   .lead { color: #C9D1EA; font-size: 0.92rem; margin: 0; }
   .note { color: #C9D1EA; text-align: center; font-size: .8rem; }
+  .stale { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: #FFF4D6; border-left: 4px solid #E0A100; color: #5A4300; font-size: .84rem; font-weight: 700; }
+  .stale.err { background: #FDE8E8; border-left-color: #C62828; color: #7A1010; }
+  .stale button { display: block; margin-top: 6px; font: inherit; font-size: .84rem; font-weight: 800; padding: 6px 12px; border-radius: 999px; border: 0; background: #C62828; color: #fff; cursor: pointer; }
 
   .panel { background: var(--panel); border-radius: 18px; padding: 16px; box-shadow: 0 0 0 4px rgba(242,193,78,.35); margin-bottom: 16px; }
   .panel h2 { font-size: 1rem; font-weight: 800; margin: 0 0 8px; }
@@ -359,6 +362,7 @@
       <select id="sort" aria-label="並び順" style="flex:0 0 auto"><option value="desc">高い順</option><option value="asc">低い順</option></select>
     </div>
     <p class="hint" id="updated" style="margin:0 0 10px"></p>
+    <div class="stale" id="stale" hidden role="status"><span id="stale-text"></span><button type="button" id="stale-retry" hidden>もう一度読み込む</button></div>
     <div id="tiers"></div>
     <p class="empty" id="empty" hidden style="color:var(--muted)"></p>
   </section>
@@ -499,8 +503,10 @@
     const S = sumOf(list);
     box.appendChild(mk("p", "pick-sum", "合計：" + yen(S.total) + "（" + list.length + "枚）" + (S.none ? "　※価格のないカード" + S.none + "枚をのぞく" : "")));
   }
-  function openList() { renderPickList(); if (picked.size) showSheet("list-sheet"); }
-  function openDm() {
+  async function openList() { await ensureFresh(); renderPickList(); if (picked.size) showSheet("list-sheet"); }
+  async function openDm() {
+    await ensureFresh();
+    if (!picked.size) return;
     const t = dmText();
     $("dm-text").textContent = t;
     $("dm-link").href = "https://x.com/messages/compose?recipient_id=" + CONFIG.DM_ID + "&text=" + encodeURIComponent(t);
@@ -539,34 +545,65 @@
     items.map((c) => c[1]).filter((p, i, a) => p && a.indexOf(p) === i).forEach((p) => sel.appendChild(new Option(p, p)));
     sel.value = cur; if (sel.value !== cur) sel.value = "";
     { const u = $("updated"); u.textContent = "※カードの価格です。配布のリクエストは"; const l = mk("a", "", "リクエスト箱"); l.href = "./"; u.append(l, "へ（無料です）"); }
+    if (lastOk) { const t = new Date(lastOk); $("updated").append(mk("span", "", "　" + t.getHours() + ":" + String(t.getMinutes()).padStart(2, "0") + " の最新の価格です")); }
     render(); renderBar();
   }
   // 前に読み込んだ内容をこのスマホに残しておき、次に開いたときはすぐ表示する（そのあと最新に更新）
+  // ・古い価格のまま気づかずに使われないように、最新を確かめている間と、確かめられなかったときは、はっきり出す
   const CACHE_KEY = "cardRate:cache";
-  async function load(quiet) {
-    if (CONFIG.PREVIEW) { $("note").textContent = "見た目確認用のプレビューです（サンプルのカードを表示しています）。"; return apply(SAMPLE); }
-    if (!quiet) {
-      let c = null; try { c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (e) {}
-      if (c && c.ok) apply(c); else { $("empty").hidden = true; setLoading(true, "価格表を読み込んでいます…"); }
-    }
-    for (let i = 0; i < 3; i++) {
-      const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8000);
-      try {
-        const res = await fetch(CONFIG.GAS_URL + "?action=tiers&t=" + Date.now(), { signal: ctl.signal });
-        const d = await res.json();
-        if (!d.ok) throw 0;
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {}
-        $("note").textContent = ""; setLoading(false); return apply(d);
-      } catch (e) { await new Promise((r) => setTimeout(r, 600)); }
-      finally { clearTimeout(timer); }
-    }
-    // まだ何も表示できていないときは、5秒後にもう一度読み込む
-    if (!quiet && $("loadbox").hidden === false) { setLoading(true, "つながりにくいため、読み込みをやり直しています…"); setTimeout(() => load(), 5000); }
+  let lastOk = 0, loading = null, retryTimer = null;
+  function setStale(text, err) {
+    $("stale").hidden = !text; $("stale").className = "stale" + (err ? " err" : "");
+    $("stale-text").textContent = text || ""; $("stale-retry").hidden = !err;
   }
+  function load(quiet) {
+    if (CONFIG.PREVIEW) { $("note").textContent = "見た目確認用のプレビューです（サンプルのカードを表示しています）。"; lastOk = Date.now(); apply(SAMPLE); return Promise.resolve(true); }
+    if (loading) return loading;
+    loading = (async () => {
+      clearTimeout(retryTimer);
+      if (!quiet) {
+        let c = null; try { c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (e) {}
+        if (c && c.ok && !items.length) { apply(c); setStale("前に開いたときの価格を表示しています。最新の価格を確かめています…"); }
+        else if (!items.length) { $("empty").hidden = true; setLoading(true, "価格表を読み込んでいます…"); }
+      }
+      for (let i = 0; i < 3; i++) {
+        const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 20000);
+        try {
+          const res = await fetch(CONFIG.GAS_URL + "?action=tiers&t=" + Date.now(), { signal: ctl.signal, cache: "no-store" });
+          const d = await res.json();
+          if (!d.ok) throw 0;
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {}
+          lastOk = Date.now();
+          $("note").textContent = ""; setLoading(false); setStale(""); apply(d); return true;
+        } catch (e) { await new Promise((r) => setTimeout(r, 800)); }
+        finally { clearTimeout(timer); }
+      }
+      // 最新を確かめられなかった
+      if (items.length) {
+        setLoading(false);
+        setStale("最新の価格を読み込めませんでした。表示している価格は、古いかもしれません。", true);
+      } else setLoading(true, "つながりにくいため、読み込みをやり直しています…");
+      retryTimer = setTimeout(() => load(true), items.length ? 15000 : 5000);
+      return false;
+    })();
+    return loading.finally(() => { loading = null; });
+  }
+  // 最新の価格を確かめてから進む（DMの文章や合計を、古い価格で作らないため）
+  async function ensureFresh() {
+    if (CONFIG.PREVIEW || Date.now() - lastOk < 60e3) return;
+    setLoading(true, "最新の価格を確かめています…");
+    const ok = await load(true);
+    setLoading(false);
+    if (!ok) toast("最新の価格を読み込めませんでした。表示中の価格で作ります。", true);
+  }
+  $("stale-retry").addEventListener("click", () => { setStale("最新の価格を確かめています…"); load(true); });
   $("dm-name").textContent = CONFIG.DM_NAME; $("dm-name2").textContent = CONFIG.DM_NAME;
   load();
-  // 開いたままでも、5分ごとに最新の価格に更新する
-  setInterval(() => { if (document.visibilityState === "visible" && $("dm-sheet").hidden && $("list-sheet").hidden) load(true); }, 5 * 60e3);
+  // 開いたままでも、2分ごとに最新の価格に更新する
+  setInterval(() => { if (document.visibilityState === "visible" && $("dm-sheet").hidden && $("list-sheet").hidden) load(true); }, 2 * 60e3);
+  // ほかのアプリから戻ってきたときも、1分以上たっていれば最新にする
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - lastOk > 60e3 && $("dm-sheet").hidden && $("list-sheet").hidden) load(true); });
+  window.addEventListener("pageshow", (e) => { if (e.persisted && Date.now() - lastOk > 60e3) load(true); });
 </script>
 </body>
 </html>
