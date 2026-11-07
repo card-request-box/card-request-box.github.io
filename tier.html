@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-11-06b -->
+<!-- version 2026-11-07a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>現在の価格表</title>
@@ -324,6 +324,18 @@
   .pick-sum { margin: 10px 0 0; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
   .freenote { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: var(--soft); border-left: 4px solid var(--gold); font-size: .85rem; white-space: pre-wrap; }
   .tcard .body { flex: 1; min-width: 0; }
+  .trow { margin-bottom: 6px; }
+  .trow .tcard { margin-bottom: 0; }
+  .trow.on .tcard { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-width: 0; }
+  .qty { display: flex; align-items: center; gap: 8px; padding: 4px 12px 9px 46px; border: 2px solid var(--gold-deep); border-top: 0; border-radius: 0 0 12px 12px; background: color-mix(in srgb, var(--gold) 22%, var(--panel)); }
+  .qty[hidden] { display: none; }
+  .qty .ql { font-size: .78rem; font-weight: 800; color: var(--muted); }
+  .qb { flex: none; width: 38px; height: 34px; border-radius: 10px; border: 2px solid var(--gold-deep); background: var(--panel); font: inherit; font-weight: 800; font-size: 1.15rem; line-height: 1; color: var(--ink); cursor: pointer; padding: 0; }
+  .qb:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .qn { min-width: 2.6em; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .qs { margin-left: auto; font-weight: 800; color: var(--gold-deep); font-variant-numeric: tabular-nums; }
+  .pick-row .qbox { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+  .pick-row .qb { width: 34px; height: 30px; border-radius: 9px; border: 2px solid var(--gold-deep); color: var(--ink); background: var(--panel); font-size: 1.05rem; padding: 0; }
   .tcard .rate { flex: none; text-align: right; font-weight: 800; font-size: 1.35rem; line-height: 1.1; color: var(--gold-deep); font-variant-numeric: tabular-nums; }
   .tcard .rate small { display: block; font-size: .65rem; color: var(--muted); font-weight: 700; }
   .tcard .rank { flex: none; width: 26px; text-align: center; font-weight: 800; font-size: .8rem; color: var(--muted); margin-top: 3px; }
@@ -428,7 +440,8 @@
   ] };
   let dmHead = "注文したいカードを選びました";
   let items = [];          // [name, pack, rarity, tier, note]
-  const picked = new Set(); // 選んだカード（name|pack|rarity）
+  const picked = new Map(); // 選んだカード（name|pack|rarity）→ 枚数
+  const MAX_KINDS = 20, MAX_QTY = 20; // 一度にえらべるのは20種類まで、1種類につき20枚まで
   // 「レアリティ／パック」の部分。名前とレアリティが同じとき・パックがないときは、その分を省く（「金枠」など）
   const subOf = (c) => [c[2] !== c[0] ? c[2] : "", c[1] || ""].filter(Boolean).join("／");
   const keyOf = (c) => c[0] + "\u0001" + c[1] + "\u0001" + c[2];
@@ -455,46 +468,67 @@
       h.append(mk("span", "tier-badge t" + Math.min((asc ? groups.length - gi : gi + 1), 6), gr.v), mk("span", "tier-count", "￥" + gr.v + "（" + gr.list.length + "枚）"));
       g.appendChild(h);
       gr.list.forEach((c) => {
+        const row = mk("div", "trow");
         const b = mk("button", "tcard"); b.type = "button";
         const k = keyOf(c);
-        b.setAttribute("aria-pressed", String(picked.has(k)));
         const body = mk("span", "body");
         body.append(mk("span", "nm", c[0]), mk("span", "sub2", subOf(c)));
         if (c[4]) body.append(mk("span", "cm", c[4]));
         const rate = mk("span", "rate", c[3]);
         b.append(mk("span", "chk", "✓"), body, rate);
         b.setAttribute("aria-label", c[0] + " " + c[2] + " ￥" + c[3]);
+        // 枚数（えらんだときだけ出る）
+        const qb = mk("div", "qty"), minus = mk("button", "qb", "−"), qn = mk("span", "qn"), plus = mk("button", "qb", "＋"), qs = mk("span", "qs");
+        minus.type = "button"; plus.type = "button";
+        minus.setAttribute("aria-label", c[0] + "を1枚へらす"); plus.setAttribute("aria-label", c[0] + "を1枚ふやす");
+        qb.append(mk("span", "ql", "枚数"), minus, qn, plus, qs);
+        const upd = () => {
+          const q = picked.get(k) || 0, n = priceOf(c);
+          b.setAttribute("aria-pressed", String(q > 0)); row.classList.toggle("on", q > 0); qb.hidden = q === 0;
+          qn.textContent = q + "枚"; qs.textContent = q > 1 && n !== null ? "計 " + yen(n * q) : "";
+        };
         b.addEventListener("click", () => {
-          if (picked.has(k)) picked.delete(k); else { if (picked.size >= 20) return toast("一度にえらべるのは20枚までです。", true); picked.add(k); }
-          b.setAttribute("aria-pressed", String(picked.has(k))); renderBar();
+          if (picked.has(k)) picked.delete(k); else { if (picked.size >= MAX_KINDS) return toast("一度にえらべるのは" + MAX_KINDS + "種類までです。", true); picked.set(k, 1); }
+          upd(); renderBar();
         });
-        g.appendChild(b);
+        minus.addEventListener("click", () => { const q = (picked.get(k) || 0) - 1; if (q <= 0) picked.delete(k); else picked.set(k, q); upd(); renderBar(); });
+        plus.addEventListener("click", () => { const q = picked.get(k) || 0; if (q >= MAX_QTY) return toast("1種類につき" + MAX_QTY + "枚までです。", true); picked.set(k, q + 1); upd(); renderBar(); });
+        upd();
+        row.append(b, qb); g.appendChild(row);
       });
       box.appendChild(g);
     });
   }
   function renderBar() {
     $("pickbar").hidden = picked.size === 0;
-    $("pick-count").textContent = picked.size;
     const S = sumOf(pickedCards());
+    $("pick-count").textContent = S.count;
     $("pick-total").textContent = "合計" + yen(S.total) + (S.none ? "（価格なし" + S.none + "枚をのぞく）" : "");
   }
   // 価格（入っていなければ null）と、選んだカードの合計（価格が入っていないカードは合計に入れない）
   const yen = (n) => "￥" + n.toLocaleString("ja-JP");
   const priceOf = (c) => String(c[3]).trim() === "" ? null : num(c);
-  function sumOf(list) { let total = 0, none = 0; list.forEach((c) => { const n = priceOf(c); if (n === null) none++; else total += n; }); return { total, none }; }
+  const qtyOf = (c) => picked.get(keyOf(c)) || 1;
+  function sumOf(list) { let total = 0, none = 0, count = 0; list.forEach((c) => { const n = priceOf(c), q = qtyOf(c); count += q; if (n === null) none += q; else total += n * q; }); return { total, none, count }; }
+  // 「￥625」→ 2枚以上なら「￥625 × 2枚 ＝ ￥1,250」
+  function linePrice(c) {
+    const n = priceOf(c), q = qtyOf(c);
+    let p = n === null ? (String(c[3]).trim() || "価格なし") : yen(n);
+    if (q > 1) p += n === null ? " × " + q + "枚" : " × " + q + "枚 ＝ " + yen(n * q);
+    return p;
+  }
   // 送る文章：カードごとの価格と、合計
   // 「価格を表示しない」を押したときは、価格と合計の金額を入れない（押さなければ今までどおり。ページを開き直すと元に戻る）
   let hidePrice = false;
   function dmText() {
     const lines = [dmHead], list = pickedCards(), S = sumOf(list);
     if (hidePrice) {
-      list.forEach((c) => lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "")));
-      lines.push("合計：" + list.length + "枚");
+      list.forEach((c) => { const q = qtyOf(c); lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "") + (q > 1 ? "　×" + q + "枚" : "")); });
+      lines.push("合計：" + S.count + "枚");
       return lines.join("\n");
     }
-    list.forEach((c) => { const n = priceOf(c); lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "") + "　" + (n === null ? (String(c[3]).trim() || "価格なし") : yen(n))); });
-    lines.push("合計：" + yen(S.total) + "（" + list.length + "枚）" + (S.none ? "\n※価格のないカード" + S.none + "枚は、合計に入っていません" : ""));
+    list.forEach((c) => { lines.push("・" + c[0] + (subOf(c) ? "（" + subOf(c) + "）" : "") + "　" + linePrice(c)); });
+    lines.push("合計：" + yen(S.total) + "（" + S.count + "枚）" + (S.none ? "\n※価格のないカード" + S.none + "枚は、合計に入っていません" : ""));
     return lines.join("\n");
   }
   const pickedCards = () => items.filter((c) => picked.has(keyOf(c))).sort((a, b) => (num(b) || 0) - (num(a) || 0));
@@ -503,15 +537,23 @@
     const box = $("list-body"); box.innerHTML = "";
     const list = pickedCards();
     if (!list.length) { closeDm(); return; }
+    const again = () => { render(); renderBar(); renderPickList(); };
     list.forEach((c) => {
+      const k = keyOf(c), q = qtyOf(c), n = priceOf(c);
       const row = mk("div", "pick-row"), body = mk("span", "body");
-      body.append(mk("span", "nm", c[0]), mk("span", "sub2", (subOf(c) ? subOf(c) + "　" : "") + "￥" + c[3]));
+      body.append(mk("span", "nm", c[0]), mk("span", "sub2", (subOf(c) ? subOf(c) + "　" : "") + "￥" + c[3] + (q > 1 ? " × " + q + "枚" + (n !== null ? " ＝ " + yen(n * q) : "") : "")));
+      const qbox = mk("span", "qbox"), minus = mk("button", "qb", "−"), plus = mk("button", "qb", "＋");
+      minus.type = "button"; plus.type = "button";
+      minus.setAttribute("aria-label", c[0] + "を1枚へらす"); plus.setAttribute("aria-label", c[0] + "を1枚ふやす");
+      minus.addEventListener("click", () => { if (q <= 1) picked.delete(k); else picked.set(k, q - 1); again(); });
+      plus.addEventListener("click", () => { if (q >= MAX_QTY) return toast("1種類につき" + MAX_QTY + "枚までです。", true); picked.set(k, q + 1); again(); });
+      qbox.append(minus, mk("span", "qn", q + "枚"), plus); body.appendChild(qbox);
       const x = mk("button", "", "外す"); x.type = "button";
-      x.addEventListener("click", () => { picked.delete(keyOf(c)); render(); renderBar(); renderPickList(); });
+      x.addEventListener("click", () => { picked.delete(k); again(); });
       row.append(body, x); box.appendChild(row);
     });
     const S = sumOf(list);
-    box.appendChild(mk("p", "pick-sum", "合計：" + yen(S.total) + "（" + list.length + "枚）" + (S.none ? "　※価格のないカード" + S.none + "枚をのぞく" : "")));
+    box.appendChild(mk("p", "pick-sum", "合計：" + yen(S.total) + "（" + S.count + "枚）" + (S.none ? "　※価格のないカード" + S.none + "枚をのぞく" : "")));
   }
   async function openList() { await ensureFresh(); renderPickList(); if (picked.size) showSheet("list-sheet"); }
   async function openDm() {
@@ -556,7 +598,7 @@
     if (typeof d.lead === "string") { $("lead").hidden = !d.lead; $("lead").textContent = d.lead; }
     $("notice").hidden = !d.notice; $("notice").textContent = d.notice || "";
     // なくなったカードは、えらんだ中からも外す
-    const alive = new Set(items.map(keyOf)); Array.from(picked).forEach((k) => { if (!alive.has(k)) picked.delete(k); });
+    const alive = new Set(items.map(keyOf)); Array.from(picked.keys()).forEach((k) => { if (!alive.has(k)) picked.delete(k); });
     const sel = $("pack"), cur = sel.value;
     sel.innerHTML = ""; sel.appendChild(new Option("すべてのパック", ""));
     items.map((c) => c[1]).filter((p, i, a) => p && a.indexOf(p) === i).forEach((p) => sel.appendChild(new Option(p, p)));
