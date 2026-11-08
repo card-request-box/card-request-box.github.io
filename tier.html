@@ -448,14 +448,16 @@
   function toast(text, err) { const t = $("toast"); t.textContent = text; t.className = "toast" + (err ? " err" : ""); t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3200); }
 
   const num = (c) => { const n = Number(String(c[3]).replace(/,/g, "")); return isNaN(n) ? null : n; };
+  // ひらがな→カタカナに変換（検索のとき、ひらがなで入力してもカタカナのカード名にマッチさせるため）
+  const toKana = (s) => String(s).replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60));
   function render() {
-    const q = $("q").value.trim().toLowerCase(), pack = $("pack").value, asc = $("sort").value === "asc";
+    const q = toKana($("q").value.trim().toLowerCase()), pack = $("pack").value, asc = $("sort").value === "asc";
     const box = $("tiers"); box.innerHTML = "";
     // 順位は全体の中での順位（しぼり込んでも変わらない）
     const ranked = items.slice().sort((a, b) => { const x = num(a), y = num(b); return x === null ? 1 : y === null ? -1 : y - x; });
     const rankOf = new Map(); let prev = null, rank = 0;
     ranked.forEach((c, i) => { const n = num(c); if (n !== prev) { rank = i + 1; prev = n; } rankOf.set(keyOf(c), n === null ? "" : rank); });
-    const shown = ranked.filter((c) => (!q || c[0].toLowerCase().indexOf(q) >= 0) && (!pack || c[1] === pack));
+    const shown = ranked.filter((c) => (!q || toKana(c[0].toLowerCase()).indexOf(q) >= 0) && (!pack || c[1] === pack));
     if (asc) shown.reverse();
     $("empty").hidden = shown.length > 0;
     if (!shown.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだ価格が入力されていません。";
