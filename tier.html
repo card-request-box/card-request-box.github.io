@@ -450,6 +450,40 @@
   const num = (c) => { const n = Number(String(c[3]).replace(/,/g, "")); return isNaN(n) ? null : n; };
   // ひらがな→カタカナに変換（検索のとき、ひらがなで入力してもカタカナのカード名にマッチさせるため）
   const toKana = (s) => String(s).replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+  // 漢字をふくむカード名の読み方（ひらがな）。検索のとき、この読み方でもマッチさせる
+  const KANA_READING = {
+    "かけだし調査員": "かけだしちょうさいん",
+    "こいぬ大好きガール": "こいぬだいすきガール",
+    "オーリム博士": "オーリムはかせ",
+    "カンナギタウンの長老": "カンナギタウンのちょうろう",
+    "ギンガ団のしたっぱ": "ギンガだんのしたっぱ",
+    "グリーンの挑発": "グリーンのちょうはつ",
+    "スター団のしたっぱ": "スターだんのしたっぱ",
+    "セレナの選択": "セレナのせんたく",
+    "フトゥー博士": "フトゥーはかせ",
+    "フレンドリィショップのお兄さん": "フレンドリィショップのおにいさん",
+    "ポケモンセンターのお姉さん": "ポケモンセンターのおねえさん",
+    "ロケット団のしたっぱ": "ロケットだんのしたっぱ",
+    "ロケット団のサンダーex": "ロケットだんのサンダーex",
+    "ロケット団のファイヤーex": "ロケットだんのファイヤーex",
+    "ロケット団のフリーザーex": "ロケットだんのフリーザーex",
+    "ロケット団のボス": "ロケットだんのボス",
+    "ロケット団のマタドガスex": "ロケットだんのマタドガスex",
+    "ロケット団のヤドキングex": "ロケットだんのヤドキングex",
+    "ロケット団のラッタex": "ロケットだんのラッタex",
+    "ロケット団の大作戦": "ロケットだんのだいさくせん",
+    "ロケット団の研究員": "ロケットだんのけんきゅういん",
+    "博士の研究": "はかせのけんきゅう",
+    "旅の行商人": "たびのぎょうしょうにん",
+    "金枠": "きんわく",
+    "釣り人": "つりびと"
+  };
+  // カード名そのもの、または（あれば）読み方の、どちらかに検索ワードが含まれていればヒットとする
+  const nameMatches = (c, q) => {
+    if (toKana(c[0].toLowerCase()).indexOf(q) >= 0) return true;
+    const reading = KANA_READING[c[0]];
+    return !!reading && toKana(reading.toLowerCase()).indexOf(q) >= 0;
+  };
   function render() {
     const q = toKana($("q").value.trim().toLowerCase()), pack = $("pack").value, asc = $("sort").value === "asc";
     const box = $("tiers"); box.innerHTML = "";
@@ -457,7 +491,7 @@
     const ranked = items.slice().sort((a, b) => { const x = num(a), y = num(b); return x === null ? 1 : y === null ? -1 : y - x; });
     const rankOf = new Map(); let prev = null, rank = 0;
     ranked.forEach((c, i) => { const n = num(c); if (n !== prev) { rank = i + 1; prev = n; } rankOf.set(keyOf(c), n === null ? "" : rank); });
-    const shown = ranked.filter((c) => (!q || toKana(c[0].toLowerCase()).indexOf(q) >= 0) && (!pack || c[1] === pack));
+    const shown = ranked.filter((c) => (!q || nameMatches(c, q)) && (!pack || c[1] === pack));
     if (asc) shown.reverse();
     $("empty").hidden = shown.length > 0;
     if (!shown.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだ価格が入力されていません。";
