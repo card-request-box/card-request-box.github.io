@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-11-07a -->
+<!-- version 2026-11-09a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>現在の価格表</title>
@@ -285,6 +285,12 @@
   }
 
   .tier-tools { display: flex; gap: 8px; margin-bottom: 12px; }
+  /* レアリティ・値段でしぼるボタン */
+  .tier-filters { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 12px; }
+  .tier-filters .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tier-filters .chips:empty { display: none; }
+  .tier-filters button { font: inherit; font-size: .8rem; font-weight: 700; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+  .tier-filters button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
   .tier-tools input, .tier-tools select { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 9px 12px; }
   .tier-group { margin-bottom: 14px; }
   .tier-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
@@ -374,6 +380,10 @@
       <input id="q" type="search" placeholder="カード名でさがす" autocomplete="off" aria-label="カード名でさがす">
       <select id="pack" aria-label="パックでしぼる"><option value="">すべてのパック</option></select>
       <select id="sort" aria-label="並び順" style="flex:0 0 auto"><option value="desc">高い順</option><option value="asc">低い順</option></select>
+    </div>
+    <div class="tier-filters">
+      <div class="chips" id="rar-chips" role="group" aria-label="レアリティでしぼる"></div>
+      <div class="chips" id="price-chips" role="group" aria-label="値段でしぼる"></div>
     </div>
     <p class="hint" id="updated" style="margin:0 0 10px"></p>
     <div class="stale" id="stale" hidden role="status"><span id="stale-text"></span><button type="button" id="stale-retry" hidden>もう一度読み込む</button></div>
@@ -484,6 +494,37 @@
     const reading = KANA_READING[c[0]];
     return !!reading && toKana(reading.toLowerCase()).indexOf(q) >= 0;
   };
+  // ---- レアリティ・値段でしぼる（何も押していなければ、今まで通り全部出る） ----
+  const RAR_ORDER_T = ["虹", "黒", "金枠", "トレーナー", "★1色違い", "★2色違い"];
+  const PRICE_RANGES = [
+    { id: "", label: "すべての値段", t: () => true },
+    { id: "lo", label: "〜200円", t: (n) => n <= 200 },
+    { id: "mid", label: "201〜400円", t: (n) => n > 200 && n <= 400 },
+    { id: "hi", label: "401円〜", t: (n) => n > 400 }
+  ];
+  const selRar = new Set(); let priceRange = "";
+  function renderFilters() {
+    const box = $("rar-chips"); box.innerHTML = "";
+    const rs = items.map((c) => c[2]).filter((r, i, a) => r && a.indexOf(r) === i)
+      .sort((a, b) => ((RAR_ORDER_T.indexOf(a) + 1) || 99) - ((RAR_ORDER_T.indexOf(b) + 1) || 99));
+    Array.from(selRar).forEach((r) => { if (rs.indexOf(r) < 0) selRar.delete(r); });
+    if (rs.length > 1) rs.forEach((r) => {
+      const b = mk("button", "", r); b.type = "button"; b.setAttribute("aria-pressed", selRar.has(r) ? "true" : "false");
+      b.addEventListener("click", () => { if (selRar.has(r)) selRar.delete(r); else selRar.add(r); renderFilters(); render(); });
+      box.appendChild(b);
+    });
+    const pb = $("price-chips"); pb.innerHTML = "";
+    if (items.some((c) => num(c) !== null)) PRICE_RANGES.forEach((p) => {
+      const b = mk("button", "", p.label); b.type = "button"; b.setAttribute("aria-pressed", priceRange === p.id ? "true" : "false");
+      b.addEventListener("click", () => { priceRange = p.id; renderFilters(); render(); });
+      pb.appendChild(b);
+    });
+  }
+  const inFilters = (c) => {
+    if (selRar.size && !selRar.has(c[2])) return false;
+    if (priceRange) { const n = num(c), p = PRICE_RANGES.find((x) => x.id === priceRange); if (n === null || !p || !p.t(n)) return false; }
+    return true;
+  };
   function render() {
     const q = toKana($("q").value.trim().toLowerCase()), pack = $("pack").value, asc = $("sort").value === "asc";
     const box = $("tiers"); box.innerHTML = "";
@@ -491,7 +532,7 @@
     const ranked = items.slice().sort((a, b) => { const x = num(a), y = num(b); return x === null ? 1 : y === null ? -1 : y - x; });
     const rankOf = new Map(); let prev = null, rank = 0;
     ranked.forEach((c, i) => { const n = num(c); if (n !== prev) { rank = i + 1; prev = n; } rankOf.set(keyOf(c), n === null ? "" : rank); });
-    const shown = ranked.filter((c) => (!q || nameMatches(c, q)) && (!pack || c[1] === pack));
+    const shown = ranked.filter((c) => (!q || nameMatches(c, q)) && (!pack || c[1] === pack) && inFilters(c));
     if (asc) shown.reverse();
     $("empty").hidden = shown.length > 0;
     if (!shown.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだ価格が入力されていません。";
@@ -639,6 +680,7 @@
     sel.innerHTML = ""; sel.appendChild(new Option("すべてのパック", ""));
     items.map((c) => c[1]).filter((p, i, a) => p && a.indexOf(p) === i).forEach((p) => sel.appendChild(new Option(p, p)));
     sel.value = cur; if (sel.value !== cur) sel.value = "";
+    renderFilters();
     { const u = $("updated"); u.textContent = "※カードの価格です。配布のリクエストは"; const l = mk("a", "", "リクエスト箱"); l.href = "./"; u.append(l, "へ（無料です）"); }
     if (lastOk) { const t = new Date(lastOk); $("updated").append(mk("span", "", "　" + t.getHours() + ":" + String(t.getMinutes()).padStart(2, "0") + " の最新の価格です")); }
     render(); renderBar();

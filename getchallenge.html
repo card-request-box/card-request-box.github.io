@@ -264,6 +264,11 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
   .chips button { font: inherit; font-size: .78rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
   .chips button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  /* 履歴・統計のしぼり込み */
+  .hist-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 8px; }
+  .hist-tools select { width: 100%; min-width: 0; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .pick-mine { display: flex; align-items: center; gap: 6px; font-size: .85rem; font-weight: 700; margin: 0 0 8px; cursor: pointer; }
+  .pick-mine input { width: 18px; height: 18px; margin: 0; }
   .clist { list-style: none; margin: 0; padding: 0; border: 2px solid var(--line); border-radius: 12px; max-height: 46vh; overflow-y: auto; }
   .clist li + li { border-top: 1px solid var(--line); }
   .clist button { width: 100%; display: grid; grid-template-columns: 3.2em 1fr auto; gap: 8px; align-items: center; text-align: left; font: inherit; font-size: .9rem; background: none; border: 0; color: var(--ink); padding: 9px 12px; cursor: pointer; }
@@ -350,6 +355,12 @@
   <section id="view-hist" role="tabpanel" aria-labelledby="tab-hist" hidden>
     <div class="panel">
       <h2>これまでの記録</h2>
+      <!-- しぼり込み（何も選ばなければ今まで通り全部出る） -->
+      <div class="chips" id="hist-hit" role="group" aria-label="結果でしぼる"></div>
+      <div class="hist-tools">
+        <select id="hist-pack" aria-label="パックでしぼる"></select>
+        <select id="hist-days" aria-label="期間でしぼる"><option value="">すべての期間</option><option value="7">今週（7日）</option><option value="30">今月（30日）</option></select>
+      </div>
       <p class="sub" id="hist-sub"></p>
       <ul class="hist" id="hist"></ul>
       <p style="text-align:center;margin:10px 0 0" id="more-wrap" hidden><button type="button" class="linkbtn" id="more">もっと見る</button></p>
@@ -365,7 +376,11 @@
         <button type="button" id="st-all" aria-pressed="false">記録している全員</button>
       </div>
       <p class="warn" id="st-warn" hidden>全員の統計には、偽の記録を投稿している方がいる可能性があるため、正確な統計にならない場合があります。参考としてご覧ください。</p>
-      <div class="field" style="margin-bottom:12px"><label for="st-pack" class="sub" style="margin:0 0 4px">パックでしぼる</label><select id="st-pack"></select></div>
+      <div class="hist-tools" style="margin-bottom:12px">
+        <div class="field" style="margin:0"><label for="st-pack" class="sub" style="margin:0 0 4px">パックでしぼる</label><select id="st-pack"></select></div>
+        <div class="field" style="margin:0"><label for="st-days" class="sub" style="margin:0 0 4px">期間でしぼる</label><select id="st-days"><option value="">すべての期間</option><option value="7">直近7日</option><option value="30">直近30日</option></select></div>
+      </div>
+      <p class="note" id="st-days-note" hidden></p>
       <div id="st-body"></div>
       <p class="status" id="st-status" role="status"></p>
     </div>
@@ -386,6 +401,7 @@
   </div>
   <div class="field" style="margin-bottom:8px"><input id="pick-q" type="search" placeholder="名前で検索（ひらがなでもOK）" autocomplete="off" aria-label="カード名で検索"></div>
   <div class="chips" id="pick-rar"></div>
+  <label class="pick-mine"><input type="checkbox" id="pick-mine"> 自分が記録したことのあるカードだけ</label>
   <ul class="clist" id="pick-list"></ul>
   <details class="help" style="margin-top:10px">
     <summary>一覧にないカード（新しいパックなど）</summary>
@@ -424,7 +440,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/6 11:05";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/9 13:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -909,7 +925,10 @@
     const q = kata($("pick-q").value.trim()), mix = p === MIX;
     const all = (p ? p.cards : []).concat(p && p.cards.length ? ITEMS.map((it) => [0, it.name, "item"]) : []);
     const nameHit = (c) => kata(c[1]).indexOf(q) >= 0 || (KANA_READING[c[1]] && kata(KANA_READING[c[1]]).indexOf(q) >= 0);
-    const hit = (c) => (!pickRar || c[2] === pickRar) && (!q || nameHit(c) || (!mix && String(c[0]) === q));
+    // 「自分が記録したことのあるカードだけ」：自分の記録に出てきた名前（前・後の両方）
+    let mineSet = null;
+    if ($("pick-mine").checked) { mineSet = new Set(); loadRecords().forEach((r) => { if (r.deleted) return; (r.cards || []).forEach((c) => { if (c && c.name) mineSet.add(c.name); }); }); }
+    const hit = (c) => (!pickRar || c[2] === pickRar) && (!mineSet || mineSet.has(c[1])) && (!q || nameHit(c) || (!mix && String(c[0]) === q));
     let rows = all.filter(hit);
     ul.hidden = !(p && p.cards.length);
     if (!ul.hidden && mix && !q && !pickRar) { ul.append(mk("li", "empty", "いろいろなパックのカードから探します。上の欄に名前を入れてください。")); return; }
@@ -929,6 +948,7 @@
     if (!ul.children.length && !ul.hidden) ul.append(mk("li", "empty", "見つかりませんでした。"));
   }
   $("pick-q").addEventListener("input", renderPickList);
+  $("pick-mine").addEventListener("change", renderPickList);
   $("free-add").addEventListener("click", () => {
     const n = $("free-name").value.normalize("NFKC").trim();
     if (!n) { $("free-name").focus(); return; }
@@ -1120,7 +1140,8 @@
     for (let i = 0; i < d.length; i += 4) { const v = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; d[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
     const sc = 255 / Math.max(1, mx - mn);
     // bin：濃いところだけ黒にする（全面イラストの、ふち取りされた名前が読みやすくなる）
-    for (let i = 0; i < d.length; i += 4) { const v = bin ? (d[i] < 110 ? 0 : 255) : (d[i] - mn) * sc; d[i] = d[i + 1] = d[i + 2] = v; }
+    // bin === "bright"：明るいところだけ黒にする（絵の上に白い文字で書かれた名前用。黒い文字として読ませる）
+    for (let i = 0; i < d.length; i += 4) { const v = bin === "bright" ? (d[i] > 175 ? 0 : 255) : bin ? (d[i] < 110 ? 0 : 255) : (d[i] - mn) * sc; d[i] = d[i + 1] = d[i + 2] = v; }
     cx.putImageData(id, 0, 0); return c;
   }
   // カードの見た目（名前とGETマークを除いた部分の小さな色の並び）
@@ -1286,6 +1307,20 @@
     let bb = best(pack), src = pack;
     // ラッキーチャレンジなど、ほかのパックのカードが混ざることがあるので、はっきり合う名前がほかにあればそちらを使う
     if (bb.score < 0.8) { const g = best(ALL_PACK); if (g.score >= 0.85 && g.score > bb.score + 0.1) { bb = g; src = ALL_PACK; } }
+    // 名前がよく読めなかったとき：右上のHPが読めていれば、そのHPのカードの中からいちばん名前が近いものを使う
+    // （exなど全面イラストのカードは名前が読みにくいが、HPは大きくはっきり書かれている）
+    let byHp = false;
+    if (s.hp && bb.score < 0.75) {
+      const hpBase = {}; pack.cards.forEach((c) => { if ((c[3] || 0) === s.hp && (!look || look.indexOf(c[2]) >= 0)) hpBase[normC(c[1])] = 1; });
+      const names = Object.keys(hpBase);
+      if (names.length) {
+        let hb = null, hs = 0, h2 = 0;
+        names.forEach((b) => { let sc = 0; (s.texts || [s.text]).forEach((t) => { const v = nameSim(normName(t), b); if (v > sc) sc = v; }); if (sc > hs) { h2 = hs; hs = sc; hb = b; } else if (sc > h2) h2 = sc; });
+        const hpMatch = bb.base && hpBase[bb.base];
+        // 今の候補のHPが合わず、HPの合う名前がそれなりに近い（または1つしかない）なら、そちらにする
+        if (!hpMatch && hb && (hs >= Math.max(0.25, bb.score - 0.15) || (names.length === 1 && hs >= 0.15))) { bb = { base: hb, score: Math.max(hs, 0.4), gap: hs - h2 }; src = pack; byHp = true; }
+      }
+    }
     if (!bb.base || bb.score < 0.34) return null;
     const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normC(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
     let cands = pick(src);
@@ -1374,10 +1409,15 @@
       }
       // 少しずらして2回読み、合うほうを使う
       // 名前の行に合わせて読む（ふつう・濃いところだけ・少し下・トレーナーズの2行目）
-      const cy = nameRowY(img, r);
+      const cy = nameRowY(img, r), full = fullArtScore(img, r);
       const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || "";
       const t2 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "", t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "";
-      slots.push({ text: t1, texts: [t1, t2, t3, t4], thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+      const texts = [t1, t2, t3, t4];
+      // 全面イラスト（exなど）は、絵の上の白い文字を読むやり方でも試す
+      if (full > 55) texts.push((await w.recognize(nameStrip(img, r, 0, false, "bright", cy))).data.text || "");
+      // 右上のHPも読む（名前がうまく読めないとき、HPの合うカードにしぼる）
+      const th = (await w.recognize(nameStrip(img, r, 0, false, false, cy, HP_XR))).data.text || "", hm = th.normalize("NFKC").replace(/[^0-9]/g, " ").match(/(\d{2,3})/);
+      slots.push({ text: t1, texts, hp: hm ? Number(hm[1]) : 0, thumb: thumbOf(img, r), full, gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
       if (onCard) onCard(slots.length);
     }
     slots.forEach((sl) => { delete sl.r; });
@@ -1602,11 +1642,29 @@
 
   // ============ 履歴 ============
   let histShow = 30;
+  // 履歴のしぼり込み（結果・パック・期間）。何も選ばなければ全部出る
+  let histHit = "";
+  fillPackSelect($("hist-pack"), true);
+  function renderHistChips() {
+    const box = $("hist-hit"); box.innerHTML = "";
+    [["", "すべて"], ["hit", "当たりだけ"], ["miss", "はずれだけ"]].forEach(([v, label]) => {
+      const b = mk("button", "", label); b.type = "button"; b.setAttribute("aria-pressed", histHit === v ? "true" : "false");
+      b.addEventListener("click", () => { histHit = v; histShow = 30; renderHist(); });
+      box.append(b);
+    });
+  }
+  $("hist-pack").addEventListener("change", () => { histShow = 30; renderHist(); });
+  $("hist-days").addEventListener("change", () => { histShow = 30; renderHist(); });
+  const sinceDays = (v) => { const d = Number(v); return d > 0 ? Date.now() - d * 24 * 3600 * 1000 : 0; };
   function renderHist() {
-    const list = loadRecords().filter((r) => !r.deleted), ul = $("hist"); ul.innerHTML = "";
-    const hits = list.filter((r) => r.hit).length;
-    $("hist-sub").textContent = list.length ? list.length + "回の記録（当たり " + hits + "回）" : "";
-    if (!list.length) { ul.append(mk("li", "empty", "まだ記録がありません。「記録する」から最初の1回を入れてみてください。")); $("more-wrap").hidden = true; return; }
+    renderHistChips();
+    const all = loadRecords().filter((r) => !r.deleted), ul = $("hist"); ul.innerHTML = "";
+    const pk = $("hist-pack").value, since = sinceDays($("hist-days").value);
+    const list = all.filter((r) => (!histHit || (histHit === "hit") === !!r.hit) && (!pk || r.pack === pk) && (!since || (Number(r.at) || 0) >= since));
+    const hits = list.filter((r) => r.hit).length, narrowed = list.length !== all.length;
+    $("hist-sub").textContent = list.length ? list.length + "回の記録（当たり " + hits + "回）" + (narrowed ? "　※しぼり込み中（全部で" + all.length + "回）" : "") : "";
+    if (!all.length) { ul.append(mk("li", "empty", "まだ記録がありません。「記録する」から最初の1回を入れてみてください。")); $("more-wrap").hidden = true; return; }
+    if (!list.length) { ul.append(mk("li", "empty", "この条件に合う記録はありません。")); $("more-wrap").hidden = true; return; }
     list.slice(0, histShow).forEach((r) => {
       const li = mk("li");
       const head = mk("div", "head");
@@ -1643,14 +1701,18 @@
   $("st-me").addEventListener("click", () => { statWho = "me"; renderStats(); });
   $("st-all").addEventListener("click", () => { statWho = "all"; renderStats(); });
   $("st-pack").addEventListener("change", renderStats);
+  $("st-days").addEventListener("change", renderStats);
+  const statDays = () => Number($("st-days").value) || 0;
 
   // 記録の一覧から統計を作る（全員の分はサーバーで同じ形に集計して返す）
-  function aggregate(list, packCode) {
+  function aggregate(list, packCode, days) {
     const z = () => [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0, 0]);
     const S = { n: 0, hit: 0, expect: 0, getN: [0, 0, 0, 0, 0], getHit: [0, 0, 0, 0, 0], wantAt: [0, 0, 0, 0, 0], wantN: 0,
       moveAll: z(), moveWant: z(), rar: {}, packs: {} };
+    const since = days > 0 ? Date.now() - days * 24 * 3600 * 1000 : 0;
     list.forEach((r) => {
       if (r.deleted || (packCode && r.pack !== packCode)) return;
+      if (since && (Number(r.at) || 0) < since) return;
       const A = r.after;
       if (!Array.isArray(A) || A.length !== 5 || A.some((v) => !(v >= 0 && v < 5))) return;   // 古い形の記録は数えない
       const got = A[r.get], hit = r.want.indexOf(got) >= 0;
@@ -1666,12 +1728,15 @@
     });
     return S;
   }
-  async function loadAllStats(packCode) {
+  // days：直近○日だけ（0なら全部）。期間つきはサーバー側も対応が必要（古いスクリプトだと全部の期間が返る → 返事の days で見分ける）
+  const statsKey = (packCode, days) => (packCode || "_") + (days ? ":" + days : "");
+  async function loadAllStats(packCode, days) {
+    days = days || 0;
     const cache = ls.get(STATS_KEY, null) || {};
-    const k = packCode || "_";
+    const k = statsKey(packCode, days);
     const c = cache[k];
     if (c && Date.now() - c.at < CONFIG.STATS_CACHE_MIN * 60000) return c.data;
-    const r = await api({ action: "gc_stats", pack: packCode || "" }, 25000);
+    const r = await api(Object.assign({ action: "gc_stats", pack: packCode || "" }, days ? { days } : {}), 25000);
     if (!r || !r.ok) throw new Error("bad");
     cache[k] = { at: Date.now(), data: r.stats }; ls.set(STATS_KEY, cache);
     return r.stats;
@@ -1680,12 +1745,18 @@
     $("st-me").setAttribute("aria-pressed", statWho === "me" ? "true" : "false");
     $("st-all").setAttribute("aria-pressed", statWho === "all" ? "true" : "false");
     $("st-warn").hidden = statWho !== "all";
-    const body = $("st-body"), packCode = $("st-pack").value; setStatus("st-status", "");
-    if (statWho === "me") { drawStats(aggregate(loadRecords(), packCode), true); return; }
+    const body = $("st-body"), packCode = $("st-pack").value, days = statDays(); setStatus("st-status", "");
+    const note = $("st-days-note"); note.hidden = true;
+    if (statWho === "me") { drawStats(aggregate(loadRecords(), packCode, days), true); return; }
     if (!CONFIG.GAS_URL) { body.innerHTML = ""; body.append(mk("p", "empty", "全員の統計は準備中です。もうしばらくお待ちください。")); return; }
-    const cache = (ls.get(STATS_KEY, null) || {})[packCode || "_"];
-    if (cache) drawStats(cache.data, false); else { body.innerHTML = ""; body.append(mk("p", "empty", "読み込んでいます…")); }
-    try { const s = await loadAllStats(packCode); if (statWho === "all" && $("st-pack").value === packCode) drawStats(s, false); }
+    const showAll = (S) => {
+      drawStats(S, false);
+      // サーバーが期間に対応していない（返事に days がない）ときは、その旨を出す
+      if (days && !(S && S.days)) { note.textContent = "※全員の統計の期間しぼり込みは、サーバー（Code.gs）を更新すると使えるようになります。今は全期間の統計を表示しています。"; note.hidden = false; }
+    };
+    const cache = (ls.get(STATS_KEY, null) || {})[statsKey(packCode, days)];
+    if (cache) showAll(cache.data); else { body.innerHTML = ""; body.append(mk("p", "empty", "読み込んでいます…")); }
+    try { const s = await loadAllStats(packCode, days); if (statWho === "all" && $("st-pack").value === packCode && statDays() === days) showAll(s); }
     catch (e) { if (!cache) { body.innerHTML = ""; body.append(mk("p", "empty", "読み込めませんでした。時間をおいて開き直してください。")); } }
   }
   function heat(values, counts, unit, labelFn, cmpFn) {
