@@ -126,6 +126,7 @@
   .rar.st, .rar.cr { color: var(--gold-deep); }
   .rar.sh { color: var(--shiny); }
   .rar.it { color: var(--muted); }
+  .rar.pr { color: var(--gold-deep); }
   .rar .frame { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: .64rem; line-height: 1.5; letter-spacing: 0; vertical-align: 1px; }
   .rar .frame.bk { background: #2A2F45; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
   .rar .frame.rb { background: linear-gradient(90deg, #FFB3B3, #FFE08A, #B8F0B0, #A8D8FF, #E0C3FF); color: #1E2235; }
@@ -443,11 +444,12 @@
     d1: { s: "◆", c: "" }, d2: { s: "◆◆", c: "" }, d3: { s: "◆◆◆", c: "" }, d4: { s: "◆◆◆◆", c: "" },
     s1: { s: "☆", c: "st" }, s2: { s: "☆☆", c: "st" }, s3: { s: "☆☆☆", c: "st" },
     sh1: { s: "色違い☆", c: "sh" }, sh2: { s: "色違い☆☆", c: "sh" }, cr: { s: "王冠", c: "cr" },
+    pr: { s: "プロモ", c: "pr" },
     item: { s: "アイテム", c: "it" }
   };
-  const RAR_ORDER = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr", "item"];
-  const RAR_GROUP = { d1: "◆1〜2", d2: "◆1〜2", d3: "◆3", d4: "◆4", s1: "☆1", s2: "☆2", s3: "☆3以上", sh1: "色違い", sh2: "色違い", cr: "☆3以上", item: "アイテム" };
-  const RAR_GROUPS = ["◆1〜2", "◆3", "◆4", "☆1", "☆2", "☆3以上", "色違い", "アイテム"];
+  const RAR_ORDER = ["d1", "d2", "d3", "d4", "s1", "s2", "s3", "sh1", "sh2", "cr", "pr", "item"];
+  const RAR_GROUP = { d1: "◆1〜2", d2: "◆1〜2", d3: "◆3", d4: "◆4", s1: "☆1", s2: "☆2", s3: "☆3以上", sh1: "色違い", sh2: "色違い", cr: "☆3以上", pr: "プロモ", item: "アイテム" };
+  const RAR_GROUPS = ["◆1〜2", "◆3", "◆4", "☆1", "☆2", "☆3以上", "色違い", "プロモ", "アイテム"];
   // フリーチャレンジなどで、カードの代わりに出てくるアイテム（color：スクショで見分けるときの色）
   const ITEMS = [{ name: "チャレンジ砂時計", color: "orange" }, { name: "パック砂時計", color: "purple" }];
   const PACKS = (window.GC_PACKS || []);
@@ -1087,8 +1089,21 @@
   }
   // 名前の帯（カードの上のほう）を、読みやすいように白黒・大きめにする
   // 名前の行の高さを探す（カードの上のほうで、濃い点がいちばん多く並ぶ行）。見つからなければふつうの位置
-  function nameRowY(img, r) {
-    const x = r.x + r.w * 0.15, w = r.w * 0.59, y0 = r.y - r.h * 0.03, hh = r.h * 0.16, cw = 120, ch = Math.round(cw * hh / w);
+  // イベントのプロモカードには、左上に黄色い「イベント」のリボンがつく（名前の左半分が隠れる）
+  // 左上だけが黄色く、右上（HPのあたり）は黄色くないときだけリボンとみなす（雷タイプの黄色いカードは両方黄色いので区別できる）
+  function eventBadgeOf(img, r) {
+    const yel = (x0, y0, w, h) => {
+      const cw = 24, ch = 10, c = cropCanvas(img, x0, y0, w, h, cw, ch), d = c.getContext("2d").getImageData(0, 0, cw, ch).data; let n = 0;
+      for (let i = 0; i < d.length; i += 4) { const [hh, ss, vv] = rgbHsv(d[i], d[i + 1], d[i + 2]); if (hh > 0.07 && hh < 0.16 && ss > 0.55 && vv > 0.75) n++; }
+      return n / (cw * ch);
+    };
+    const left = yel(r.x + r.w * 0.06, r.y + r.h * 0.04, r.w * 0.38, r.h * 0.09), right = yel(r.x + r.w * 0.55, r.y + r.h * 0.04, r.w * 0.4, r.h * 0.09);
+    return left > 0.3 && right < 0.08;
+  }
+  // リボンがあるとき、名前を読む範囲（リボンの右側だけ）と、HPを読む範囲（右上）
+  const BADGE_XR = { x0: 0.47, w: 0.27 }, HP_XR = { x0: 0.70, w: 0.25 };
+  function nameRowY(img, r, xr) {
+    const x = r.x + r.w * (xr ? xr.x0 : 0.15), w = r.w * (xr ? xr.w : 0.59), y0 = r.y - r.h * 0.03, hh = r.h * 0.16, cw = 120, ch = Math.round(cw * hh / w);
     const c = cropCanvas(img, x, y0, w, hh, cw, ch), d = c.getContext("2d").getImageData(0, 0, cw, ch).data, rowv = [];
     for (let y = 0; y < ch; y++) { let n = 0; for (let xx = 0; xx < cw; xx++) { const i = (y * cw + xx) * 4; if (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11 < 100) n++; } rowv.push(n); }
     const win = Math.max(2, Math.round(ch * 0.045 / 0.16)); let best = -1, bv = 0;
@@ -1096,9 +1111,10 @@
     if (best < 0 || bv < cw * win * 0.06) return r.y + r.h * 0.06;
     return y0 + (best + win / 2) * hh / ch;
   }
-  function nameStrip(img, r, dy, trainer, bin, cy) {
+  function nameStrip(img, r, dy, trainer, bin, cy, xr) {
     // ポケモンは1行目（左のマークとHPを除く）、トレーナーズ（グッズ・サポート）は2行目に名前がある
-    const x = r.x + r.w * (trainer ? 0.04 : 0.15), y = trainer ? r.y + r.h * 0.075 : (cy !== undefined ? cy - r.h * 0.04 : r.y + r.h * 0.02) + r.h * (dy || 0), w = r.w * (trainer ? 0.6 : 0.59), h = r.h * (trainer ? 0.06 : 0.08);
+    // xr：読む横の範囲を指定するとき（イベントのリボンの右側だけ、など）
+    const x = r.x + r.w * (xr ? xr.x0 : trainer ? 0.04 : 0.15), y = trainer ? r.y + r.h * 0.075 : (cy !== undefined ? cy - r.h * 0.04 : r.y + r.h * 0.02) + r.h * (dy || 0), w = r.w * (xr ? xr.w : trainer ? 0.6 : 0.59), h = r.h * (trainer ? 0.06 : 0.08);
     const oh = 96, ow = Math.round(oh * w / h), c = cropCanvas(img, x, y, w, h, ow, oh), cx = c.getContext("2d");
     const id = cx.getImageData(0, 0, ow, oh), d = id.data; let mn = 255, mx = 0;
     for (let i = 0; i < d.length; i += 4) { const v = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; d[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -1218,6 +1234,31 @@
   }
   // 読み取った1枚を、パックのカード（名前・レア度）に決める
   const ALL_PACK = { code: "*", cards: [].concat.apply([], PACKS.map((p) => p.cards)) };
+  const PROMO_CODE = "PR";
+  // イベントのリボンがあるカード：イベントのゲットチャレンジで出るプロモカードの中から決める
+  // リボンで名前の左側が隠れるので、読めた文字は名前の「おしり」のことが多い（「アローラロコン」なら「コン」など）
+  function identifyPromo(s) {
+    const pk = packByCode(PROMO_CODE); if (!pk || !pk.cards.length) return null;
+    const texts = (s.texts || [s.text]).map((t) => normName(t)).filter((t) => t.length >= 1);
+    if (!texts.length) return null;
+    const seen = {}; let best = null, bs = 0, second = 0;
+    pk.cards.forEach((c) => {
+      if (seen[c[1]]) return; seen[c[1]] = 1;
+      const b = normC(c[1]); let sc = 0;
+      texts.forEach((t) => {
+        let v = nameSim(t, b);
+        if (t.length >= 2 && b.endsWith(t)) v = Math.max(v, 0.9);           // おしりが合う
+        else if (t.length >= 2 && b.indexOf(t) >= 0) v = Math.max(v, 0.75);  // 途中が合う
+        else if (t.length === 1 && b.endsWith(t)) v = Math.max(v, 0.4);      // 1文字だけ読めた
+        if (v > sc) sc = v;
+      });
+      // HPが読めていて合えば少し有利に（「ロコン」と「カビゴン」のように、おしりが同じ名前を分ける）
+      if (sc > 0 && s.hp && c[3] === s.hp) sc += 0.15;
+      if (sc > bs) { second = bs; bs = sc; best = c; } else if (sc > second) second = sc;
+    });
+    if (!best || bs < 0.34) return null;
+    return { card: { no: best[0], name: best[1], r: best[2] }, unsure: bs < 0.75 || bs - second < 0.1, score: bs };
+  }
   function identify(pack, s) {
     // 誰かが記録したことのあるカードと見た目がほぼ同じなら、名前が読めなくてもそのカードにする
     const nl = s.thumb ? nearestLook(s.thumb) : null;
@@ -1227,6 +1268,7 @@
       if (!s.item) (s.texts || []).forEach((t) => { const r = bestBase(pack, normName(t)); if (r.score > q0.score) q0 = r; });
       if (!(q0.score >= 0.8 && q0.base !== normName(nl.card.name))) return { card: nl.card, unsure: false, score: 1 };
     }
+    if (s.badge && !s.item) { const pr = identifyPromo(s); if (pr) return pr; }
     if (s.item) {
       // 覚えている見た目があれば、それを優先する
       const looks = loadLooks(); let hit = null, hd = 1;
@@ -1319,6 +1361,17 @@
     const w = await getOcr(), slots = [];
     for (const r of rects) {
       if (r.item) { const it = itemOf(img, r); slots.push({ item: true, itemName: it.name, itemUnsure: it.unsure, text: "", texts: [], thumb: thumbOf(img, r), full: 0, get: getScore(img, r), shape: r.shape }); if (onCard) onCard(slots.length); continue; }
+      // イベントのリボンがあるカードは、リボンの右側だけで名前を読む（左側は隠れている）
+      const badge = eventBadgeOf(img, r);
+      if (badge) {
+        const cy = nameRowY(img, r, BADGE_XR);
+        const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy, BADGE_XR))).data.text || "", t2 = (await w.recognize(nameStrip(img, r, 0, false, true, cy, BADGE_XR))).data.text || "";
+        // 名前の一部しか読めないので、右上のHPも読んで候補をしぼる（「ロコン」と「カビゴン」など）
+        const th = (await w.recognize(nameStrip(img, r, 0, false, false, cy, HP_XR))).data.text || "", hm = th.normalize("NFKC").replace(/[^0-9]/g, " ").match(/(\d{2,3})/);
+        slots.push({ text: t1, texts: [t1, t2], badge: true, hp: hm ? Number(hm[1]) : 0, thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+        if (onCard) onCard(slots.length);
+        continue;
+      }
       // 少しずらして2回読み、合うほうを使う
       // 名前の行に合わせて読む（ふつう・濃いところだけ・少し下・トレーナーズの2行目）
       const cy = nameRowY(img, r);
@@ -1328,7 +1381,7 @@
       if (onCard) onCard(slots.length);
     }
     slots.forEach((sl) => { delete sl.r; });
-    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, shape: s.shape })) }]);
+    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, badge: !!s.badge, hp: s.hp || 0, shape: s.shape })) }]);
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
     const lucky = rects.filter((r) => !r.item && luckyOf(img, r) > 0.2).length >= 3;
     return { slots, isAfter: slots[gi].get > 0.15, getIdx: slots[gi].get > 0.15 ? gi : -1, lucky };
@@ -1355,7 +1408,7 @@
     }
     if (base.item) return (sb.item && sa.item && sb.itemUnsure && !sa.itemUnsure) ? sa : base;
     const tb = sb.item ? [] : (sb.texts || []), ta = sa.item || aIsGet ? [] : (sa.texts || []);
-    return Object.assign({}, base, { item: false, texts: tb.concat(ta), full: Math.max(sb.item ? 0 : sb.full || 0, sa.item ? 0 : sa.full || 0), gold: Math.max(sb.gold || 0, sa.gold || 0) });
+    return Object.assign({}, base, { item: false, badge: !!(sb.badge || sa.badge), hp: sb.hp || sa.hp || 0, texts: tb.concat(ta), full: Math.max(sb.item ? 0 : sb.full || 0, sa.item ? 0 : sa.full || 0), gold: Math.max(sb.gold || 0, sa.gold || 0) });
   }
 
   // 読み取った手がかり（前・後の5か所）から、カードと移動を決める。パックを選び直したときも、これでやり直す
@@ -1442,7 +1495,9 @@
       const ev = SB ? SB.map((sb, p) => m ? mergeSlot(sb, SA[m.indexOf(p)], m.indexOf(p) === getIdx) : sb) : null;
       // パックを決める（前と後の両方の名前で。GETのマークで隠れた名前は使わない）
       const lucky = (before && before.lucky) || (after && after.lucky);
-      const pk = lucky ? MIX : guessPack(ev || SA.filter((x, i) => i !== getIdx));
+      // イベントのリボンがあれば、イベントのゲットチャレンジ（プロモカード）
+      const badge = !!(SB && SB.some((x) => x.badge)) && !!packByCode(PROMO_CODE);
+      const pk = badge ? packByCode(PROMO_CODE) : lucky ? MIX : guessPack(ev || SA.filter((x, i) => i !== getIdx));
       if (pk && pk.code !== $("pack").value) { $("pack").value = pk.code; ls.set(LAST_PACK_KEY, pk.code); toast("パックを「" + pk.name + "」にしました。違うときは①で選び直してください。"); }
       const pack = packByCode($("pack").value);
       await loadSharedLooks(pack.code);
