@@ -319,6 +319,8 @@
     <div class="panel">
       <h2><span class="step">1</span>パック</h2>
       <div class="field"><label for="pack" class="sub" style="margin:0 0 4px">5枚が入っていたパック</label><select id="pack"></select></div>
+      <div class="field" style="margin-top:6px"><label for="card-lang" class="sub" style="margin:0 0 4px">カードの言語（ゲームの設定で日本語以外にしている人だけ変えてください）</label>
+        <select id="card-lang"><option value="auto">自動（日本語・英語・フランス語・ドイツ語・スペイン語・イタリア語・ポルトガル語）</option><option value="ko">한국어（韓国語）</option><option value="zh">繁體中文（中国語）</option></select></div>
 
       <div class="shotbox">
         <div class="shot-head"><b>スクショから入力</b><span>前・後どちらか1枚、または両方</span></div>
@@ -440,7 +442,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/9 14:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/9 16:30";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -472,6 +474,9 @@
   // ゲットチャレンジには☆3（イマーシブ）・色違い・王冠が出ないので、選ぶところと読み取りの候補から外す（手で入れる欄では、まだ選べる）
   const NOT_IN_GC = { s3: 1, sh1: 1, sh2: 1, cr: 1 };
   PACKS.forEach((p) => { p.cards = p.cards.filter((c) => !NOT_IN_GC[c[2]]); });
+  // カードの英語名（c[5]）。カードの言語を英語にしている人のスクショは英語で読めるので、英語名でも照合する
+  const GC_EN = window.GC_EN || {};
+  PACKS.forEach((p) => { const m = GC_EN[p.code] || {}; p.cards.forEach((c) => { c[5] = m[String(c[0])] || ""; c[6] = p.code + "|" + c[0]; }); });
   // ☆2で同じポケモンが2種類あるとき：番号の小さい方が黒枠、大きい方が虹枠（特別なイラストのカード）
   const FRAME = {};
   PACKS.forEach((p) => {
@@ -487,7 +492,7 @@
   const OTHER = { code: "X", name: "そのほかのパック（一覧にない）", cards: [] };
   // ラッキーチャレンジなど、いろいろなパックのカードが出るとき用（全パックのカードを名前とレア度で1つずつ）
   const MIX = { code: "MIX", name: "ラッキーチャレンジなど（いろいろなパック）", cards: [] };
-  (() => { const seen = {}; PACKS.forEach((p) => p.cards.forEach((c) => { const f = frameOf(p.code, c[0], c[1]), k = c[1] + "|" + c[2] + "|" + f; if (seen[k]) return; seen[k] = 1; MIX.cards.push([c[0], c[1], c[2], c[3] || 0, p.name]); if (f) FRAME["MIX|" + c[0] + "|" + c[1]] = f; })); })();
+  (() => { const seen = {}; PACKS.forEach((p) => p.cards.forEach((c) => { const f = frameOf(p.code, c[0], c[1]), k = c[1] + "|" + c[2] + "|" + f; if (seen[k]) return; seen[k] = 1; MIX.cards.push([c[0], c[1], c[2], c[3] || 0, p.name, c[5] || "", c[6] || ""]); if (f) FRAME["MIX|" + c[0] + "|" + c[1]] = f; })); })();
   const packByCode = (c) => PACKS.find((p) => p.code === c) || (c === "X" ? OTHER : c === "MIX" ? MIX : null);
   const packOfCard = (name, r) => { const p = PACKS.find((pk) => pk.cards.some((c) => c[1] === name && c[2] === r)); return p ? p.name : ""; };
 
@@ -997,6 +1002,16 @@
   function setShotStatus(t, err) { const e = $("shot-status"); e.textContent = t || ""; e.className = "shot-status" + (err ? " error" : ""); $("shot-note").hidden = !!t; }
   let ocrWorker = null;
   function loadScript(src) { return new Promise((ok, ng) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => ng(new Error("script")); document.head.appendChild(s); }); }
+  // 韓国語・中国語のカード用の2つめの文字読み（設定で選んだときだけ読み込む。日本語の読みと両方使う）
+  let ocrWorker2 = null, ocrWorker2Lang = "";
+  async function getOcr2(lang) {
+    if (ocrWorker2 && ocrWorker2Lang === lang) return ocrWorker2;
+    if (ocrWorker2) { try { await ocrWorker2.terminate(); } catch (e) {} ocrWorker2 = null; }
+    if (!window.Tesseract) await loadScript(OCR_SRC);
+    const w2 = await window.Tesseract.createWorker(lang, 1, Object.assign({}, OCR_OPT, { langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/" + lang + "@1.0.0/4.0.0_best_int" }));
+    await w2.setParameters({ tessedit_pageseg_mode: "7" });
+    ocrWorker2 = w2; ocrWorker2Lang = lang; return w2;
+  }
   async function getOcr() {
     if (ocrWorker) return ocrWorker;
     if (!window.Tesseract) await loadScript(OCR_SRC);
@@ -1061,9 +1076,12 @@
       if (u < 0) continue;
       const all = top.concat(rows[u].c), rowOf = [0, 0, 0, 1, 1];
       if (window.__gcDebugOn) window.__gcComps = all.map((c) => ({ x0: c.x0, y0: c.y0, w: c.w, h: c.h, fill: +c.fill.toFixed(3), shape: +c.shape.toFixed(3) }));
+      // カードらしい大きさ（白っぽいカードはふちが背景にとけて、形がくずれることがあるので、大きさでも判断する）
+      const sure = all.filter((c) => c.shape >= 0.6 || c.fill >= 0.8), medW = sure.length ? sure.map((c) => c.w).sort((x, y) => x - y)[sure.length >> 1] : 0;
       const out = all.map((c) => {
         // 中の色ではなく形で決める（白っぽいカードの中は背景と見分けにくく、すき間が多くなるため）
-        const isCard = c.shape >= 0.6 || c.fill >= 0.8;
+        // それでも形がくずれているときは、ほかのカードと同じくらいの大きさならカード（アイテムの砂時計はカードの6割くらいの大きさしかない）
+        const isCard = c.shape >= 0.6 || c.fill >= 0.8 || (medW > 0 && c.w >= medW * 0.72 && c.h >= medW * 1.0);
         if (!isCard) {
           // アイテム（砂時計など）：下をそろえて、上の「GET」マークの分は入れない
           const w = c.w * k, h = Math.min(c.h * k, w * 1.18);
@@ -1124,7 +1142,27 @@
     return left > 0.3 && right < 0.08;
   }
   // リボンがあるとき、名前を読む範囲（リボンの右側だけ）と、HPを読む範囲（右上）
-  const BADGE_XR = { x0: 0.47, w: 0.27 }, HP_XR = { x0: 0.70, w: 0.25 };
+  const BADGE_XR = { x0: 0.47, w: 0.27 }, HP_XR = { x0: 0.66, w: 0.24, h: 0.12 };   // HPは名前の行より少し下に出ることがあるので、縦を広めに
+  // 右上のHPを読む。ふつうの読み方 → 全面イラスト用（白い文字）の順に試して、HPらしい数字（30〜340、10きざみ）が出たら採用
+  // 読めた数字の並びから、HPらしい数（30〜340、10きざみ）を探す。「HP」の一部やエネルギーのマークが数字として混ざることがあるので、3けた→2けたの順に窓をずらして探す
+  const hpFrom = (t) => {
+    const d = String(t || "").normalize("NFKC").replace(/[^0-9]/g, "");
+    for (const len of [3, 2]) for (let i = 0; i + len <= d.length; i++) { const n = Number(d.slice(i, i + len)); if (n >= 30 && n <= 340 && n % 10 === 0 && d[i] !== "0") return n; }
+    return 0;
+  };
+  async function readHp(w, img, r, cy, full) {
+    // 切り取りの高さ（ふつう 8% / 広め 12%）と、文字の読み方（ふつう / 白文字用）を順に試す
+    const N = { x0: 0.66, w: 0.24, h: 0.08 }, T = HP_XR;
+    const tries = full > 55 ? [["bright", T], ["bright", N], [false, T], [false, N]] : [[false, N], [false, T], ["bright", N], ["bright", T]];
+    const seen = []; let hp = 0;
+    // 数字だけを読むモードにする（日本語モードのままだと、数字をカナや漢字に読みまちがえやすい）
+    try { await w.setParameters({ tessedit_char_whitelist: "0123456789HP" }); } catch (e) {}
+    try {
+      for (const [bin, xr] of tries) { const t = (await w.recognize(nameStrip(img, r, 0, false, bin, cy, xr))).data.text || ""; seen.push(t.trim()); hp = hpFrom(t); if (hp) break; }
+    } finally { try { await w.setParameters({ tessedit_char_whitelist: "" }); } catch (e) {} }
+    readHp.last = seen;
+    return hp;
+  }
   function nameRowY(img, r, xr) {
     const x = r.x + r.w * (xr ? xr.x0 : 0.15), w = r.w * (xr ? xr.w : 0.59), y0 = r.y - r.h * 0.03, hh = r.h * 0.16, cw = 120, ch = Math.round(cw * hh / w);
     const c = cropCanvas(img, x, y0, w, hh, cw, ch), d = c.getContext("2d").getImageData(0, 0, cw, ch).data, rowv = [];
@@ -1137,7 +1175,7 @@
   function nameStrip(img, r, dy, trainer, bin, cy, xr) {
     // ポケモンは1行目（左のマークとHPを除く）、トレーナーズ（グッズ・サポート）は2行目に名前がある
     // xr：読む横の範囲を指定するとき（イベントのリボンの右側だけ、など）
-    const x = r.x + r.w * (xr ? xr.x0 : trainer ? 0.04 : 0.15), y = trainer ? r.y + r.h * 0.075 : (cy !== undefined ? cy - r.h * 0.04 : r.y + r.h * 0.02) + r.h * (dy || 0), w = r.w * (xr ? xr.w : trainer ? 0.6 : 0.59), h = r.h * (trainer ? 0.06 : 0.08);
+    const x = r.x + r.w * (xr ? xr.x0 : trainer ? 0.04 : 0.15), y = trainer ? r.y + r.h * 0.075 : (cy !== undefined ? cy - r.h * 0.04 : r.y + r.h * 0.02) + r.h * (dy || 0), w = r.w * (xr ? xr.w : trainer ? 0.6 : 0.59), h = r.h * (xr && xr.h ? xr.h : trainer ? 0.06 : 0.08);
     const oh = 96, ow = Math.round(oh * w / h), c = cropCanvas(img, x, y, w, h, ow, oh), cx = c.getContext("2d");
     const id = cx.getImageData(0, 0, ow, oh), d = id.data; let mn = 255, mx = 0;
     for (let i = 0; i < d.length; i += 4) { const v = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; d[i] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -1200,9 +1238,49 @@
   const NORMAL_R = ["d1", "d2", "d3"], FULL_R = ["d4", "s1", "s2", "sh1", "sh2", "s3", "cr"];
   // そのパックで、読み取った文字にいちばん近い名前を探す
   const NORM = new Map(), normC = (n) => { let v = NORM.get(n); if (v === undefined) { v = normName(n); NORM.set(n, v); } return v; };
+  // ---- 日本語以外のカード名 ----
+  // ポケポケは「カードの言語」を9つから選べる（日本語・英語・フランス語・ドイツ語・スペイン語・イタリア語・ポルトガル語・韓国語・繁体字中国語）
+  // 英語名は getchallenge-cards.js の GC_EN に、それ以外は getchallenge-names.js（必要になったときだけ読み込む）に入っている
+  // LANG_MODE："ja"（日本語） / "latin"（英語＋欧州5言語をまとめて） / "ko" / "zh"
+  let LANG_MODE = "ja";
+  let NAMES = window.GC_NAMES || null, namesLoading = null;
+  function loadNames() {
+    if (NAMES) return Promise.resolve(NAMES);
+    if (!namesLoading) namesLoading = loadScript("getchallenge-names.js?v=" + encodeURIComponent(APP_VERSION)).then(() => { NAMES = window.GC_NAMES || {}; return NAMES; }).catch(() => { namesLoading = null; return null; });
+    return namesLoading;
+  }
+  const namesOf = (c) => { if (!NAMES || !c[6]) return null; const i = c[6].indexOf("|"); const m = NAMES[c[6].slice(0, i)]; return m ? m[c[6].slice(i + 1)] : null; };
+  // アルファベットの名前：アクセント記号を外し、小文字・英数字だけにする（OCRはアクセントをよく落とす）
+  const normEn = (s) => String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normKo = (s) => String(s || "").normalize("NFKC").replace(/[^가-힣a-z0-9]/gi, "").toLowerCase();
+  const normZh = (s) => String(s || "").normalize("NFKC").replace(/[^一-鿿a-z0-9]/gi, "").toLowerCase();
+  const isEnglishText = (texts) => (texts || []).some((t) => { const s = String(t || ""); const latin = (s.match(/[A-Za-z]{3,}/g) || []).join("").length, kana = (s.match(/[ぁ-んァ-ヶ一-龠]/g) || []).length; return latin >= 5 && latin > kana; });
+  const hasHangul = (texts) => (texts || []).some((t) => (String(t || "").match(/[가-힣]/g) || []).length >= 2);
+  // カードの表示名（いつも日本語）と、今のモードで照合に使う正規化した名前の一覧
+  const cardName = (c) => c[1];
+  function cardKeys(c) {
+    if (LANG_MODE === "ja") return [normC(c[1])];
+    const n = namesOf(c) || {};
+    if (LANG_MODE === "ko") return n.ko ? [normKo(n.ko)] : [];
+    if (LANG_MODE === "zh") return n.zh ? [normZh(n.zh)] : [];
+    const out = []; [c[5], n.fr, n.de, n.es, n.it, n.pt].forEach((x) => { if (x) { const k = normEn(x); if (k && out.indexOf(k) < 0) out.push(k); } });
+    return out;
+  }
+  const normText = (t) => LANG_MODE === "ja" ? normName(t) : LANG_MODE === "ko" ? normKo(t) : LANG_MODE === "zh" ? normZh(t) : normEn(t);
+  // 読めた文字から、照合に使う言語モードを決める（韓国語・中国語は設定で選んだときだけ）
+  function modeFor(texts) {
+    if (cardLang === "ko" && hasHangul(texts)) return "ko";
+    if (cardLang === "zh") return (texts || []).some((t) => /[一-鿿]{2,}/.test(String(t || "")) && !/[ぁ-んァ-ヶ]/.test(String(t || ""))) ? "zh" : "ja";
+    return isEnglishText(texts) ? "latin" : "ja";
+  }
+  // パックの中で、読めた文字にいちばん近いカード名を探す。base は日本語のカード名（表示に使う名前）
   function bestBase(pack, ocrNorm) {
     const seen = {}; let best = null, bs = 0, second = 0;
-    pack.cards.forEach((c) => { const b = normC(c[1]); if (seen[b]) return; seen[b] = 1; const sc = nameSim(ocrNorm, b); if (sc > bs) { second = bs; bs = sc; best = b; } else if (sc > second) second = sc; });
+    pack.cards.forEach((c) => {
+      if (seen[c[1]]) return; seen[c[1]] = 1;
+      let sc = 0; cardKeys(c).forEach((k) => { const v = nameSim(ocrNorm, k); if (v > sc) sc = v; });
+      if (sc > bs) { second = bs; bs = sc; best = c[1]; } else if (sc > second) second = sc;
+    });
     return { base: best, score: bs, gap: bs - second };
   }
   function loadLooks() { const v = ls.get(LOOK_KEY, {}); return v && typeof v === "object" ? v : {}; }
@@ -1246,9 +1324,12 @@
       if (d < bd) { second = bd; bd = d; best = k; } else if (d < second) second = d;
     });
     if (!best) return null;
-    const i = best.lastIndexOf("|"), name = best.slice(0, i), r = best.slice(i + 1);
-    const c = (packByCode(draft.pack) || { cards: [] }).cards.find((x) => x[1] === name && x[2] === r);
-    return { card: { no: c ? c[0] : 0, name, r }, d: bd, margin: second - bd };
+    const i = best.lastIndexOf("|"), name0 = best.slice(0, i), r = best.slice(i + 1);
+    // 見た目の名前が英語などで登録されていたら（手で入れた人がいる）、同じカードの日本語名にそろえる
+    const cards = (packByCode(draft.pack) || { cards: [] }).cards;
+    const c = cards.find((x) => x[1] === name0 && x[2] === r) || cards.find((x) => x[2] === r && (x[5] === name0 || Object.values(namesOf(x) || {}).indexOf(name0) >= 0));
+    const name = c ? c[1] : name0;
+    return { card: { no: c ? c[0] : 0, name, r, en: c ? c[5] || "" : "" }, d: bd, margin: second - bd };
   }
   // 見た目がどれくらい近いか（名前だけで。レア度はどれでも）。覚えていなければ 1
   function lookDistByName(thumb, name) {
@@ -1278,23 +1359,29 @@
   // 読み取った1枚を、パックのカード（名前・レア度）に決める
   const ALL_PACK = { code: "*", cards: [].concat.apply([], PACKS.map((p) => p.cards)) };
   const PROMO_CODE = "PR";
+  // カードの言語の設定（auto：日本語・英語・欧州言語を自動で見分ける / ko / zh：その言語用の文字読みも使う）
+  const LANG_KEY = "getChallenge:cardLang";
+  let cardLang = ["auto", "ko", "zh"].indexOf(ls.get(LANG_KEY, "auto")) >= 0 ? ls.get(LANG_KEY, "auto") : "auto";
+  $("card-lang").value = cardLang;
+  $("card-lang").addEventListener("change", () => { cardLang = $("card-lang").value; ls.set(LANG_KEY, cardLang); if (cardLang !== "auto") loadNames(); });
+  if (cardLang !== "auto") loadNames();
   // イベントのリボンがあるカード：イベントのゲットチャレンジで出るプロモカードの中から決める
   // リボンで名前の左側が隠れるので、読めた文字は名前の「おしり」のことが多い（「アローラロコン」なら「コン」など）
   function identifyPromo(s) {
     const pk = packByCode(PROMO_CODE); if (!pk || !pk.cards.length) return null;
-    const texts = (s.texts || [s.text]).map((t) => normName(t)).filter((t) => t.length >= 1);
+    const texts = (s.texts || [s.text]).map((t) => normText(t)).filter((t) => t.length >= 1);
     if (!texts.length) return null;
     const seen = {}; let best = null, bs = 0, second = 0;
     pk.cards.forEach((c) => {
       if (seen[c[1]]) return; seen[c[1]] = 1;
-      const b = normC(c[1]); let sc = 0;
-      texts.forEach((t) => {
+      const ks = cardKeys(c); if (!ks.length) return; let sc = 0;
+      texts.forEach((t) => ks.forEach((b) => {
         let v = nameSim(t, b);
         if (t.length >= 2 && b.endsWith(t)) v = Math.max(v, 0.9);           // おしりが合う
         else if (t.length >= 2 && b.indexOf(t) >= 0) v = Math.max(v, 0.75);  // 途中が合う
         else if (t.length === 1 && b.endsWith(t)) v = Math.max(v, 0.4);      // 1文字だけ読めた
         if (v > sc) sc = v;
-      });
+      }));
       // HPが読めていて合えば少し有利に（「ロコン」と「カビゴン」のように、おしりが同じ名前を分ける）
       if (sc > 0 && s.hp && c[3] === s.hp) sc += 0.15;
       if (sc > bs) { second = bs; bs = sc; best = c; } else if (sc > second) second = sc;
@@ -1302,14 +1389,31 @@
     if (!best || bs < 0.34) return null;
     return { card: { no: best[0], name: best[1], r: best[2] }, unsure: bs < 0.75 || bs - second < 0.1, score: bs };
   }
+  // ありえる言語モードを全部試して、いちばん自信のある結果を使う（設定を変え忘れていても、日本語のカードは日本語として読める）
+  function modesFor(texts) {
+    const out = ["ja"];
+    if (isEnglishText(texts)) out.push("latin");
+    if (cardLang === "ko" && hasHangul(texts)) out.push("ko");
+    if (cardLang === "zh" && (texts || []).some((t) => /[一-鿿]{2,}/.test(String(t || "")))) out.push("zh");
+    return out;
+  }
   function identify(pack, s) {
+    let best = null;
+    for (const m of modesFor(s.texts || [s.text])) {
+      LANG_MODE = m;
+      try { const r = identify_(pack, s); if (r && (!best || (r.score || 0) + (r.unsure ? 0 : 0.2) > (best.score || 0) + (best.unsure ? 0 : 0.2))) best = r; }
+      finally { LANG_MODE = "ja"; }
+    }
+    return best;
+  }
+  function identify_(pack, s) {
     // 誰かが記録したことのあるカードと見た目がほぼ同じなら、名前が読めなくてもそのカードにする
     const nl = s.thumb ? nearestLook(s.thumb) : null;
     if (lookOk(nl) && (!s.item) === (nl.card.r !== "item")) {
       // 読めた文字がはっきり別のカードを指しているときは、見た目より文字を信じる（まちがって覚えた見た目を使わないため）
       let q0 = { base: null, score: 0 };
-      if (!s.item) (s.texts || []).forEach((t) => { const r = bestBase(pack, normName(t)); if (r.score > q0.score) q0 = r; });
-      if (!(q0.score >= 0.8 && q0.base !== normName(nl.card.name))) return { card: nl.card, unsure: false, score: 1 };
+      if (!s.item) (s.texts || []).forEach((t) => { const r = bestBase(pack, normText(t)); if (r.score > q0.score) q0 = r; });
+      if (!(q0.score >= 0.8 && q0.base !== nl.card.name)) return { card: nl.card, unsure: false, score: 1 };
     }
     if (s.badge && !s.item) { const pr = identifyPromo(s); if (pr) return pr; }
     if (s.item) {
@@ -1318,7 +1422,7 @@
       ITEMS.forEach((it) => (looks[draft.pack + "|" + it.name + "|item"] || []).forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = it.name; } }));
       return { card: { no: 0, name: hit && hd < 0.09 ? hit : s.itemName, r: "item" }, unsure: !(hit && hd < 0.09) && s.itemUnsure, score: 1 };
     }
-    const best0 = (pk) => { let bb = { base: null, score: 0, gap: 0 }; (s.texts || [s.text]).forEach((t) => { const r = bestBase(pk, normName(t)); if (r.score > bb.score) bb = r; }); return bb; };
+    const best0 = (pk) => { let bb = { base: null, score: 0, gap: 0 }; (s.texts || [s.text]).forEach((t) => { const r = bestBase(pk, normText(t)); if (r.score > bb.score) bb = r; }); return bb; };
     // 見た目で、ありえるカードをしぼる（全面イラストなら◆4・☆系、ふつうの枠なら◆1〜3）。しぼると全然合わないときは、しぼらない
     const look = s.full > 85 ? FULL_R : s.full < 50 ? NORMAL_R : null;
     const best = (pk) => {
@@ -1333,17 +1437,16 @@
     // （exなど全面イラストのカードは名前が読みにくいが、HPは大きくはっきり書かれている）
     let byHp = false;
     if (s.hp && bb.score < 0.75) {
-      const hpBase = {}; pack.cards.forEach((c) => { if ((c[3] || 0) === s.hp && (!look || look.indexOf(c[2]) >= 0)) hpBase[normC(c[1])] = 1; });
+      const hpBase = {}; pack.cards.forEach((c) => { if ((c[3] || 0) === s.hp && (!look || look.indexOf(c[2]) >= 0) && cardKeys(c).length) hpBase[c[1]] = c; });
       const names = Object.keys(hpBase);
       if (names.length) {
         let hb = null, hs = 0, h2 = 0;
-        names.forEach((b) => { let sc = 0; (s.texts || [s.text]).forEach((t) => { const v = nameSim(normName(t), b); if (v > sc) sc = v; }); if (sc > hs) { h2 = hs; hs = sc; hb = b; } else if (sc > h2) h2 = sc; });
+        names.forEach((b) => { let sc = 0; const ks = cardKeys(hpBase[b]); (s.texts || [s.text]).forEach((t) => { const nt = normText(t); ks.forEach((k) => { const v = nameSim(nt, k); if (v > sc) sc = v; }); }); if (sc > hs) { h2 = hs; hs = sc; hb = b; } else if (sc > h2) h2 = sc; });
         const hpMatch = bb.base && hpBase[bb.base];
         // 名前の近さで決めきれないとき（差が小さい）は、覚えている見た目が近いほうにする
         if (hb && names.length > 1 && hs - h2 < 0.12 && s.thumb) {
-          const byName = {}; pack.cards.forEach((c) => { if (hpBase[normC(c[1])]) byName[normC(c[1])] = c[1]; });
           let lb = null, ld = 1, l2 = 1;
-          names.forEach((b) => { const d = lookDistByName(s.thumb, byName[b]); if (d < ld) { l2 = ld; ld = d; lb = b; } else if (d < l2) l2 = d; });
+          names.forEach((b) => { const d = lookDistByName(s.thumb, b); if (d < ld) { l2 = ld; ld = d; lb = b; } else if (d < l2) l2 = d; });
           if (lb && ld < 0.12 && l2 - ld >= 0.02) { hb = lb; hs = Math.max(hs, 0.62); h2 = Math.min(h2, hs - 0.15); }
         }
         // 今の候補のHPが合わず、HPの合う名前がそれなりに近い（または1つしかない）なら、そちらにする
@@ -1351,7 +1454,7 @@
       }
     }
     if (!bb.base || bb.score < 0.34) return null;
-    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => normC(c[1]) === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
+    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => c[1] === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
     let cands = pick(src);
     const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
     // HPが読めて、HPの合うカードがあれば、それだけにする（exとexでないカードはHPがちがう）
@@ -1392,9 +1495,14 @@
   // 1枚の手がかりが、そのパックのカードにどれだけ合うか（全面イラストなのに、パックにはふつうの枠しかない名前なら弱くする）
   function slotScore(p, s) {
     if (!s || s.item) return 0;
+    let m = 0;
+    for (const md of modesFor(s.texts)) { LANG_MODE = md; try { const v = slotScore_(p, s); if (v > m) m = v; } finally { LANG_MODE = "ja"; } }
+    return m;
+  }
+  function slotScore_(p, s) {
     const look = s.full > 85 ? FULL_R : s.full < 50 ? NORMAL_R : null; let m = 0;
     (s.texts || []).forEach((t) => {
-      const x = normName(t); if (x.length < 2) return;
+      const x = normText(t); if (x.length < 2) return;
       let v = bestBase(look ? packLook(p, look) : p, x).score;
       if (look) { const u = bestBase(p, x).score; if (u > v + 0.3) v = u * 0.85; }
       if (v > m) m = v;
@@ -1423,6 +1531,7 @@
     const rects = findCards(img) || findCards(img, true);
     if (!rects) return null;
     const w = await getOcr(), slots = [];
+    const w2 = cardLang === "ko" ? await getOcr2("kor") : cardLang === "zh" ? await getOcr2("chi_tra") : null;
     for (const r of rects) {
       if (r.item) { const it = itemOf(img, r); slots.push({ item: true, itemName: it.name, itemUnsure: it.unsure, text: "", texts: [], thumb: thumbOf(img, r), full: 0, get: getScore(img, r), shape: r.shape }); if (onCard) onCard(slots.length); continue; }
       // イベントのリボンがあるカードは、リボンの右側だけで名前を読む（左側は隠れている）
@@ -1431,8 +1540,8 @@
         const cy = nameRowY(img, r, BADGE_XR);
         const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy, BADGE_XR))).data.text || "", t2 = (await w.recognize(nameStrip(img, r, 0, false, true, cy, BADGE_XR))).data.text || "";
         // 名前の一部しか読めないので、右上のHPも読んで候補をしぼる（「ロコン」と「カビゴン」など）
-        const th = (await w.recognize(nameStrip(img, r, 0, false, false, cy, HP_XR))).data.text || "", hm = th.normalize("NFKC").replace(/[^0-9]/g, " ").match(/(\d{2,3})/);
-        slots.push({ text: t1, texts: [t1, t2], badge: true, hp: hm ? Number(hm[1]) : 0, thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+        const hp = await readHp(w, img, r, cy, fullArtScore(img, r));
+        slots.push({ text: t1, texts: [t1, t2], badge: true, hp, hpT: readHp.last, thumb: thumbOf(img, r), full: fullArtScore(img, r), gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
         if (onCard) onCard(slots.length);
         continue;
       }
@@ -1444,13 +1553,15 @@
       const texts = [t1, t2, t3, t4];
       // 全面イラスト（exなど）は、絵の上の白い文字を読むやり方でも試す
       if (full > 55) texts.push((await w.recognize(nameStrip(img, r, 0, false, "bright", cy))).data.text || "");
+      // 韓国語・中国語の設定なら、その言語の文字読みでも読む
+      if (w2) { texts.push((await w2.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", (await w2.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || ""); if (full > 55) texts.push((await w2.recognize(nameStrip(img, r, 0, false, "bright", cy))).data.text || ""); }
       // 右上のHPも読む（名前がうまく読めないとき、HPの合うカードにしぼる）
-      const th = (await w.recognize(nameStrip(img, r, 0, false, false, cy, HP_XR))).data.text || "", hm = th.normalize("NFKC").replace(/[^0-9]/g, " ").match(/(\d{2,3})/);
-      slots.push({ text: t1, texts, hp: hm ? Number(hm[1]) : 0, thumb: thumbOf(img, r), full, gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+      const hp = await readHp(w, img, r, cy, full);
+      slots.push({ text: t1, texts, hp, hpT: readHp.last, thumb: thumbOf(img, r), full, gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
       if (onCard) onCard(slots.length);
     }
     slots.forEach((sl) => { delete sl.r; });
-    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, badge: !!s.badge, hp: s.hp || 0, shape: s.shape })) }]);
+    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, badge: !!s.badge, hp: s.hp || 0, hpT: s.hpT || [], shape: s.shape })) }]);
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
     const lucky = rects.filter((r) => !r.item && luckyOf(img, r) > 0.2).length >= 3;
     return { slots, isAfter: slots[gi].get > 0.15, getIdx: slots[gi].get > 0.15 ? gi : -1, lucky };
@@ -1524,8 +1635,27 @@
     return { odd, unsure };
   }
 
+  // 調査用の表示（?debug のときだけ）
+  function showDebug() {
+    let box = $("gc-debug");
+    if (!box) { box = mk("pre", "", ""); box.id = "gc-debug"; box.style.cssText = "white-space:pre-wrap;font-size:.7rem;background:var(--soft);border-radius:10px;padding:8px;margin-top:8px;max-height:50vh;overflow:auto;"; $("shot-status").after(box); }
+    const lines = ["[debug] 版 " + APP_VERSION + " / 画面 " + screen.width + "x" + screen.height + " dpr" + devicePixelRatio + " / " + navigator.userAgent.slice(0, 60)];
+    dbgSizes.forEach((s, i) => lines.push("画像" + (i + 1) + ": " + s));
+    (window.__gcDebug || []).forEach((d, si) => {
+      lines.push("--- スクショ" + (si + 1) + " カード枠=" + (d.rects ? d.rects.length : 0));
+      (d.slots || []).forEach((s, i) => lines.push((i + 1) + ": " + (s.item ? "アイテム" : "HP=" + (s.hp || "?") + " 全面=" + Math.round(s.full || 0) + (s.badge ? " リボン" : "") + " 文字=" + JSON.stringify((s.t || []).map((t) => String(t).trim().slice(0, 20))) + (s.hp ? "" : " HP読み=" + JSON.stringify((s.hpT || []).map((t) => String(t).slice(0, 12)))))));
+    });
+    if (window.__gcMatch) lines.push("前後の対応: " + JSON.stringify(window.__gcMatch.m) + " 差=" + (window.__gcMatch.d || 0).toFixed(3));
+    lines.push("判定: " + draft.cards.map((c, i) => (i + 1) + "=" + (c ? c.name + "/" + c.r + (draft.unsureB[i] ? "(確認)" : "") : "-")).join(" "));
+    if (window.__gcErr) lines.push("エラー: " + window.__gcErr);
+    box.textContent = lines.join("\n");
+  }
+  // URLに ?debug をつけると、読み取った生の文字・HP・画像サイズを画面の下に出す（うまく読めないときの調査用）
+  if (/[?&]debug\b/.test(location.search)) window.__gcDebugOn = true;
+  const dbgSizes = [];
   $("shot-file").addEventListener("change", async (e) => {
     const files = Array.from(e.target.files || []).slice(0, 2); e.target.value = "";
+    if (window.__gcDebugOn) { window.__gcDebug = []; dbgSizes.length = 0; }
     if (!files.length) return;
     setShotStatus("読み取っています…（はじめての時は、文字を読むデータの読み込みに少しかかります）");
     try {
@@ -1535,7 +1665,7 @@
         const head = "読み取っています…（" + (files.length > 1 ? (f + 1) + "/" + files.length + "枚目・" : "");
         setShotStatus(head + "カードを探しています）");
         let r = null;
-        try { const img = await fileToImage(files[f]); r = await readShot(img, (k) => setShotStatus(head + "カード " + k + "/5）")); } catch (er) { r = null; }
+        try { const img = await fileToImage(files[f]); if (window.__gcDebugOn) dbgSizes.push(img.naturalWidth + "x" + img.naturalHeight + " " + Math.round((files[f].size || 0) / 1024) + "KB " + (files[f].type || "")); r = await readShot(img, (k) => setShotStatus(head + "カード " + k + "/5）")); } catch (er) { r = null; if (window.__gcDebugOn) window.__gcErr = String((er && er.stack) || er); }
         if (r) shots.push(r); else skipped.push(f + 1);
       }
       if (!shots.length) { setShotStatus("カード5枚の場所が見つかりませんでした。シャッフル前かチャレンジ結果の画面を、切り取らずにそのままスクショしてください（「チャレンジ済み」で暗くなった画面は読めません）。", true); return; }
@@ -1569,6 +1699,9 @@
       const pk = badge ? packByCode(PROMO_CODE) : lucky ? MIX : guessPack(ev || SA.filter((x, i) => i !== getIdx));
       if (pk && pk.code !== $("pack").value) { $("pack").value = pk.code; ls.set(LAST_PACK_KEY, pk.code); toast("パックを「" + pk.name + "」にしました。違うときは①で選び直してください。"); }
       const pack = packByCode($("pack").value);
+      // 日本語以外のカード名が必要そうなら、名前のデータを読み込んでから決める
+      const allSlots = (SB || []).concat(SA || []);
+      if (cardLang !== "auto" || allSlots.some((x) => x && !x.item && isEnglishText(x.texts))) await loadNames();
       await loadSharedLooks(pack.code);
       // パックが変わったとき・2枚同時のとき・古いほうを使わないときは最初から。片方だけ読んだときは、もう片方の入力は残す
       if (pack.code !== draft.pack || both || dropped) draft = newDraft(pack.code);
@@ -1590,6 +1723,7 @@
       if (!SB) msg += "\nシャッフル前の5か所は、タップすると結果の5枚から選べます。";
       msg += "\n欲しかったカードに「♥欲しい」をつけてください。";
       setShotStatus(msg);
+      if (window.__gcDebugOn) showDebug();
     } catch (err) {
       if (window.__gcDebugOn) window.__gcErr = String((err && err.stack) || err);
       setShotStatus(ocrWorker ? "読み取りの途中でうまくいきませんでした。もう一度お試しください。" : "読み取れませんでした。通信できる場所で、もう一度お試しください。", true);
