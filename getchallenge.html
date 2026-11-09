@@ -442,7 +442,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/9 17:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/9 18:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -996,9 +996,9 @@
   const OCR_OPT = {
     workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
     corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
-    langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/jpn@1.0.0/4.0.0", gzip: true
+    langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/jpn@1.0.0/4.0.0_best_int", gzip: true   // 精度の高いほうのモデル（軽いほうだとHPの数字がほぼ読めない）
   };
-  const LOOK_KEY = "getChallenge:looks";
+  const LOOK_KEY = "getChallenge:looks2";   // 見た目の計算を変えたので、前に覚えた見た目（looks）は使わない
   function setShotStatus(t, err) { const e = $("shot-status"); e.textContent = t || ""; e.className = "shot-status" + (err ? " error" : ""); $("shot-note").hidden = !!t; }
   let ocrWorker = null;
   function loadScript(src) { return new Promise((ok, ng) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => ng(new Error("script")); document.head.appendChild(s); }); }
@@ -1186,10 +1186,24 @@
     cx.putImageData(id, 0, 0); return c;
   }
   // カードの見た目（名前とGETマークを除いた部分の小さな色の並び）
-  function thumbOf(img, r) {
-    const c = cropCanvas(img, r.x + r.w * 0.05, r.y + r.h * 0.14, r.w * 0.9, r.h * 0.8, 8, 12);
-    const d = c.getContext("2d").getImageData(0, 0, 8, 12).data, out = [];
-    for (let i = 0; i < d.length; i += 4) out.push(d[i], d[i + 1], d[i + 2]);
+  // ブラウザの縮小のしかた（Safari と Chrome で違う）に左右されないよう、等倍で切り出してから自分でマスごとの平均色をとる
+  // （公式画像から作った見た目データも同じ計算で作ってあるので、そのまま比べられる）
+  // スクショで見つけた枠（白いふち・影を含む）の中で、カード本体（公式画像と同じ範囲）がある位置。スクショごとに、いくつかの候補から公式の見た目にいちばん合うものを選ぶ
+  const THUMB_G0 = { x0: 0, y0: 0.06, w: 0.94, h: 0.94 };
+  const THUMB_GS = []; [0.04, 0.06, 0.08].forEach((y0) => [0.92, 0.94, 0.96].forEach((sz) => THUMB_GS.push({ x0: 0, y0, w: sz, h: sz })));
+  let thumbG = THUMB_G0;
+  function thumbOf(img, r, g) {
+    g = g || thumbG;
+    const cx = r.x + r.w * g.x0, cy = r.y + r.h * g.y0, cw = r.w * g.w, ch = r.h * g.h;
+    const w = cw * 0.9, h = ch * 0.8, W = Math.max(8, Math.round(w)), H = Math.max(12, Math.round(h));
+    const c = cropCanvas(img, cx + cw * 0.05, cy + ch * 0.14, w, h, W, H);
+    const d = c.getContext("2d").getImageData(0, 0, W, H).data, out = [];
+    for (let gy = 0; gy < 12; gy++) for (let gx = 0; gx < 8; gx++) {
+      const xa = Math.floor(gx * W / 8), xb = Math.max(xa + 1, Math.floor((gx + 1) * W / 8)), ya = Math.floor(gy * H / 12), yb = Math.max(ya + 1, Math.floor((gy + 1) * H / 12));
+      let rr = 0, gg = 0, bb = 0, n = 0;
+      for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) { const i = (y * W + x) * 4; rr += d[i]; gg += d[i + 1]; bb += d[i + 2]; n++; }
+      out.push(Math.round(rr / n), Math.round(gg / n), Math.round(bb / n));
+    }
     return out;
   }
   const thumbDist = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length / 255; };
@@ -1289,7 +1303,23 @@
   const thumbToStr = (t) => { let b = ""; for (let i = 0; i < t.length; i++) b += String.fromCharCode(t[i]); return btoa(b); };
   const strToThumb = (s) => { try { const b = atob(s), out = []; for (let i = 0; i < b.length; i++) out.push(b.charCodeAt(i)); return out.length === 288 ? out : null; } catch (e) { return null; } };
   let sharedMem = {};
-  function sharedLooks(pack) { if (sharedMem[pack]) return sharedMem[pack]; const c = (ls.get(SHARED_KEY, {}) || {})[pack]; return c ? (sharedMem[pack] = c.looks) : {}; }
+  function sharedLooks(pack) {
+    if (sharedMem[pack] && (sharedMem[pack]._f || !REFS)) return sharedMem[pack];
+    const c = sharedMem[pack] ? { looks: sharedMem[pack] } : (ls.get(SHARED_KEY, {}) || {})[pack];
+    if (!c) return {};
+    if (!REFS) return (sharedMem[pack] = c.looks);
+    // 公式の見た目から遠すぎるもの（古い計算で作ったもの・まちがって覚えたもの）は使わない
+    const pk = packByCode(pack), out = {};
+    Object.keys(c.looks).forEach((k) => {
+      if (k === "_f") return;
+      const i = k.lastIndexOf("|"), nm = k.slice(0, i), r = k.slice(i + 1);
+      const card = pk && pk.cards.find((x) => x[1] === nm && x[2] === r), ref = refOf(card);
+      const arr = (c.looks[k] || []).filter((t) => !ref || thumbDist(t, ref) <= 0.12);
+      if (arr.length) out[k] = arr;
+    });
+    Object.defineProperty(out, "_f", { value: true, enumerable: false });
+    return (sharedMem[pack] = out);
+  }
   async function loadSharedLooks(pack) {
     if (!CONFIG.GAS_URL || !pack) return;
     const all = ls.get(SHARED_KEY, {}) || {}, c = all[pack];
@@ -1604,6 +1634,12 @@
     // ふつうの背景で見つからなければ、ピンクなど明るい色の背景（ラッキーチャレンジ）として探す
     const rects = findCards(img) || findCards(img, true);
     if (!rects) return null;
+    // 公式の見た目データがあれば、このスクショでのカード本体の位置（枠の中のどこか）を決める：5枚ぶんの「いちばん近いカードとの差」の合計が最小の候補
+    if (REFS) {
+      let bg = thumbG, bs = 1e9;
+      THUMB_GS.forEach((g) => { let sum = 0; rects.forEach((r) => { if (r.item) return; const m = refMatch(ALL_PACK, thumbOf(img, r, g)); sum += m ? m.d : 1; }); if (sum < bs) { bs = sum; bg = g; } });
+      thumbG = bg; if (window.__gcDebugOn) window.__gcGeom = bg;
+    }
     const w = await getOcr(), slots = [];
     const w2 = cardLang === "ko" ? await getOcr2("kor") : cardLang === "zh" ? await getOcr2("chi_tra") : null;
     for (const r of rects) {
@@ -1619,9 +1655,17 @@
         if (onCard) onCard(slots.length);
         continue;
       }
+      // 公式の見た目がはっきり合うカードなら、文字は1回だけ読んで（念のための確認用）、HPは読まない（スマホでの時間を短くする）
+      const thumb = thumbOf(img, r), rm = REFS ? refMatch(ALL_PACK, thumb) : null, sure = !!(rm && rm.d < 0.08 && rm.margin >= 0.04);
+      const cy = nameRowY(img, r), full = fullArtScore(img, r);
+      if (sure) {
+        const t1 = (await w.recognize(nameStrip(img, r, 0, false, full > 55 ? "bright" : false, cy))).data.text || "";
+        slots.push({ text: t1, texts: [t1], hp: 0, hpT: [], sure: true, thumb, full, gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+        if (onCard) onCard(slots.length);
+        continue;
+      }
       // 少しずらして2回読み、合うほうを使う
       // 名前の行に合わせて読む（ふつう・濃いところだけ・少し下・トレーナーズの2行目）
-      const cy = nameRowY(img, r), full = fullArtScore(img, r);
       const t1 = (await w.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", t4 = (await w.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || "";
       const t2 = (await w.recognize(nameStrip(img, r, 0, false, true))).data.text || "", t3 = (await w.recognize(nameStrip(img, r, 0, true))).data.text || "";
       const texts = [t1, t2, t3, t4];
@@ -1631,11 +1675,11 @@
       if (w2) { texts.push((await w2.recognize(nameStrip(img, r, 0, false, false, cy))).data.text || "", (await w2.recognize(nameStrip(img, r, 0, false, true, cy))).data.text || ""); if (full > 55) texts.push((await w2.recognize(nameStrip(img, r, 0, false, "bright", cy))).data.text || ""); }
       // 右上のHPも読む（名前がうまく読めないとき、HPの合うカードにしぼる）
       const hp = await readHp(w, img, r, cy, full);
-      slots.push({ text: t1, texts, hp, hpT: readHp.last, thumb: thumbOf(img, r), full, gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
+      slots.push({ text: t1, texts, hp, hpT: readHp.last, thumb, full, gold: goldOf(img, r), get: getScore(img, r), shape: r.shape, cy, r });
       if (onCard) onCard(slots.length);
     }
     slots.forEach((sl) => { delete sl.r; });
-    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, badge: !!s.badge, hp: s.hp || 0, hpT: s.hpT || [], shape: s.shape })) }]);
+    if (window.__gcDebugOn) window.__gcDebug = (window.__gcDebug || []).concat([{ rects, comps: window.__gcComps, slots: slots.map((s) => ({ t: s.texts, full: s.full, get: +s.get.toFixed(3), item: !!s.item, badge: !!s.badge, hp: s.hp || 0, hpT: s.hpT || [], shape: s.shape, sure: !!s.sure })) }]);
     const gi = slots.reduce((m, s, i) => s.get > slots[m].get ? i : m, 0);
     const lucky = rects.filter((r) => !r.item && luckyOf(img, r) > 0.2).length >= 3;
     return { slots, isAfter: slots[gi].get > 0.15, getIdx: slots[gi].get > 0.15 ? gi : -1, lucky };
@@ -1685,7 +1729,8 @@
         const id = identify(pack, x);
         // GETのカードは名前が「GET」のマークで隠れるので、はっきり読めたときだけ入れる
         const use = !!(id && (i !== getIdx || id.score >= 0.85));
-        draft.acards[i] = use ? id.card : null; draft.unsureA[i] = use && (id.unsure || i === getIdx); draft.okA[i] = use && !draft.unsureA[i];
+        // （公式の見た目ではっきり合っていれば、GETのカードでも「確認」はつけない）
+        draft.acards[i] = use ? id.card : null; draft.unsureA[i] = use && (id.unsure || (i === getIdx && !(id.ref < 0.08))); draft.okA[i] = use && !draft.unsureA[i];
       });
     }
     // 同じ画面に同じカードが2枚あるとき（見た目がほぼ同じ）、自信のある方に合わせる
@@ -1717,8 +1762,9 @@
     dbgSizes.forEach((s, i) => lines.push("画像" + (i + 1) + ": " + s));
     (window.__gcDebug || []).forEach((d, si) => {
       lines.push("--- スクショ" + (si + 1) + " カード枠=" + (d.rects ? d.rects.length : 0));
-      (d.slots || []).forEach((s, i) => lines.push((i + 1) + ": " + (s.item ? "アイテム" : "HP=" + (s.hp || "?") + " 全面=" + Math.round(s.full || 0) + (s.badge ? " リボン" : "") + " 文字=" + JSON.stringify((s.t || []).map((t) => String(t).trim().slice(0, 20))) + (s.hp ? "" : " HP読み=" + JSON.stringify((s.hpT || []).map((t) => String(t).slice(0, 12)))))));
+      (d.slots || []).forEach((s, i) => lines.push((i + 1) + ": " + (s.item ? "アイテム" : (s.sure ? "見た目で確定 " : "") + "HP=" + (s.hp || "?") + " 全面=" + Math.round(s.full || 0) + (s.badge ? " リボン" : "") + " 文字=" + JSON.stringify((s.t || []).map((t) => String(t).trim().slice(0, 20))) + (s.hp ? "" : " HP読み=" + JSON.stringify((s.hpT || []).map((t) => String(t).slice(0, 12)))))));
     });
+    if (window.__gcGeom) lines.push("カード本体の位置: " + JSON.stringify(window.__gcGeom));
     if (window.__gcMatch) lines.push("前後の対応: " + JSON.stringify(window.__gcMatch.m) + " 差=" + (window.__gcMatch.d || 0).toFixed(3));
     lines.push("判定: " + draft.cards.map((c, i) => (i + 1) + "=" + (c ? c.name + "/" + c.r + (draft.unsureB[i] ? "(確認)" : "") : "-")).join(" "));
     const dpk = packByCode(draft.pack);
@@ -1743,6 +1789,7 @@
         const head = "読み取っています…（" + (files.length > 1 ? (f + 1) + "/" + files.length + "枚目・" : "");
         setShotStatus(head + "カードを探しています）");
         let r = null;
+        try { await refsP; } catch (e) {}
         try { const img = await fileToImage(files[f]); if (window.__gcDebugOn) dbgSizes.push(img.naturalWidth + "x" + img.naturalHeight + " " + Math.round((files[f].size || 0) / 1024) + "KB " + (files[f].type || "")); r = await readShot(img, (k) => setShotStatus(head + "カード " + k + "/5）")); } catch (er) { r = null; if (window.__gcDebugOn) window.__gcErr = String((er && er.stack) || er); }
         if (r) shots.push(r); else skipped.push(f + 1);
       }
