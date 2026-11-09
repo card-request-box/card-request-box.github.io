@@ -369,6 +369,34 @@
       .replace(/[ァィゥェォッャュョヮ]/g, (c) => "アイウエオツヤユヨワ"["ァィゥェォッャュョヮ".indexOf(c)])
       .replace(/[\s・ー〜~\-]/g, "");
   }
+  // 漢字をふくむカード名の読み方（ひらがな）。検索のとき、この読み方でもマッチさせる
+  const KANA_READING = {
+    "かけだし調査員": "かけだしちょうさいん",
+    "こいぬ大好きガール": "こいぬだいすきガール",
+    "オーリム博士": "オーリムはかせ",
+    "カンナギタウンの長老": "カンナギタウンのちょうろう",
+    "ギンガ団のしたっぱ": "ギンガだんのしたっぱ",
+    "グリーンの挑発": "グリーンのちょうはつ",
+    "スター団のしたっぱ": "スターだんのしたっぱ",
+    "セレナの選択": "セレナのせんたく",
+    "フトゥー博士": "フトゥーはかせ",
+    "フレンドリィショップのお兄さん": "フレンドリィショップのおにいさん",
+    "ポケモンセンターのお姉さん": "ポケモンセンターのおねえさん",
+    "ロケット団のしたっぱ": "ロケットだんのしたっぱ",
+    "ロケット団のサンダーex": "ロケットだんのサンダーex",
+    "ロケット団のファイヤーex": "ロケットだんのファイヤーex",
+    "ロケット団のフリーザーex": "ロケットだんのフリーザーex",
+    "ロケット団のボス": "ロケットだんのボス",
+    "ロケット団のマタドガスex": "ロケットだんのマタドガスex",
+    "ロケット団のヤドキングex": "ロケットだんのヤドキングex",
+    "ロケット団のラッタex": "ロケットだんのラッタex",
+    "ロケット団の大作戦": "ロケットだんのだいさくせん",
+    "ロケット団の研究員": "ロケットだんのけんきゅういん",
+    "博士の研究": "はかせのけんきゅう",
+    "旅の行商人": "たびのぎょうしょうにん",
+    "金枠": "きんわく",
+    "釣り人": "つりびと"
+  };
 
   // ---- カードデータ ----
   let cardList = [];
@@ -379,7 +407,7 @@
       const pack = String(row[1] || "").trim();
       const rarity = String(row[2] || "").trim();
       if (!name || RARITIES.indexOf(rarity) < 0) continue;
-      if (!byName.has(name)) byName.set(name, { name, key: norm(name), versions: [] });
+      if (!byName.has(name)) byName.set(name, { name, key: norm(name), readKey: KANA_READING[name] ? norm(KANA_READING[name]) : "", versions: [] });
       const c = byName.get(name);
       if (!c.versions.some((v) => v.rarity === rarity && v.pack === pack)) c.versions.push({ rarity, pack });
     }
@@ -504,8 +532,9 @@
     const starts = [], contains = [];
     for (const c of cardList) {
       if ((rarity || pack) && !versionsIn(c, rarity, pack).length) continue;
-      if (c.key.startsWith(k)) starts.push(c);
-      else if (k.length >= 2 && c.key.includes(k)) contains.push(c);
+      const keys = c.readKey ? [c.key, c.readKey] : [c.key];
+      if (keys.some((kk) => kk.startsWith(k))) starts.push(c);
+      else if (k.length >= 2 && keys.some((kk) => kk.includes(k))) contains.push(c);
     }
     return starts.sort(byN).concat(contains.sort(byN)).slice(0, limit || CONFIG.MAX_SUGGEST);
   }
