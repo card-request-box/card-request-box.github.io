@@ -440,7 +440,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/9 13:30";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/9 14:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -719,6 +719,7 @@
   $("ai-on").addEventListener("click", () => { ai.on = true; aiSave(); renderBoard2(); });
 
   let draft = null;
+  let saveAsked = false;   // 「確認」つきのまま記録しようとして、一度「合っていますか？」と聞いた状態
   function newDraft(pack) {
     return { pack: pack, cards: [null, null, null, null, null], want: [], after: [-1, -1, -1, -1, -1], get: -1,
       acards: [null, null, null, null, null],            // 後だけ先に分かったときの、後の場所ごとのカード
@@ -777,6 +778,8 @@
 
   // ---- ② シャッフル前の5枚 ----
   function renderBoard() {
+    // 入力が変わったら、「名前は合っている・記録する」の確認はやり直し
+    if (saveAsked) { saveAsked = false; $("save").textContent = "記録する"; }
     const b = $("board"); b.innerHTML = "";
     draft.cards.forEach((c, i) => {
       const pos = mk("div", "pos");
@@ -1594,8 +1597,21 @@
   });
 
   // ---- 保存 ----
+  // 「確認」マークが残ったまま記録しようとしたら、一度だけ「合っていますか？」と聞く
+  // 「合っている」で2回目を押したら、そのカードの見た目を覚える（放置すると何も学習しないので、もったいない）
+  const unsureSlots = () => [0, 1, 2, 3, 4].filter((q) => draft.cards[q] && (draft.unsureB[q] || (draft.after.indexOf(q) >= 0 && draft.unsureA[draft.after.indexOf(q)])));
   $("save").addEventListener("click", () => {
     if (draftProblem()) return;
+    const us = unsureSlots();
+    if (us.length && !saveAsked) {
+      saveAsked = true;
+      $("save").textContent = "名前は合っている・記録する";
+      setStatus("rec-status", "「確認」の印が " + us.length + " 枚あります（" + us.map((q) => draft.cards[q].name).join("・") + "）。名前が合っていればもう一度ボタンを押してください。違っていれば、そのカードをタップして直してから記録してください。");
+      setTimeout(() => { if (saveAsked) { saveAsked = false; $("save").textContent = "記録する"; setStatus("rec-status", ""); } }, 15000);
+      return;
+    }
+    if (us.length) { us.forEach((q) => { draft.unsureB[q] = false; draft.okB[q] = true; const k = draft.after.indexOf(q); if (k >= 0) { draft.unsureA[k] = false; draft.okA[k] = true; } }); }
+    saveAsked = false; $("save").textContent = "記録する";
     // 同じチャレンジ（同じ5枚・同じ移動）を2回記録すると統計がずれるので、記録しない
     const sig = (pk, cards, after) => pk + "|" + cards.map((c) => c ? c.name + c.r : "").join(",") + "|" + after.join(",");
     const me = sig(draft.pack, draft.cards, draft.after);
