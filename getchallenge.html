@@ -442,7 +442,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/9 16:30";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/9 17:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -1340,6 +1340,43 @@
   // 見た目で決めてよいか：とても近い（0.06未満）か、そこそこ近くて（0.10未満）2番目のカードよりはっきり近い
   // （スマホによって色味や明るさがちがうので、絶対の近さだけだと合わないことが多い）
   const lookOk = (nl) => !!nl && (nl.d < 0.06 || (nl.d < 0.10 && nl.margin >= 0.025));
+  // ---- 公式のカード画像から作った見た目（getchallenge-refs.js）。全カード分あるので、名前が読めなくても・どの言語でも、絵で決められる ----
+  let REFS = window.GC_REFS || null, refsLoading = null;
+  const refMem = {};
+  function loadRefs() {
+    if (REFS) return Promise.resolve(REFS);
+    if (!refsLoading) refsLoading = loadScript("getchallenge-refs.js?v=" + encodeURIComponent(APP_VERSION)).then(() => { REFS = window.GC_REFS || {}; return REFS; }).catch(() => { refsLoading = null; return null; });
+    return refsLoading;
+  }
+  // そのカード（配列）の公式の見た目。なければ null
+  function refOf(c) {
+    if (!REFS || !c || !c[6]) return null;
+    const k = c[6]; if (refMem[k] !== undefined) return refMem[k];
+    const i = k.indexOf("|"), m = REFS[k.slice(0, i)], s = m && m[k.slice(i + 1)];
+    return (refMem[k] = s ? strToThumb(s) : null);
+  }
+  // パックの中で、スクショのカードの見た目にいちばん近い公式カード。d＝近さ（0に近いほど同じ）、margin＝2番目に近い「別のカード」との差
+  function refMatch(pack, thumb, filter) {
+    if (!REFS || !thumb || !pack) return null;
+    let best = null, bd = 1, second = 1;
+    const same = (a, b) => a[1] === b[1] && a[2] === b[2] && frameOf(pack.code, a[0], a[1]) === frameOf(pack.code, b[0], b[1]);
+    pack.cards.forEach((c) => {
+      if (filter && !filter(c)) return;
+      const t = refOf(c); if (!t) return;
+      const d = thumbDist(t, thumb);
+      if (d < bd) { if (best && !same(best, c)) second = bd; bd = d; best = c; }
+      else if (d < second && !same(best, c)) second = d;
+    });
+    return best ? { card: { no: best[0], name: best[1], r: best[2] }, c: best, d: bd, margin: second - bd, pk: pack } : null;
+  }
+  // 公式の見た目で決めてよいか（近くて、2番目のカードとはっきり差がある）
+  const refOk = (rm) => !!rm && rm.d < 0.10 && rm.margin >= 0.02;
+  // その名前のカード（レア度はどれでも）の公式の見た目との近さ。なければ 1
+  function refDistByName(pack, thumb, name) {
+    let d = 1; if (!REFS || !thumb) return d;
+    pack.cards.forEach((c) => { if (c[1] !== name) return; const t = refOf(c); if (!t) return; const x = thumbDist(t, thumb); if (x < d) d = x; });
+    return d;
+  }
   function queueLook(thumb, c) {
     if (!thumb || !c || !draft || !CONFIG.GAS_URL) return;
     const q = ls.get(LOOKQ_KEY, []) || []; q.push({ pack: draft.pack, name: c.name, r: c.r, t: thumbToStr(thumb) }); ls.set(LOOKQ_KEY, q.slice(-60));
@@ -1409,11 +1446,29 @@
   function identify_(pack, s) {
     // 誰かが記録したことのあるカードと見た目がほぼ同じなら、名前が読めなくてもそのカードにする
     const nl = s.thumb ? nearestLook(s.thumb) : null;
-    if (lookOk(nl) && (!s.item) === (nl.card.r !== "item")) {
+    // 公式のカード画像の見た目にいちばん近いカード（下で使う）。覚えた見た目がまちがっていた（別のカードで覚えた）ときの保険にもなる
+    let rf = null;
+    if (!s.item && s.thumb && REFS) {
+      rf = refMatch(pack, s.thumb);
+      // パックにないカード（ラッキーチャレンジなど）のこともあるので、パックの中で合わなければ全カードからも探す
+      if (!refOk(rf) && pack !== MIX && pack !== ALL_PACK) { const ra = refMatch(ALL_PACK, s.thumb); if (ra && ra.d < 0.08 && ra.margin >= 0.03 && (!rf || ra.d < rf.d - 0.03)) rf = ra; }
+    }
+    if (lookOk(nl) && (!s.item) === (nl.card.r !== "item") && !(refOk(rf) && rf.card.name !== nl.card.name && rf.d < nl.d + 0.015)) {
       // 読めた文字がはっきり別のカードを指しているときは、見た目より文字を信じる（まちがって覚えた見た目を使わないため）
       let q0 = { base: null, score: 0 };
       if (!s.item) (s.texts || []).forEach((t) => { const r = bestBase(pack, normText(t)); if (r.score > q0.score) q0 = r; });
       if (!(q0.score >= 0.8 && q0.base !== nl.card.name)) return { card: nl.card, unsure: false, score: 1 };
+    }
+    // 公式のカード画像の見た目と比べる。はっきり近ければ、名前が読めなくても（どの言語でも）そのカードにする
+    if (rf) {
+      if (refOk(rf)) {
+        // 読めた文字がはっきり別のカードを指しているときは文字を信じる。HPが読めていて合わないときも、見た目だけでは決めない
+        // （「ピカチュウ」と「ピカチュウex」のように、読めた文字が見た目のカードにも同じくらい合うなら、見た目のほうを信じる）
+        let q0 = { base: null, score: 0 }, qr = 0; const rks = cardKeys(rf.c);
+        (s.texts || []).forEach((t) => { const nt = normText(t); const r = bestBase(pack, nt); if (r.score > q0.score) q0 = r; rks.forEach((k) => { const v = nameSim(nt, k); if (v > qr) qr = v; }); });
+        const hpBad = !!(s.hp && rf.c[3] && rf.c[3] !== s.hp);
+        if (!(q0.score >= 0.8 && q0.base !== rf.card.name && q0.score > qr + 0.1) && !hpBad) return { card: rf.card, unsure: false, score: 1, ref: rf.d };
+      }
     }
     if (s.badge && !s.item) { const pr = identifyPromo(s); if (pr) return pr; }
     if (s.item) {
@@ -1435,6 +1490,12 @@
     if (bb.score < 0.8) { const g = best(ALL_PACK); if (g.score >= 0.85 && g.score > bb.score + 0.1) { bb = g; src = ALL_PACK; } }
     // 名前がよく読めなかったとき：右上のHPが読めていれば、そのHPのカードの中からいちばん名前が近いものを使う
     // （exなど全面イラストのカードは名前が読みにくいが、HPは大きくはっきり書かれている）
+    // 名前がよく読めず、公式の見た目がそこそこ近ければ、見た目のカードの名前にする（HPが読めて合わないときは使わない）
+    let byRef = false;
+    if (rf && bb.score < 0.6 && rf.d < 0.13 && rf.margin >= 0.015 && !(s.hp && rf.c[3] && rf.c[3] !== s.hp)) {
+      if (rf.card.name !== bb.base) { bb = { base: rf.card.name, score: Math.max(bb.score, 0.45), gap: 0.1 }; src = rf.pk; }
+      byRef = true;
+    }
     let byHp = false;
     if (s.hp && bb.score < 0.75) {
       const hpBase = {}; pack.cards.forEach((c) => { if ((c[3] || 0) === s.hp && (!look || look.indexOf(c[2]) >= 0) && cardKeys(c).length) hpBase[c[1]] = c; });
@@ -1446,7 +1507,7 @@
         // 名前の近さで決めきれないとき（差が小さい）は、覚えている見た目が近いほうにする
         if (hb && names.length > 1 && hs - h2 < 0.12 && s.thumb) {
           let lb = null, ld = 1, l2 = 1;
-          names.forEach((b) => { const d = lookDistByName(s.thumb, b); if (d < ld) { l2 = ld; ld = d; lb = b; } else if (d < l2) l2 = d; });
+          names.forEach((b) => { const d = Math.min(lookDistByName(s.thumb, b), refDistByName(pack, s.thumb, b)); if (d < ld) { l2 = ld; ld = d; lb = b; } else if (d < l2) l2 = d; });
           if (lb && ld < 0.12 && l2 - ld >= 0.02) { hb = lb; hs = Math.max(hs, 0.62); h2 = Math.min(h2, hs - 0.15); }
         }
         // 今の候補のHPが合わず、HPの合う名前がそれなりに近い（または1つしかない）なら、そちらにする
@@ -1454,7 +1515,7 @@
       }
     }
     if (!bb.base || bb.score < 0.34) return null;
-    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => c[1] === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r; if (seen[k]) return false; seen[k] = 1; return true; }); };
+    const pick = (pk) => { const seen = {}; return pk.cards.filter((c) => c[1] === bb.base).map((c) => ({ no: c[0], name: c[1], r: c[2], hp: c[3] || 0 })).filter((c) => { const k = c.name + c.r + frameOf(pk.code, c.no, c.name); if (seen[k]) return false; seen[k] = 1; return true; }); };
     let cands = pick(src);
     const exText = (s.texts || [s.text]).some((t) => /e\s*[xX×ｘ]|E\s*X|c\s*x/.test(t));
     // HPが読めて、HPの合うカードがあれば、それだけにする（exとexでないカードはHPがちがう）
@@ -1471,9 +1532,17 @@
       const wantEx = exText || s.full > 85;
       const f = cands.filter((c) => /ex$/.test(c.name) === wantEx); if (f.length) cands = f;
     }
+    // 読めた名前のカードにはHPの合うものがなく、公式の見た目で近いカードのHPが合うなら、そちら（「ナッシー」と読めたが実は「ナッシーex」など）
+    if (!hpOk && s.hp && rf && rf.c[3] === s.hp && rf.d < 0.14 && !cands.some((c) => c.hp === s.hp)) { cands = [{ no: rf.c[0], name: rf.c[1], r: rf.c[2], hp: rf.c[3] }]; bb = { base: rf.c[1], score: Math.max(bb.score, 0.5), gap: bb.gap }; }
     cands = cands.map((c) => ({ no: c.no, name: c.name, r: c.r }));
     let unsure = bb.score < 0.6 || bb.gap < 0.12;
-    if (cands.length === 1) return { card: cands[0], unsure, score: bb.score };
+    if (cands.length === 1) return { card: cands[0], unsure: unsure && !(byRef && rf.d < 0.10), score: bb.score };
+    // 候補が何枚かあるとき（◆4とex☆2、☆2の黒枠と虹枠など）：公式の見た目にいちばん近いものにする
+    if (s.thumb && REFS) {
+      let rb = null, rd = 1, r2 = 1;
+      cands.forEach((c) => { const card = src.cards.find((x) => x[0] === c.no && x[1] === c.name) || ALL_PACK.cards.find((x) => x[0] === c.no && x[1] === c.name); const t = refOf(card); if (!t) return; const d = thumbDist(t, s.thumb); if (d < rd) { r2 = rd; rd = d; rb = c; } else if (d < r2) r2 = d; });
+      if (rb && rd < 0.14 && r2 - rd >= 0.02) return { card: rb, unsure: unsure && rd >= 0.10, score: bb.score, ref: rd };
+    }
     // 覚えている見た目（自分＋みんな）があれば、それに近いものを選ぶ
     let hit = null, hd = 1; const known = [];
     cands.forEach((c) => { const ls2 = looksFor(c); if (ls2.length) known.push(c); ls2.forEach((t) => { const dd = thumbDist(t, s.thumb); if (dd < hd) { hd = dd; hit = c; } }); });
@@ -1512,7 +1581,12 @@
   // パックが分からないとき：読み取った名前がいちばん合うパックを選ぶ（同じくらいなら新しいパック）
   function guessPack(ev) {
     let best = null, bs = -1, bn = 0;
-    const strong = (p) => { let sc = 0, n = 0; ev.forEach((s) => { const m = slotScore(p, s); if (m >= 0.75) { sc += m; n++; } }); return [sc, n]; };
+    const strong = (p) => { let sc = 0, n = 0; ev.forEach((s) => {
+      let m = slotScore(p, s);
+      // 公式の見た目がはっきり合うカードがあれば、それも「このパックのカード」の手がかり
+      if (s && !s.item && s.thumb && REFS) { const rm = refMatch(p, s.thumb); if (refOk(rm) && (!s.hp || !rm.c[3] || rm.c[3] === s.hp)) m = Math.max(m, 0.9 + (0.1 - rm.d)); }
+      if (m >= 0.75) { sc += m; n++; }
+    }); return [sc, n]; };
     PACKS.forEach((p) => { const [sc, n] = strong(p); const v = sc + (p.code === draft.pack ? 0.01 : 0); if (v > bs) { bs = v; best = p; bn = n; } });
     // 1つのパックではそろわないカードが2枚以上あれば、ラッキーチャレンジなどの「いろいろなパック」
     const [, mn] = strong(MIX);
@@ -1647,6 +1721,9 @@
     });
     if (window.__gcMatch) lines.push("前後の対応: " + JSON.stringify(window.__gcMatch.m) + " 差=" + (window.__gcMatch.d || 0).toFixed(3));
     lines.push("判定: " + draft.cards.map((c, i) => (i + 1) + "=" + (c ? c.name + "/" + c.r + (draft.unsureB[i] ? "(確認)" : "") : "-")).join(" "));
+    const dpk = packByCode(draft.pack);
+    if (REFS && dpk) lines.push("公式の見た目: " + draft.thumbB.map((t, i) => { const rm = t ? refMatch(dpk, t) : null; return (i + 1) + "=" + (rm ? rm.card.name + "/" + rm.card.r + " " + rm.d.toFixed(3) + "±" + rm.margin.toFixed(3) : "-"); }).join(" "));
+    else lines.push("公式の見た目: " + (REFS ? "" : "未読込"));
     if (window.__gcErr) lines.push("エラー: " + window.__gcErr);
     box.textContent = lines.join("\n");
   }
@@ -1660,6 +1737,7 @@
     setShotStatus("読み取っています…（はじめての時は、文字を読むデータの読み込みに少しかかります）");
     try {
       let shots = [], skipped = [];
+      const refsP = loadRefs();   // 公式のカード画像の見た目（絵で決める用）。文字を読む準備と同時に読み込む
       await getOcr();   // 文字を読む準備（通信できないときは、ここで止まる）
       for (let f = 0; f < files.length; f++) {
         const head = "読み取っています…（" + (files.length > 1 ? (f + 1) + "/" + files.length + "枚目・" : "");
@@ -1696,6 +1774,7 @@
       const lucky = (before && before.lucky) || (after && after.lucky);
       // イベントのリボンがあれば、イベントのゲットチャレンジ（プロモカード）
       const badge = !!(SB && SB.some((x) => x.badge)) && !!packByCode(PROMO_CODE);
+      try { await refsP; } catch (e) {}
       const pk = badge ? packByCode(PROMO_CODE) : lucky ? MIX : guessPack(ev || SA.filter((x, i) => i !== getIdx));
       if (pk && pk.code !== $("pack").value) { $("pack").value = pk.code; ls.set(LAST_PACK_KEY, pk.code); toast("パックを「" + pk.name + "」にしました。違うときは①で選び直してください。"); }
       const pack = packByCode($("pack").value);
