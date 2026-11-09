@@ -440,7 +440,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/9 13:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "11/9 13:30";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -1226,17 +1226,36 @@
   // 候補のカードの見た目（自分が覚えたもの＋みんなのもの）
   function looksFor(c) { const k = draft.pack + "|" + c.name + "|" + c.r; return (loadLooks()[k] || []).concat(sharedLooks(draft.pack)[c.name + "|" + c.r] || []); }
   // このパックで覚えている見た目（自分＋みんな）から、いちばん近いカードを探す
-  function nearestLook(thumb) {
-    let best = null, bd = 1;
-    const mine = loadLooks(), pre = draft.pack + "|";
-    Object.keys(mine).forEach((k) => { if (k.indexOf(pre) !== 0) return; mine[k].forEach((t) => { const d = thumbDist(t, thumb); if (d < bd) { bd = d; best = k.slice(pre.length); } }); });
+  // このパックで覚えている見た目（自分＋みんな）を、「カード名|レア度」ごとにまとめて返す
+  function allLooks() {
+    const out = {}, mine = loadLooks(), pre = draft.pack + "|";
+    Object.keys(mine).forEach((k) => { if (k.indexOf(pre) === 0) out[k.slice(pre.length)] = (out[k.slice(pre.length)] || []).concat(mine[k]); });
     const sh = sharedLooks(draft.pack);
-    Object.keys(sh).forEach((k) => sh[k].forEach((t) => { const d = thumbDist(t, thumb); if (d < bd) { bd = d; best = k; } }));
+    Object.keys(sh).forEach((k) => { out[k] = (out[k] || []).concat(sh[k]); });
+    return out;
+  }
+  // いちばん近い見た目のカードと、2番目に近い「別のカード」との差（margin）。差が大きいほど、その見た目を信じてよい
+  function nearestLook(thumb) {
+    let best = null, bd = 1, second = 1;
+    const L = allLooks();
+    Object.keys(L).forEach((k) => {
+      let d = 1; L[k].forEach((t) => { const x = thumbDist(t, thumb); if (x < d) d = x; });
+      if (d < bd) { second = bd; bd = d; best = k; } else if (d < second) second = d;
+    });
     if (!best) return null;
     const i = best.lastIndexOf("|"), name = best.slice(0, i), r = best.slice(i + 1);
     const c = (packByCode(draft.pack) || { cards: [] }).cards.find((x) => x[1] === name && x[2] === r);
-    return { card: { no: c ? c[0] : 0, name, r }, d: bd };
+    return { card: { no: c ? c[0] : 0, name, r }, d: bd, margin: second - bd };
   }
+  // 見た目がどれくらい近いか（名前だけで。レア度はどれでも）。覚えていなければ 1
+  function lookDistByName(thumb, name) {
+    let d = 1; const L = allLooks();
+    Object.keys(L).forEach((k) => { if (k.slice(0, k.lastIndexOf("|")) !== name) return; L[k].forEach((t) => { const x = thumbDist(t, thumb); if (x < d) d = x; }); });
+    return d;
+  }
+  // 見た目で決めてよいか：とても近い（0.06未満）か、そこそこ近くて（0.10未満）2番目のカードよりはっきり近い
+  // （スマホによって色味や明るさがちがうので、絶対の近さだけだと合わないことが多い）
+  const lookOk = (nl) => !!nl && (nl.d < 0.06 || (nl.d < 0.10 && nl.margin >= 0.025));
   function queueLook(thumb, c) {
     if (!thumb || !c || !draft || !CONFIG.GAS_URL) return;
     const q = ls.get(LOOKQ_KEY, []) || []; q.push({ pack: draft.pack, name: c.name, r: c.r, t: thumbToStr(thumb) }); ls.set(LOOKQ_KEY, q.slice(-60));
@@ -1283,7 +1302,7 @@
   function identify(pack, s) {
     // 誰かが記録したことのあるカードと見た目がほぼ同じなら、名前が読めなくてもそのカードにする
     const nl = s.thumb ? nearestLook(s.thumb) : null;
-    if (nl && nl.d < 0.06 && (!s.item) === (nl.card.r !== "item")) {
+    if (lookOk(nl) && (!s.item) === (nl.card.r !== "item")) {
       // 読めた文字がはっきり別のカードを指しているときは、見た目より文字を信じる（まちがって覚えた見た目を使わないため）
       let q0 = { base: null, score: 0 };
       if (!s.item) (s.texts || []).forEach((t) => { const r = bestBase(pack, normName(t)); if (r.score > q0.score) q0 = r; });
@@ -1317,6 +1336,13 @@
         let hb = null, hs = 0, h2 = 0;
         names.forEach((b) => { let sc = 0; (s.texts || [s.text]).forEach((t) => { const v = nameSim(normName(t), b); if (v > sc) sc = v; }); if (sc > hs) { h2 = hs; hs = sc; hb = b; } else if (sc > h2) h2 = sc; });
         const hpMatch = bb.base && hpBase[bb.base];
+        // 名前の近さで決めきれないとき（差が小さい）は、覚えている見た目が近いほうにする
+        if (hb && names.length > 1 && hs - h2 < 0.12 && s.thumb) {
+          const byName = {}; pack.cards.forEach((c) => { if (hpBase[normC(c[1])]) byName[normC(c[1])] = c[1]; });
+          let lb = null, ld = 1, l2 = 1;
+          names.forEach((b) => { const d = lookDistByName(s.thumb, byName[b]); if (d < ld) { l2 = ld; ld = d; lb = b; } else if (d < l2) l2 = d; });
+          if (lb && ld < 0.12 && l2 - ld >= 0.02) { hb = lb; hs = Math.max(hs, 0.62); h2 = Math.min(h2, hs - 0.15); }
+        }
         // 今の候補のHPが合わず、HPの合う名前がそれなりに近い（または1つしかない）なら、そちらにする
         if (!hpMatch && hb && (hs >= Math.max(0.25, bb.score - 0.15) || (names.length === 1 && hs >= 0.15))) { bb = { base: hb, score: Math.max(hs, 0.4), gap: hs - h2 }; src = pack; byHp = true; }
       }
