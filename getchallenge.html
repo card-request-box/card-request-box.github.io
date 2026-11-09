@@ -442,7 +442,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "11/9 18:00";   // ページの版（直したら変える）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "ver.8";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -1758,7 +1758,7 @@
   function showDebug() {
     let box = $("gc-debug");
     if (!box) { box = mk("pre", "", ""); box.id = "gc-debug"; box.style.cssText = "white-space:pre-wrap;font-size:.7rem;background:var(--soft);border-radius:10px;padding:8px;margin-top:8px;max-height:50vh;overflow:auto;"; $("shot-status").after(box); }
-    const lines = ["[debug] 版 " + APP_VERSION + " / 画面 " + screen.width + "x" + screen.height + " dpr" + devicePixelRatio + " / " + navigator.userAgent.slice(0, 60)];
+    const lines = ["[debug] " + APP_VERSION + " / 画面 " + screen.width + "x" + screen.height + " dpr" + devicePixelRatio + " / " + navigator.userAgent.slice(0, 60)];
     dbgSizes.forEach((s, i) => lines.push("画像" + (i + 1) + ": " + s));
     (window.__gcDebug || []).forEach((d, si) => {
       lines.push("--- スクショ" + (si + 1) + " カード枠=" + (d.rects ? d.rects.length : 0));
@@ -2194,7 +2194,7 @@
   function renderFoot() {
     const pend = loadRecords().filter((r) => !r.synced && !r.deleted && sendable(r)).length;
     const t = pushError ? pushError : CONFIG.GAS_URL ? (pend ? "送信待ちの記録が " + pend + "件あります（通信できたときに自動で送ります）" : "") : "記録はこのスマホの中に保存されます。";
-    $("foot-note").textContent = (t ? t + "\n" : "") + "ページの版：" + APP_VERSION;
+    $("foot-note").textContent = (t ? t + "\n" : "") + "ページのバージョン：" + APP_VERSION;
   }
 
   // ============ 起動 ============
