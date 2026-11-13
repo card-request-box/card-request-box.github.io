@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-11-09a -->
+<!-- version 2026-11-13a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>現在の価格表</title>
@@ -301,6 +301,7 @@
   .tier-badge.t5 { background: #3E6FB0; color: #fff; box-shadow: 0 3px 0 #284B7A; }
   .tier-badge.t6 { background: #8A63C9; color: #fff; box-shadow: 0 3px 0 #5E3F93; }
   .tier-count { font-size: .8rem; color: var(--muted); font-weight: 700; }
+  .tier-badge.pin { background: #2B2F3A; color: #fff; box-shadow: 0 3px 0 #11141A; font-size: 1rem; }
   .tcard { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; font: inherit; color: var(--ink); background: var(--soft); border: 2px solid transparent; border-radius: 12px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer; }
   .tcard[aria-pressed="true"] { border-color: var(--gold-deep); background: color-mix(in srgb, var(--gold) 22%, var(--panel)); }
   .tcard:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
@@ -455,6 +456,8 @@
   // 「レアリティ／パック」の部分。名前とレアリティが同じとき・パックがないときは、その分を省く（「金枠」など）
   const subOf = (c) => [c[2] !== c[0] ? c[2] : "", c[1] || ""].filter(Boolean).join("／");
   const keyOf = (c) => c[0] + "\u0001" + c[1] + "\u0001" + c[2];
+  // 石垢（カード登録で、レアリティを 7（石垢）にした行。名前が「石垢」で始まる行も）。価格表のいちばん上に出す
+  const isPinned = (c) => String(c[2] || "").trim() === "石垢" || /^石垢/.test(String(c[0] || "").trim());
   function toast(text, err) { const t = $("toast"); t.textContent = text; t.className = "toast" + (err ? " err" : ""); t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3200); }
 
   const num = (c) => { const n = Number(String(c[3]).replace(/,/g, "")); return isNaN(n) ? null : n; };
@@ -486,16 +489,17 @@
     "博士の研究": "はかせのけんきゅう",
     "旅の行商人": "たびのぎょうしょうにん",
     "金枠": "きんわく",
+    "石垢": "いしあか",
     "釣り人": "つりびと"
   };
   // カード名そのもの、または（あれば）読み方の、どちらかに検索ワードが含まれていればヒットとする
   const nameMatches = (c, q) => {
     if (toKana(c[0].toLowerCase()).indexOf(q) >= 0) return true;
-    const reading = KANA_READING[c[0]];
+    const reading = KANA_READING[c[0]] || (isPinned(c) ? "いしあか" + String(c[0]).trim().slice(2) : "");
     return !!reading && toKana(reading.toLowerCase()).indexOf(q) >= 0;
   };
   // ---- レアリティ・値段でしぼる（何も押していなければ、今まで通り全部出る） ----
-  const RAR_ORDER_T = ["虹", "黒", "金枠", "トレーナー", "★1色違い", "★2色違い"];
+  const RAR_ORDER_T = ["石垢", "虹", "黒", "金枠", "トレーナー", "★1色違い", "★2色違い"];
   const PRICE_RANGES = [
     { id: "", label: "すべての値段", t: () => true },
     { id: "lo", label: "〜200円", t: (n) => n <= 200 },
@@ -529,20 +533,27 @@
     const q = toKana($("q").value.trim().toLowerCase()), pack = $("pack").value, asc = $("sort").value === "asc";
     const box = $("tiers"); box.innerHTML = "";
     // 順位は全体の中での順位（しぼり込んでも変わらない）
-    const ranked = items.slice().sort((a, b) => { const x = num(a), y = num(b); return x === null ? 1 : y === null ? -1 : y - x; });
+    const ranked = items.filter((c) => !isPinned(c)).sort((a, b) => { const x = num(a), y = num(b); return x === null ? 1 : y === null ? -1 : y - x; });
     const rankOf = new Map(); let prev = null, rank = 0;
     ranked.forEach((c, i) => { const n = num(c); if (n !== prev) { rank = i + 1; prev = n; } rankOf.set(keyOf(c), n === null ? "" : rank); });
-    const shown = ranked.filter((c) => (!q || nameMatches(c, q)) && (!pack || c[1] === pack) && inFilters(c));
+    const ok = (c) => (!q || nameMatches(c, q)) && (!pack || c[1] === pack) && inFilters(c);
+    const shown = ranked.filter(ok);
     if (asc) shown.reverse();
-    $("empty").hidden = shown.length > 0;
-    if (!shown.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだ価格が入力されていません。";
+    // 石垢（名前が「石垢」で始まるもの）は、並び順に関係なくいちばん上にまとめて出す
+    const pins = items.filter((c) => isPinned(c) && ok(c));
+    $("empty").hidden = shown.length + pins.length > 0;
+    if (!shown.length && !pins.length) $("empty").textContent = items.length ? "条件に合うカードがありません。" : "まだ価格が入力されていません。";
     // 価格の数字ごとにまとめて並べる
     const groups = [];
-    shown.forEach((c) => { let g = groups.find((x) => x.v === c[3]); if (!g) { g = { v: c[3], list: [] }; groups.push(g); } g.list.push(c); });
-    groups.forEach((gr, gi) => {
+    if (pins.length) groups.push({ pin: true, list: pins });
+    shown.forEach((c) => { let g = groups.find((x) => !x.pin && x.v === c[3]); if (!g) { g = { v: c[3], list: [] }; groups.push(g); } g.list.push(c); });
+    const nCard = groups.filter((x) => !x.pin).length;
+    groups.forEach((gr, gi0) => {
       const g = mk("div", "tier-group");
       const h = mk("div", "tier-head");
-      h.append(mk("span", "tier-badge t" + Math.min((asc ? groups.length - gi : gi + 1), 6), gr.v), mk("span", "tier-count", "￥" + gr.v + "（" + gr.list.length + "枚）"));
+      const gi = pins.length ? gi0 - 1 : gi0;
+      if (gr.pin) h.append(mk("span", "tier-badge pin", "石垢"), mk("span", "tier-count", gr.list.length + "件"));
+      else h.append(mk("span", "tier-badge t" + Math.min((asc ? nCard - gi : gi + 1), 6), gr.v), mk("span", "tier-count", "￥" + gr.v + "（" + gr.list.length + "枚）"));
       g.appendChild(h);
       gr.list.forEach((c) => {
         const row = mk("div", "trow");
