@@ -448,7 +448,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "ver.9";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "ver.10";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -2057,7 +2057,9 @@
     const cache = ls.get(STATS_KEY, null) || {};
     const k = statsKey(packCode, days);
     const c = cache[k];
-    if (c && Date.now() - c.at < CONFIG.STATS_CACHE_MIN * 60000) return c.data;
+    // カードごとの統計（cards）がない古い形なら、1分たったら読み直す（サーバーを更新した直後のため）
+    const fresh = c && (c.data && c.data.cards ? Date.now() - c.at < CONFIG.STATS_CACHE_MIN * 60000 : Date.now() - c.at < 60000);
+    if (fresh) return c.data;
     const r = await api(Object.assign({ action: "gc_stats", pack: packCode || "" }, days ? { days } : {}), 25000);
     if (!r || !r.ok) throw new Error("bad");
     cache[k] = { at: Date.now(), data: r.stats }; ls.set(STATS_KEY, cache);
@@ -2216,7 +2218,7 @@
   function drawCardStats(body, S, mine, isSample) {
     if (isSample) return;
     body.append(mk("h3", "", "カードごとの統計"));
-    if (!S.cards) { body.append(mk("p", "note", "※全員のカードごとの統計は、サーバー（Code.gs）を更新すると見られるようになります。")); return; }
+    if (!S.cards) { body.append(mk("p", "note", "※全員のカードごとの統計は、まだ読み込めていません（サーバーのCode.gsが古いままか、更新した直後です）。1分ほどして統計を開き直してください。")); return; }
     const all = Object.keys(S.cards).map((k) => {
       const v = S.cards[k], i = k.indexOf("|"), rest = k.slice(i + 1).split("|");
       return { name: k.slice(0, i), r: rest[0], no: Number(rest[1]) || 0, n: v[0], get: v[1], want: v[2], wantHit: v[3], to: v.slice(4, 9) };
