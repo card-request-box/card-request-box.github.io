@@ -243,8 +243,9 @@
   .heat .p { position: relative; display: block; font-size: .66rem; font-weight: 800; color: var(--muted); }
   .note { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
   .tbl-wrap { overflow-x: auto; }
-  .card-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
-  .card-tools input { flex: 1 1 10em; min-width: 0; }
+  .card-tools { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 0 0 8px; }
+  .card-tools input, .card-tools select { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .card-tools input:focus, .card-tools select:focus { outline: none; border-color: var(--gold); }
   table.mx.cards th, table.mx.cards td { white-space: nowrap; padding: 4px 5px; }
   table.mx.cards td.nm { text-align: left; }
   table.mx.cards td.nm .rar { margin-left: 4px; font-size: .7rem; }
@@ -448,7 +449,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "ver.10";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "ver.11";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
