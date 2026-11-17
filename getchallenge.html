@@ -243,6 +243,12 @@
   .heat .p { position: relative; display: block; font-size: .66rem; font-weight: 800; color: var(--muted); }
   .note { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
   .tbl-wrap { overflow-x: auto; }
+  .card-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
+  .card-tools input { flex: 1 1 10em; min-width: 0; }
+  table.mx.cards th, table.mx.cards td { white-space: nowrap; padding: 4px 5px; }
+  table.mx.cards td.nm { text-align: left; }
+  table.mx.cards td.nm .rar { margin-left: 4px; font-size: .7rem; }
+  table.mx.cards td.hi { font-weight: 800; }
   table.mx { border-collapse: collapse; font-size: .8rem; width: 100%; font-variant-numeric: tabular-nums; }
   table.mx th, table.mx td { border: 1px solid var(--line); padding: 4px 6px; text-align: center; }
   table.mx th { background: var(--soft); font-weight: 800; }
@@ -442,7 +448,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "ver.8";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "ver.9";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
@@ -2010,7 +2016,7 @@
   function aggregate(list, packCode, days) {
     const z = () => [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0, 0]);
     const S = { n: 0, hit: 0, expect: 0, getN: [0, 0, 0, 0, 0], getHit: [0, 0, 0, 0, 0], wantAt: [0, 0, 0, 0, 0], wantN: 0,
-      moveAll: z(), moveWant: z(), rar: {}, packs: {} };
+      moveAll: z(), moveWant: z(), rar: {}, packs: {}, cards: {} };
     const since = days > 0 ? Date.now() - days * 24 * 3600 * 1000 : 0;
     list.forEach((r) => {
       if (r.deleted || (packCode && r.pack !== packCode)) return;
@@ -2027,9 +2033,23 @@
         const g = RAR_GROUP[(r.cards[w] || {}).r] || "?"; S.rar[g] = S.rar[g] || [0, 0]; S.rar[g][0]++; if (got === w) S.rar[g][1]++;
       });
       S.packs[r.pack] = S.packs[r.pack] || [0, 0]; S.packs[r.pack][0]++; if (hit) S.packs[r.pack][1]++;
+      // カードごと：[出た回数, GETされた回数, 欲しいにした回数, そのうち当たった回数, 後の場所1〜5に行った回数]（サーバーと同じ形）
+      for (let q = 0; q < 5; q++) {
+        const c = (r.cards || [])[q]; if (!c || !c.name || c.r === "item") continue;
+        const k = cardStatKey(c), d = A.indexOf(q);
+        const v = S.cards[k] = S.cards[k] || [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        v[0]++; if (got === q) v[1]++;
+        if (r.want.indexOf(q) >= 0) { v[2]++; if (got === q) v[3]++; }
+        if (d >= 0) v[4 + d]++;
+      }
     });
     return S;
   }
+  // カードごとの統計の見出し：「カード名|レア度」（☆2は黒枠と虹枠を分けるため番号もつける。サーバーと同じ）
+  const cardStatKey = (c) => String(c.name).slice(0, 40) + "|" + String(c.r || "") + (c.r === "s2" ? "|" + (Number(c.no) || 0) : "");
+  // ☆2の黒枠・虹枠（どのパックのカードかは分からないので、番号と名前が合うパックを探す）
+  const frameAny = (no, name) => { for (const p of PACKS) { const f = frameOf(p.code, no, name); if (f) return f; } return ""; };
+  let cardSort = "n", cardQ = "", cardShow = 20;
   // days：直近○日だけ（0なら全部）。期間つきはサーバー側も対応が必要（古いスクリプトだと全部の期間が返る → 返事の days で見分ける）
   const statsKey = (packCode, days) => (packCode || "_") + (days ? ":" + days : "");
   async function loadAllStats(packCode, days) {
@@ -2178,6 +2198,7 @@
       rk.forEach((g) => { const a = S.rar[g], li = mk("li"), bar = mk("span", "bar"), i = mk("i"); i.style.width = pct(a[1], a[0]) + "%"; bar.append(i); li.append(mk("span", "lb", g), bar, mk("span", "n", pct(a[1], a[0]) + "%")); ul.append(li); });
       body.append(ul);
     }
+    drawCardStats(body, S, mine, isSample);
     if (!$("st-pack").value) {
       const pk = Object.keys(S.packs).sort((a, b) => S.packs[b][0] - S.packs[a][0]).slice(0, 8);
       if (pk.length > 1) {
@@ -2189,6 +2210,56 @@
     }
     if (S.n < 30) body.append(mk("p", "note", "※ まだ " + S.n + "回分なので、偶然の差が大きく出ます。目安として、場所ごとに100回以上あると偏りが見えやすくなります。"));
     if (!mine && S.updated) body.append(mk("p", "note", "全員の統計：" + fmtDate(S.updated) + " 時点（" + (S.users || 0) + "人の記録）"));
+  }
+
+  // ---- カードごとの統計 ----
+  function drawCardStats(body, S, mine, isSample) {
+    if (isSample) return;
+    body.append(mk("h3", "", "カードごとの統計"));
+    if (!S.cards) { body.append(mk("p", "note", "※全員のカードごとの統計は、サーバー（Code.gs）を更新すると見られるようになります。")); return; }
+    const all = Object.keys(S.cards).map((k) => {
+      const v = S.cards[k], i = k.indexOf("|"), rest = k.slice(i + 1).split("|");
+      return { name: k.slice(0, i), r: rest[0], no: Number(rest[1]) || 0, n: v[0], get: v[1], want: v[2], wantHit: v[3], to: v.slice(4, 9) };
+    });
+    if (!all.length) { body.append(mk("p", "empty", "まだ数えられるカードがありません。")); return; }
+    const MIN = 10;   // GETの割合で並べるときは、これより少ない回数のカードは入れない（偶然の差が大きすぎる）
+    const tools = mk("div", "card-tools");
+    const qi = mk("input"); qi.type = "search"; qi.id = "card-q"; qi.placeholder = "カード名でさがす（ひらがなでもOK）"; qi.value = cardQ; qi.setAttribute("aria-label", "カード名でさがす"); qi.autocomplete = "off";
+    const sel = mk("select"); sel.id = "card-sort"; sel.setAttribute("aria-label", "並び順");
+    [["n", "出た回数が多い順"], ["getHi", "GETされた割合が高い順"], ["getLo", "GETされた割合が低い順"]].forEach(([v, l]) => sel.append(new Option(l, v)));
+    sel.value = cardSort;
+    tools.append(qi, sel);
+    const wrap = mk("div", "tbl-wrap"), more = mk("button", "btn small", ""); more.type = "button";
+    const draw = () => {
+      const q = kata(cardQ.trim());
+      let list = all.filter((c) => !q || kata(c.name).indexOf(q) >= 0 || (KANA_READING[c.name] && kata(KANA_READING[c.name]).indexOf(q) >= 0));
+      const rate = (c) => c.get / c.n;
+      if (cardSort === "n") list.sort((a, b) => b.n - a.n);
+      else { list = list.filter((c) => c.n >= MIN); list.sort((a, b) => cardSort === "getHi" ? rate(b) - rate(a) || b.n - a.n : rate(a) - rate(b) || b.n - a.n); }
+      wrap.innerHTML = "";
+      if (!list.length) { wrap.append(mk("p", "empty", q ? "そのカードの記録はまだありません。" : "並べられるカードがまだありません（" + MIN + "回以上出たカードだけを並べます）。")); more.style.display = "none"; return; }
+      const t = mk("table", "mx cards"), hr = mk("tr");
+      hr.append(mk("th", "", "カード"), mk("th", "", "回数"), mk("th", "", "GET"));
+      POS_LABEL.forEach((l) => hr.append(mk("th", "", l)));
+      t.append(hr);
+      list.slice(0, cardShow).forEach((c) => {
+        const tr = mk("tr"), nm = mk("td", "nm");
+        nm.append(c.name, rarEl(c.r, c.r === "s2" ? frameAny(c.no, c.name) : ""));
+        tr.append(nm, mk("td", "", String(c.n)), mk("td", "", pct(c.get, c.n) + "%"));
+        const mx = Math.max.apply(null, c.to), sum = c.to.reduce((a, b) => a + b, 0);
+        c.to.forEach((v) => { const td = mk("td", sum && v === mx && v > 0 ? "hi" : "", sum ? pct(v, sum) + "%" : "-"); if (sum) td.style.background = "rgba(242,193,78," + (v / sum * 1.6).toFixed(2) + ")"; tr.append(td); });
+        t.append(tr);
+      });
+      wrap.append(t);
+      more.style.display = list.length > cardShow ? "" : "none"; more.textContent = "もっと見る（あと" + (list.length - cardShow) + "枚）";
+    };
+    qi.addEventListener("input", () => { cardQ = qi.value; cardShow = 20; draw(); });
+    sel.addEventListener("change", () => { cardSort = sel.value; cardShow = 20; draw(); });
+    more.addEventListener("click", () => { cardShow += 30; draw(); });
+    body.append(tools, wrap, more);
+    draw();
+    body.append(mk("p", "note", "「回数」はそのカードが5枚の中に出た回数、「GET」はそのうちGETされた割合、「左上〜右下」はシャッフル後に行った場所の割合です。偏りがなければ、どれも20%前後になります。" + (cardSort === "n" ? "" : "GETの割合で並べるときは、" + MIN + "回以上出たカードだけを並べます。")));
+    body.append(mk("p", "note", "回数が少ないカードは、偶然で大きくずれます。目安として、出た回数が100回以上あると比べやすくなります。" + (mine ? "" : "全員の統計では、2回以下しか出ていないカードは出していません。")));
   }
 
   function renderFoot() {
