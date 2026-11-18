@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<!-- version 2026-11-13a -->
+<!-- version 2026-11-18a -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>現在の価格表</title>
@@ -316,7 +316,7 @@
   .pickbar .clear { flex: none; font: inherit; font-size: .8rem; font-weight: 800; color: #C9D1EA; background: transparent; border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
   .tabs a { font-size: .8rem; padding: 9px 6px; white-space: nowrap; flex: 1 1 auto; }
   /* メニュー4つ（ゲットチャレンジ追加）でもはみ出さないように */
-  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; border-radius: 22px; }
+  .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; border-radius: 22px; }
   .tabs a { min-width: 0; display: flex; align-items: center; justify-content: center; padding: 7px 2px; border-radius: 18px; font-size: .74rem; line-height: 1.25; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
   @media (max-width: 380px) { .tabs a { font-size: .66rem; } }
   .freenote { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--ok) 14%, var(--panel)); font-size: .82rem; }
@@ -368,6 +368,7 @@
     <a href="roulette.html">配布ルーレット</a>
     <a aria-current="page" href="tier.html">現在価格</a>
     <a href="getchallenge.html">ゲットチャレンジ</a>
+    <a href="rank.html">ランクマ</a>
   </nav>
   <div class="loadbox" id="loadbox" hidden role="status"><span class="spin" aria-hidden="true"></span><span><span id="loadbox-text">読み込んでいます…</span><small id="loadbox-sub" hidden>はじめて開いたときは、10秒ほどかかることがあります。そのままお待ちください。</small></span></div>
   <header>

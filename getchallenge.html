@@ -70,7 +70,7 @@
   h1 .mark { color: var(--gold); margin-right: 6px; }
   .lead { color: #C9D1EA; font-size: .9rem; margin: 0; }
 
-  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; margin: 0 0 18px; background: rgba(16,25,58,.95); border: 1px solid rgba(242,193,78,.35); border-radius: 22px; }
+  .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 4px; margin: 0 0 18px; background: rgba(16,25,58,.95); border: 1px solid rgba(242,193,78,.35); border-radius: 22px; }
   .tabs a { min-width: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 7px 2px; border-radius: 18px; color: #C9D1EA; font-weight: 800; font-size: .74rem; text-decoration: none; line-height: 1.25; word-break: keep-all; overflow-wrap: anywhere; }
   .tabs a:hover { color: #fff; }
   .tabs a[aria-current="page"] { background: var(--gold); color: #2B1F03; box-shadow: 0 3px 0 var(--gold-deep); }
@@ -305,6 +305,7 @@
     <a href="roulette.html">配布ルーレット</a>
     <a href="tier.html">現在価格</a>
     <a aria-current="page" href="getchallenge.html">ゲットチャレンジ</a>
+    <a href="rank.html">ランクマ</a>
   </nav>
   <div class="loginbar" id="loginbar">
     <div class="who" id="login-who"></div>
@@ -449,7 +450,7 @@
 (function () {
   "use strict";
   // ============ 設定 ============
-  const APP_VERSION = "ver.11";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
+  const APP_VERSION = "ver.12";   // ページのバージョン（直したら数を増やす）。古いページが残っていないか、いちばん下で分かるように
   const CONFIG = {
     // 全員の記録を集める Apps Script のURL（新しく作ったもの）。空のあいだは、記録はこのスマホの中だけに保存されます
     GAS_URL: "https://script.google.com/macros/s/AKfycbzmXvzdsoWMyYTjI2l2GfHl9ArKnsq6YuDz6nuroqcQ39pC-8bodt07fGSuaRXWG2Dl/exec",
